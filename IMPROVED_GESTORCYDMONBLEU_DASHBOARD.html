@@ -1,0 +1,251 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard | Gestor Mejorado{% endblock %}
+
+{% block content %}
+
+<style>
+    .badge-estado {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 12px;
+    }
+    .badge-pendiente { background: #fef3c7; color: #92400e; }
+    .badge-aprobado { background: #dcfce7; color: #166534; }
+    .badge-rechazado { background: #fee2e2; color: #991b1b; }
+    
+    .badge-payment {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .badge-pending { background: #fbbf24; color: #78350f; }
+    .badge-paid { background: #86efac; color: #15803d; }
+    .badge-failed { background: #f87171; color: #7c2d12; }
+    
+    .card-solicitud {
+        transition: all 0.2s;
+        border-left: 4px solid;
+    }
+    .card-solicitud:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .items-preview {
+        font-size: 12px;
+        color: #666;
+        margin-top: 8px;
+    }
+    
+    .tracking-info {
+        background: #f0f9ff;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-top: 8px;
+    }
+    
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        background: white;
+        padding: 16px;
+        border-radius: 8px;
+        border-left: 4px solid;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .stat-card h3 { margin: 0; font-size: 24px; font-weight: 800; }
+    .stat-card p { margin: 4px 0 0 0; font-size: 12px; color: #666; }
+    
+    .stat-pending { border-color: #f59e0b; }
+    .stat-approved { border-color: #10b981; }
+    .stat-rejected { border-color: #ef4444; }
+    .stat-paid { border-color: #3b82f6; }
+</style>
+
+<div class="container-fluid">
+    
+    <!-- ESTADÍSTICAS -->
+    <div class="stats-row mt-4">
+        <div class="stat-card stat-pending">
+            <h3>{{ pendientes|length }}</h3>
+            <p>🟡 Pendientes</p>
+        </div>
+        <div class="stat-card stat-approved">
+            <h3>{{ aprobadas|length }}</h3>
+            <p>🟢 Aprobadas</p>
+        </div>
+        <div class="stat-card stat-rejected">
+            <h3>{{ rechazadas|length }}</h3>
+            <p>🔴 Rechazadas</p>
+        </div>
+        <div class="stat-card stat-paid">
+            <h3>{{ (pendientes|length) + (aprobadas|length) + (rechazadas|length) }}</h3>
+            <p>📦 Total</p>
+        </div>
+    </div>
+
+    <!-- KANBAN -->
+    <div class="row">
+
+        <!-- ================== PENDIENTES ================== -->
+        <div class="col-md-4">
+            <div class="kanban-column shadow-sm">
+                <div class="kanban-header bg-warning text-dark">
+                    🟡 Pendientes ({{ pendientes|length }})
+                </div>
+
+                {% for s in pendientes %}
+                <div class="card card-solicitud shadow-sm mb-3" style="border-left-color: #f59e0b;">
+                    <div class="card-body">
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                            <h6 class="card-title mb-0">
+                                <strong>{{ s.return_type|capitalize }}</strong> · #{{ s.order_id }}
+                            </h6>
+                            <a href="{{ url_for('detalle_solicitud', id=s.id) }}" class="badge" style="background: #0066cc; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Ver</a>
+                        </div>
+
+                        <p class="mb-1" style="font-size: 13px;">
+                            <strong>{{ s.contact_name }}</strong>
+                        </p>
+                        <p class="mb-1" style="font-size: 12px; color: #666;">
+                            {{ s.contact_email }}
+                        </p>
+                        {% if s.amount %}
+                        <p class="mb-2" style="font-size: 12px; color: #666;">
+                            💰 <strong>${{ "%.2f"|format(s.amount|float) }}</strong>
+                            <span class="badge-payment badge-{{ s.payment_status }}">{{ s.payment_status|upper }}</span>
+                        </p>
+                        {% endif %}
+                        
+                        <!-- ÍTEMS -->
+                        {% if s.items_json %}
+                        <div class="items-preview">
+                            <strong>Artículos:</strong>
+                            {% for item in s.items_json %}
+                                <div>- {{ item.producto }} ({{ item.talla_original }} → {{ item.talla_cambio }})</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- RAZÓN -->
+                        {% if s.razon %}
+                        <div style="font-size: 12px; color: #666; margin-top: 8px; padding: 8px; background: #f9f9f9; border-radius: 4px;">
+                            <strong>Razón:</strong> {{ s.razon[:60] }}{% if s.razon|length > 60 %}...{% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- TRACKING -->
+                        {% if s.tracking_number %}
+                        <div class="tracking-info">
+                            📍 <strong>Tracking:</strong> {{ s.tracking_number }}
+                            {% if s.carrier %}({{ s.carrier }}){% endif %}
+                        </div>
+                        {% endif %}
+
+                        <!-- ACCIONES -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px;">
+                            <form method="POST" action="{{ url_for('aprobar_solicitud', id=s.id) }}">
+                                <input type="hidden" name="nota" value="Aprobado desde el gestor">
+                                <button class="btn btn-success btn-sm w-100">✅ Aprobar</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('rechazar_solicitud', id=s.id) }}">
+                                <input type="hidden" name="nota" value="Rechazado desde el gestor">
+                                <button class="btn btn-danger btn-sm w-100">❌ Rechazar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-center text-muted mt-3">Sin solicitudes</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- ================== APROBADAS ================== -->
+        <div class="col-md-4">
+            <div class="kanban-column shadow-sm">
+                <div class="kanban-header bg-success text-white">
+                    🟢 Aprobadas ({{ aprobadas|length }})
+                </div>
+
+                {% for s in aprobadas %}
+                <div class="card card-solicitud shadow-sm mb-3" style="border-left-color: #10b981;">
+                    <div class="card-body">
+                        <div style="display: flex; justify-content: space-between;">
+                            <h6 class="card-title mb-1"><strong>{{ s.return_type|capitalize }}</strong></h6>
+                            <a href="{{ url_for('detalle_solicitud', id=s.id) }}" class="badge" style="background: #0066cc; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Ver</a>
+                        </div>
+                        <p class="mb-1" style="font-size: 12px;">
+                            <strong>{{ s.contact_name }}</strong><br>
+                            Orden: #{{ s.order_id }}
+                        </p>
+                        {% if s.amount %}
+                        <p style="font-size: 12px; color: #10b981; font-weight: 600;">
+                            💰 ${{ "%.2f"|format(s.amount|float) }}
+                            <span class="badge-payment badge-{{ s.payment_status }}">{{ s.payment_status|upper }}</span>
+                        </p>
+                        {% endif %}
+                        {% if s.tracking_number %}
+                        <div class="tracking-info">
+                            ✅ <strong>{{ s.tracking_number }}</strong>
+                            {% if s.carrier %}({{ s.carrier }}){% endif %}
+                        </div>
+                        {% else %}
+                        <div style="font-size: 11px; color: #f59e0b; margin-top: 8px; padding: 6px; background: #fffbeb; border-radius: 4px;">
+                            ⏳ Sin etiqueta aún
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-center text-muted mt-3">Sin solicitudes</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- ================== RECHAZADAS ================== -->
+        <div class="col-md-4">
+            <div class="kanban-column shadow-sm">
+                <div class="kanban-header bg-danger text-white">
+                    🔴 Rechazadas ({{ rechazadas|length }})
+                </div>
+
+                {% for s in rechazadas %}
+                <div class="card card-solicitud shadow-sm mb-3" style="border-left-color: #ef4444;">
+                    <div class="card-body">
+                        <div style="display: flex; justify-content: space-between;">
+                            <h6 class="card-title mb-1"><strong>{{ s.return_type|capitalize }}</strong></h6>
+                            <a href="{{ url_for('detalle_solicitud', id=s.id) }}" class="badge" style="background: #0066cc; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Ver</a>
+                        </div>
+                        <p class="mb-1" style="font-size: 12px;">
+                            <strong>{{ s.contact_name }}</strong><br>
+                            Orden: #{{ s.order_id }}
+                        </p>
+                        {% if s.razon %}
+                        <div style="font-size: 11px; color: #666; margin-top: 8px; padding: 6px; background: #f9f9f9; border-radius: 4px;">
+                            {{ s.razon[:50] }}{% if s.razon|length > 50 %}...{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-center text-muted mt-3">Sin solicitudes</p>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

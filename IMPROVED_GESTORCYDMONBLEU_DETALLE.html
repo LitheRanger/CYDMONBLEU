@@ -1,0 +1,363 @@
+{% extends "layout.html" %}
+
+{% block title %}Detalle Solicitud {{ solicitud.request_id }} | Gestor{% endblock %}
+
+{% block content %}
+
+<style>
+    .detail-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 24px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+    }
+    
+    .detail-section {
+        background: white;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        border-left: 4px solid #667eea;
+    }
+    
+    .detail-section h4 {
+        margin-top: 0;
+        margin-bottom: 16px;
+        color: #333;
+        font-weight: 700;
+    }
+    
+    .detail-row {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-label {
+        font-weight: 600;
+        color: #666;
+        font-size: 13px;
+    }
+    
+    .detail-value {
+        font-size: 14px;
+        color: #333;
+    }
+    
+    .badge-status {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 12px;
+    }
+    
+    .status-pendiente { background: #fef3c7; color: #92400e; }
+    .status-aprobado { background: #dcfce7; color: #166534; }
+    .status-rechazado { background: #fee2e2; color: #991b1b; }
+    
+    .status-pending { background: #fbbf24; color: #78350f; }
+    .status-paid { background: #86efac; color: #15803d; }
+    .status-failed { background: #f87171; color: #7c2d12; }
+    
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    
+    .items-table th {
+        background: #f3f4f6;
+        padding: 8px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .items-table td {
+        padding: 8px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .historial-item {
+        background: #f9fafb;
+        padding: 12px;
+        border-left: 3px solid #667eea;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        font-size: 13px;
+    }
+    
+    .historial-action {
+        font-weight: 600;
+        color: #667eea;
+        margin-bottom: 4px;
+    }
+    
+    .historial-user {
+        color: #666;
+        font-size: 12px;
+    }
+    
+    .historial-time {
+        color: #999;
+        font-size: 11px;
+        margin-top: 4px;
+    }
+    
+    .action-buttons {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px;
+        margin-top: 16px;
+    }
+    
+    .btn-action {
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+        transition: all 0.2s;
+    }
+    
+    .btn-approve {
+        background: #10b981;
+        color: white;
+    }
+    .btn-approve:hover { background: #059669; }
+    
+    .btn-reject {
+        background: #ef4444;
+        color: white;
+    }
+    .btn-reject:hover { background: #dc2626; }
+    
+    .btn-download {
+        background: #3b82f6;
+        color: white;
+    }
+    .btn-download:hover { background: #2563eb; }
+    
+    .btn-back {
+        background: #6b7280;
+        color: white;
+    }
+    .btn-back:hover { background: #4b5563; }
+</style>
+
+<div class="container mt-4">
+    
+    <!-- HEADER -->
+    <div class="detail-header">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <h2 style="margin: 0 0 8px 0;">Solicitud {{ solicitud.request_id }}</h2>
+                <p style="margin: 0; opacity: 0.9;">Orden: #{{ solicitud.order_id }}</p>
+            </div>
+            <span class="badge-status status-{{ solicitud.estado }}">{{ solicitud.estado|upper }}</span>
+        </div>
+    </div>
+    
+    <!-- INFORMACIÓN DEL CLIENTE -->
+    <div class="detail-section">
+        <h4>👤 Información del Cliente</h4>
+        <div class="detail-row">
+            <div class="detail-label">Nombre</div>
+            <div class="detail-value">{{ solicitud.contact_name }}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Email</div>
+            <div class="detail-value">
+                <a href="mailto:{{ solicitud.contact_email }}">{{ solicitud.contact_email }}</a>
+            </div>
+        </div>
+        {% if solicitud.contact_phone %}
+        <div class="detail-row">
+            <div class="detail-label">Teléfono</div>
+            <div class="detail-value">{{ solicitud.contact_phone }}</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- DETALLE DE LA DEVOLUCIÓN -->
+    <div class="detail-section">
+        <h4>📦 Detalle de la Devolución</h4>
+        <div class="detail-row">
+            <div class="detail-label">Tipo</div>
+            <div class="detail-value">{{ solicitud.return_type|capitalize }}</div>
+        </div>
+        {% if solicitud.razon %}
+        <div class="detail-row">
+            <div class="detail-label">Razón</div>
+            <div class="detail-value">{{ solicitud.razon }}</div>
+        </div>
+        {% endif %}
+        
+        {% if solicitud.items_json %}
+        <div class="detail-row" style="grid-template-columns: 1fr;">
+            <div class="detail-label">Artículos</div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Talla Original</th>
+                        <th>Talla Cambio</th>
+                        <th>Cantidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in solicitud.items_json %}
+                    <tr>
+                        <td>{{ item.producto }}</td>
+                        <td>{{ item.talla_original }}</td>
+                        <td>{{ item.talla_cambio }}</td>
+                        <td>{{ item.cantidad }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- INFORMACIÓN DE PAGO -->
+    <div class="detail-section">
+        <h4>💰 Información de Pago</h4>
+        {% if solicitud.amount %}
+        <div class="detail-row">
+            <div class="detail-label">Monto</div>
+            <div class="detail-value"><strong>${{ "%.2f"|format(solicitud.amount|float) }}</strong></div>
+        </div>
+        {% endif %}
+        <div class="detail-row">
+            <div class="detail-label">Estado</div>
+            <div class="detail-value">
+                <span class="badge-status status-{{ solicitud.payment_status }}">
+                    {{ solicitud.payment_status|upper }}
+                </span>
+            </div>
+        </div>
+        {% if solicitud.stripe_session_id %}
+        <div class="detail-row">
+            <div class="detail-label">Sesión Stripe</div>
+            <div class="detail-value">
+                <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">{{ solicitud.stripe_session_id }}</code>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- INFORMACIÓN DE ENVÍO -->
+    {% if solicitud.carrier or solicitud.tracking_number %}
+    <div class="detail-section">
+        <h4>📮 Información de Envío</h4>
+        {% if solicitud.carrier %}
+        <div class="detail-row">
+            <div class="detail-label">Transportista</div>
+            <div class="detail-value">{{ solicitud.carrier }}</div>
+        </div>
+        {% endif %}
+        {% if solicitud.tracking_number %}
+        <div class="detail-row">
+            <div class="detail-label">Tracking</div>
+            <div class="detail-value">
+                <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">{{ solicitud.tracking_number }}</code>
+            </div>
+        </div>
+        {% endif %}
+        {% if solicitud.label_created_at %}
+        <div class="detail-row">
+            <div class="detail-label">Etiqueta</div>
+            <div class="detail-value">
+                ✅ Generada {{ solicitud.label_created_at.strftime('%d/%m/%Y %H:%M') }}
+                {% if solicitud.label_base64 %}
+                <a href="#" onclick="downloadLabel()" class="btn-action btn-download" style="display: inline; padding: 4px 8px; margin-left: 8px; font-size: 12px;">📥 Descargar</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- HISTORIAL -->
+    <div class="detail-section">
+        <h4>📋 Historial de Acciones</h4>
+        {% if historial %}
+            {% for h in historial %}
+            <div class="historial-item">
+                <div class="historial-action">{{ h.accion|upper }}</div>
+                {% if h.nota %}
+                <div>{{ h.nota }}</div>
+                {% endif %}
+                <div class="historial-user">por <strong>{{ h.usuario }}</strong></div>
+                <div class="historial-time">{{ h.fecha.strftime('%d/%m/%Y %H:%M:%S') }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <p style="color: #999; font-size: 12px;">Sin historial</p>
+        {% endif %}
+    </div>
+    
+    <!-- ACCIONES -->
+    {% if solicitud.estado == 'pendiente' %}
+    <div class="detail-section">
+        <h4>⚡ Acciones</h4>
+        <div class="action-buttons">
+            <form method="POST" action="{{ url_for('aprobar_solicitud', id=solicitud.id) }}" style="display: contents;">
+                <input type="hidden" name="nota" value="Aprobado desde detalle">
+                <button type="submit" class="btn-action btn-approve">✅ Aprobar</button>
+            </form>
+            <form method="POST" action="{{ url_for('rechazar_solicitud', id=solicitud.id) }}" style="display: contents;">
+                <input type="hidden" name="nota" value="Rechazado desde detalle">
+                <button type="submit" class="btn-action btn-reject">❌ Rechazar</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- BOTÓN VOLVER -->
+    <div style="margin-top: 24px;">
+        <a href="{{ url_for('dashboard') }}" class="btn-action btn-back">← Volver al Kanban</a>
+    </div>
+</div>
+
+<script>
+function downloadLabel() {
+    const label = '{{ solicitud.label_base64 }}';
+    const mime = '{{ solicitud.label_mime }}' || 'application/pdf';
+    const tracking = '{{ solicitud.tracking_number }}';
+    
+    if (!label) {
+        alert('Etiqueta no disponible');
+        return;
+    }
+    
+    const byteChars = atob(label);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+    }
+    
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `guia-${tracking}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+</script>
+
+{% endblock %}
