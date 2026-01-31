@@ -1519,6 +1519,8 @@
                 </select>
                 <label for="file-${idx}" style="margin-top:10px;">Subir foto</label>
                 <input type="file" id="file-${idx}" accept="image/*">
+                <div id="file-error-${idx}" class="error-message"></div>
+                <div class="photo-preview" id="preview-${idx}"></div>
             `;
 
             const reasonSelect = body.querySelector(`#reason-${idx}`);
@@ -1564,27 +1566,32 @@
             if(fileInput.files[0]) {
                 const file = fileInput.files[0];
                 const maxSize = 5 * 1024 * 1024; // 5MB
+                const preview = document.getElementById(`preview-${idx}`);
                 
                 if (file.size > maxSize) {
-                    showError(`file-${idx}`, 'La foto no debe superar 5MB');
+                    showError(`file-error-${idx}`, 'La foto no debe superar 5MB');
                     seleccion[idx].file = null;
-                    document.getElementById(`preview-${idx}`).classList.remove('active');
+                    fileInput.classList.add('error');
+                    if (preview) preview.classList.remove('active');
                     return;
                 }
                 
                 if (!file.type.startsWith('image/')) {
-                    showError(`file-${idx}`, 'Solo se aceptan imágenes');
+                    showError(`file-error-${idx}`, 'Solo se aceptan imágenes');
                     seleccion[idx].file = null;
-                    document.getElementById(`preview-${idx}`).classList.remove('active');
+                    fileInput.classList.add('error');
+                    if (preview) preview.classList.remove('active');
                     return;
                 }
                 
                 seleccion[idx].file = file;
+                hideError(`file-error-${idx}`);
+                fileInput.classList.remove('error');
                 
                 // Preview
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    const preview = document.getElementById(`preview-${idx}`);
+                    if (!preview) return;
                     preview.innerHTML = `
                         <img src="${e.target.result}" alt="Preview">
                         <p>${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)</p>
@@ -1600,7 +1607,10 @@
     function removePhoto(idx) {
         const fileInput = document.getElementById(`file-${idx}`);
         fileInput.value = '';
-        document.getElementById(`preview-${idx}`).classList.remove('active');
+        const preview = document.getElementById(`preview-${idx}`);
+        if (preview) preview.classList.remove('active');
+        hideError(`file-error-${idx}`);
+        fileInput.classList.remove('error');
         if (seleccion[idx]) {
             seleccion[idx].file = null;
         }

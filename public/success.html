@@ -173,6 +173,11 @@
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session_id');
 
+        const API_BASE = (function() {
+            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            return isDev ? 'http://localhost:3000' : window.location.origin;
+        })();
+
         async function verifyPayment() {
             const container = document.getElementById('content');
             
@@ -187,6 +192,26 @@
             }
 
             try {
+                const verifyRes = await fetch(`${API_BASE}/api/verify-payment/${encodeURIComponent(sessionId)}`);
+                const verifyData = await verifyRes.json();
+
+                if (!verifyData.success) {
+                    throw new Error('No se pudo verificar el pago');
+                }
+
+                const paymentStatus = verifyData.paymentStatus;
+                const isPaid = paymentStatus === 'paid' || paymentStatus === 'no_payment_required';
+
+                if (!isPaid) {
+                    container.innerHTML = `
+                        <div class="success-icon">⏳</div>
+                        <h1>Pago en proceso</h1>
+                        <p>Tu pago aún no se confirma. Intenta de nuevo en unos minutos.</p>
+                        <a href="/success.html?session_id=${encodeURIComponent(sessionId)}" class="btn">Reintentar verificación</a>
+                    `;
+                    return;
+                }
+
                 const trackingNumber = localStorage.getItem('mon_tracking') || 'MON-XXXXXX-XXXXXX';
                 const orderData = JSON.parse(localStorage.getItem('mon_order_data') || '{}');
 
