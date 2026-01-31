@@ -87,6 +87,17 @@ class ShopifyTokenManager {
     return data.orders ? data.orders[0] : null;
   }
 
+  // 1.1 Buscar Orden por ID (Para guías de paquetería)
+  async getOrderById(orderId) {
+    try {
+      const data = await this.makeRequest(`/admin/api/2024-01/orders/${orderId}.json`);
+      return data.order || null;
+    } catch (e) {
+      console.error(`Error buscando orden ${orderId}`);
+      return null;
+    }
+  }
+
   // 2. Obtener Detalles de Producto (Para el Modal de Tallas)
   async getProductDetails(productId) {
     try {

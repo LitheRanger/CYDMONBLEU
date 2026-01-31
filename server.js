@@ -11,6 +11,7 @@ const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STR
 
 // Importamos tu cliente robusto de Shopify
 const shopifyClient = require('./Shopifyclient.js');
+const fedexClient = require('./fedexClient.js');
 
 const app = express();
 app.use(cors());
@@ -50,15 +51,46 @@ async function initDb() {
             amount DECIMAL(10,2) NOT NULL,
             payment_status VARCHAR(32) DEFAULT 'pending',
             stripe_session_id VARCHAR(255) NULL,
+            carrier VARCHAR(32) NULL,
+            tracking_number VARCHAR(64) NULL,
+            label_base64 MEDIUMTEXT NULL,
+            label_mime VARCHAR(64) NULL,
+            label_created_at TIMESTAMP NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `;
 
     try {
         await dbPool.execute(createTableSQL);
+
+        const dbName = process.env.DB_NAME;
+        if (dbName) {
+            await ensureColumn(dbName, 'returns_requests', 'carrier', 'VARCHAR(32) NULL');
+            await ensureColumn(dbName, 'returns_requests', 'tracking_number', 'VARCHAR(64) NULL');
+            await ensureColumn(dbName, 'returns_requests', 'label_base64', 'MEDIUMTEXT NULL');
+            await ensureColumn(dbName, 'returns_requests', 'label_mime', 'VARCHAR(64) NULL');
+            await ensureColumn(dbName, 'returns_requests', 'label_created_at', 'TIMESTAMP NULL');
+        }
         console.log('✅ DB lista: tabla returns_requests verificada');
     } catch (err) {
         console.error('❌ Error inicializando DB:', err);
+    }
+}
+
+async function ensureColumn(dbName, tableName, columnName, columnDef) {
+    if (!dbPool) return;
+    try {
+        const [rows] = await dbPool.execute(
+            `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+            [dbName, tableName, columnName]
+        );
+        if (rows && rows[0] && rows[0].cnt === 0) {
+            await dbPool.execute(
+                `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`
+            );
+        }
+    } catch (err) {
+        console.warn(`⚠️ No se pudo verificar/agregar columna ${columnName}:`, err.message);
     }
 }
 
@@ -407,6 +439,31 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             }
         }
 
+        // Generar guía de FedEx (si está configurado)
+        if (dbPool && requestId && fedexClient.isConfigured()) {
+            try {
+                const order = await shopifyClient.getOrderById(orderId);
+                if (!order || !order.shipping_address) {
+                    console.warn('⚠️ No se pudo obtener dirección de envío de la orden');
+                } else {
+                    const label = await fedexClient.createReturnLabel({ order, requestId });
+                    if (label && label.trackingNumber) {
+                        await dbPool.execute(
+                            `UPDATE returns_requests SET carrier = 'FEDEX', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = NOW() WHERE id = ?`,
+                            [label.trackingNumber, label.labelBase64, label.labelMime, requestId]
+                        );
+                        console.log(`📦 Guía FedEx generada: ${label.trackingNumber}`);
+                    } else {
+                        console.warn('⚠️ FedEx respondió sin tracking');
+                    }
+                }
+            } catch (labelErr) {
+                console.error('❌ Error generando guía FedEx:', labelErr.message || labelErr);
+            }
+        } else if (!fedexClient.isConfigured()) {
+            console.warn('ℹ️ FedEx no configurado: no se generó guía');
+        }
+
         // Aquí puedes agregar lógica para enviar email de confirmación
     }
 
@@ -433,6 +490,41 @@ app.get('/api/verify-payment/:sessionId', async (req, res) => {
     } catch (error) {
         console.error('Error verificando pago:', error);
         res.status(500).json({ success: false, message: "Error al verificar pago" });
+    }
+});
+
+// --- 7. OBTENER GUÍA GENERADA ---
+app.get('/api/label/:requestId', async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const { requestId } = req.params;
+        const [rows] = await dbPool.execute(
+            `SELECT carrier, tracking_number, label_base64, label_mime FROM returns_requests WHERE id = ? LIMIT 1`,
+            [requestId]
+        );
+
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+        }
+
+        const row = rows[0];
+        if (!row.tracking_number || !row.label_base64) {
+            return res.status(404).json({ success: false, message: 'Guía aún no disponible' });
+        }
+
+        res.json({
+            success: true,
+            carrier: row.carrier,
+            trackingNumber: row.tracking_number,
+            labelBase64: row.label_base64,
+            labelMime: row.label_mime || 'application/pdf'
+        });
+    } catch (err) {
+        console.error('Error obteniendo guía:', err);
+        res.status(500).json({ success: false, message: 'Error obteniendo guía' });
     }
 });
 
