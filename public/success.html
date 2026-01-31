@@ -15,6 +15,14 @@
             --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
         }
 
+        @font-face {
+            font-family: 'HelveticaNeueLTProHv';
+            src: url('HelveticaNeueLTProHv.otf') format('opentype');
+            font-weight: 800;
+            font-style: normal;
+            font-display: swap;
+        }
+
         @media (prefers-color-scheme: dark) {
             :root {
                 --primary: #fff;
@@ -76,6 +84,8 @@
             font-size: 32px;
             margin-bottom: 12px;
             color: var(--success-color);
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 800;
         }
 
         p {
@@ -102,8 +112,8 @@
 
         .tracking-number {
             font-size: 24px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
+            font-weight: 800;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
             color: var(--primary);
         }
 
@@ -142,6 +152,8 @@
             font-weight: 600;
             margin-top: 24px;
             transition: transform 0.2s;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 800;
         }
 
         .btn:hover {

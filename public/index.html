@@ -25,6 +25,14 @@
             --info-color: #1976d2;
         }
 
+        @font-face {
+            font-family: 'HelveticaNeueLTProHv';
+            src: url('HelveticaNeueLTProHv.otf') format('opentype');
+            font-weight: 800;
+            font-style: normal;
+            font-display: swap;
+        }
+
         /* Dark mode support */
         @media (prefers-color-scheme: dark) {
             :root {
@@ -85,7 +93,7 @@
             }
         }
 
-        .logo-header svg {
+        .logo-header img {
             max-width: 200px;
             height: auto;
         }
@@ -151,6 +159,7 @@
         h1, h2, h3 {
             font-weight: 700;
             letter-spacing: -0.5px;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
         }
 
         h3 {
@@ -165,6 +174,19 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--text-secondary);
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .btn,
+        .prod-title,
+        .prod-price,
+        .payment-item-name,
+        .payment-item-type,
+        .change-status,
+        strong,
+        b {
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 800;
         }
 
         /* --- INPUTS Y LABELS --- */
@@ -1023,7 +1045,7 @@
                 padding: 24px;
             }
 
-            .logo-header svg {
+            .logo-header img {
                 max-width: 160px;
             }
 
@@ -1178,8 +1200,8 @@
         }
 
         .tracking-number {
-            font-family: monospace;
-            font-weight: 700;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 800;
             font-size: 18px;
             letter-spacing: 2px;
             color: var(--primary);
@@ -1197,9 +1219,7 @@
 <div class="toast-container" id="toastContainer"></div>
 <div class="main-container">
     <div class="logo-header">
-        <svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MON BLEU Logo">
-            <text x="10" y="45" font-size="32" font-weight="bold" fill="#000">MON|BLEU</text>
-        </svg>
+        <img src="logo.png" alt="MON BLEU" class="logo-img">
     </div>
 
     <div class="progress-container">
