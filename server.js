@@ -24,6 +24,32 @@ app.use((req, res, next) => {
     return express.json()(req, res, next);
 });
 
+// --- ADMIN BASIC AUTH ---
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASS = process.env.ADMIN_PASS;
+
+function requireAdmin(req, res, next) {
+    if (!ADMIN_USER || !ADMIN_PASS) {
+        return res.status(500).json({ success: false, message: 'Admin no configurado' });
+    }
+
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Basic ')) {
+        res.set('WWW-Authenticate', 'Basic realm="Admin"');
+        return res.status(401).send('Auth required');
+    }
+
+    const base64 = auth.replace('Basic ', '');
+    const [user, pass] = Buffer.from(base64, 'base64').toString('utf8').split(':');
+
+    if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
+        res.set('WWW-Authenticate', 'Basic realm="Admin"');
+        return res.status(401).send('Invalid credentials');
+    }
+
+    next();
+}
+
 // --- DB CONFIG (MySQL) ---
 const dbDisabled = String(process.env.DISABLE_DB || '').toLowerCase() === 'true';
 const hasDbConfig = !dbDisabled && !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME);
@@ -125,6 +151,11 @@ app.use('/uploads', express.static('uploads'));
 // Ruta raíz para servir el index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Panel Admin (HTML)
+app.get('/admin', requireAdmin, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // --- 2. ENDPOINT: VALIDAR ORDEN Y TRAER TALLAS ---
@@ -490,6 +521,35 @@ app.get('/api/verify-payment/:sessionId', async (req, res) => {
     } catch (error) {
         console.error('Error verificando pago:', error);
         res.status(500).json({ success: false, message: "Error al verificar pago" });
+    }
+});
+
+// --- ADMIN API ---
+app.get('/api/admin/requests', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const [rows] = await dbPool.execute(
+            `SELECT id, order_id, contact_email, return_type, items_json, amount, payment_status, stripe_session_id,
+                    carrier, tracking_number, label_created_at, created_at
+             FROM returns_requests
+             ORDER BY created_at DESC
+             LIMIT 200`
+        );
+
+        const data = (rows || []).map(r => ({
+            ...r,
+            items: (() => {
+                try { return JSON.parse(r.items_json || '[]'); } catch { return []; }
+            })()
+        }));
+
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error('Error admin list:', err);
+        res.status(500).json({ success: false, message: 'Error obteniendo solicitudes' });
     }
 });
 

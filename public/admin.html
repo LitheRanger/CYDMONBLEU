@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel Admin - MON|BLEU</title>
+    <style>
+        :root {
+            --primary: #000;
+            --secondary: #fff;
+            --text-primary: #000;
+            --text-secondary: #666;
+            --bg-light: #f9f9f9;
+            --border-light: #e5e7eb;
+            --success: #16a34a;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+        }
+
+        @font-face {
+            font-family: 'HelveticaNeueLTProHv';
+            src: url('HelveticaNeueLTProHv.otf') format('opentype');
+            font-weight: 800;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 28px;
+            background: var(--secondary);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 800;
+        }
+
+        .container {
+            padding: 24px 28px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .toolbar input {
+            padding: 10px 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            min-width: 240px;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: var(--secondary);
+            padding: 10px 14px;
+            border: 0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 800;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-light);
+            text-align: left;
+            font-size: 13px;
+            vertical-align: top;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .badge.paid { background: #dcfce7; color: var(--success); }
+        .badge.pending { background: #fef3c7; color: var(--warning); }
+        .badge.failed { background: #fee2e2; color: var(--danger); }
+
+        .muted { color: var(--text-secondary); font-size: 12px; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .link-btn {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .empty {
+            padding: 32px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Panel Admin - Devoluciones</h1>
+        <img src="logo.png" alt="MON BLEU" style="height:28px;" />
+    </header>
+
+    <div class="container">
+        <div class="toolbar">
+            <input type="text" id="search" placeholder="Buscar por orden, correo o tracking..." />
+            <button class="btn" id="btn-refresh">Actualizar</button>
+        </div>
+
+        <table class="table" id="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Orden</th>
+                    <th>Contacto</th>
+                    <th>Tipo</th>
+                    <th>Pago</th>
+                    <th>Tracking</th>
+                    <th>Items</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+        <div id="empty" class="empty" style="display:none;">Sin resultados</div>
+    </div>
+
+    <script>
+        const API_BASE = (function() {
+            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            return isDev ? 'http://localhost:3000' : window.location.origin;
+        })();
+
+        let requests = [];
+
+        function formatDate(value) {
+            if (!value) return '';
+            const d = new Date(value);
+            return d.toLocaleString();
+        }
+
+        function badge(status) {
+            const s = String(status || 'pending').toLowerCase();
+            if (s === 'paid') return '<span class="badge paid">Pagado</span>';
+            if (s === 'failed') return '<span class="badge failed">Fallido</span>';
+            return '<span class="badge pending">Pendiente</span>';
+        }
+
+        function render(data) {
+            const tbody = document.getElementById('tbody');
+            tbody.innerHTML = '';
+
+            if (!data.length) {
+                document.getElementById('empty').style.display = 'block';
+                return;
+            }
+            document.getElementById('empty').style.display = 'none';
+
+            data.forEach(r => {
+                const tr = document.createElement('tr');
+                const items = (r.items || []).map(i => i.variantId || i.id || '').filter(Boolean);
+
+                tr.innerHTML = `
+                    <td>${r.id}</td>
+                    <td>${r.order_id || ''}</td>
+                    <td>${r.contact_email || ''}<div class="muted">${r.return_type || ''}</div></td>
+                    <td>${r.return_type || ''}</td>
+                    <td>${badge(r.payment_status)}</td>
+                    <td>${r.tracking_number || '<span class="muted">Sin guía</span>'}</td>
+                    <td class="muted">${items.length ? items.join(', ') : '—'}</td>
+                    <td class="muted">${formatDate(r.created_at)}</td>
+                    <td>
+                        <div class="actions">
+                            <button class="link-btn" data-id="${r.id}" data-action="label">Descargar guía</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function loadRequests() {
+            const res = await fetch(`${API_BASE}/api/admin/requests`);
+            const data = await res.json();
+            if (data.success) {
+                requests = data.data || [];
+                applyFilter();
+            }
+        }
+
+        function applyFilter() {
+            const q = (document.getElementById('search').value || '').toLowerCase();
+            const filtered = requests.filter(r => {
+                const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+                return hay.includes(q);
+            });
+            render(filtered);
+        }
+
+        async function downloadLabel(requestId) {
+            const res = await fetch(`${API_BASE}/api/label/${encodeURIComponent(requestId)}`);
+            const data = await res.json();
+            if (!data.success || !data.labelBase64) {
+                alert('Guía no disponible');
+                return;
+            }
+            const byteChars = atob(data.labelBase64);
+            const byteNumbers = new Array(byteChars.length);
+            for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+            const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.labelMime || 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `guia-${data.trackingNumber || requestId}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('btn-refresh').addEventListener('click', loadRequests);
+        document.getElementById('search').addEventListener('input', applyFilter);
+
+        document.getElementById('tbody').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action="label"]');
+            if (!btn) return;
+            const id = btn.getAttribute('data-id');
+            downloadLabel(id);
+        });
+
+        loadRequests();
+    </script>
+</body>
+</html>
