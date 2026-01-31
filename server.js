@@ -24,7 +24,8 @@ app.use((req, res, next) => {
 });
 
 // --- DB CONFIG (MySQL) ---
-const hasDbConfig = !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME);
+const dbDisabled = String(process.env.DISABLE_DB || '').toLowerCase() === 'true';
+const hasDbConfig = !dbDisabled && !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME);
 const dbPool = hasDbConfig ? mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -61,7 +62,11 @@ async function initDb() {
     }
 }
 
-initDb();
+if (!dbDisabled) {
+    initDb();
+} else {
+    console.warn('⚠️ Base de datos desactivada temporalmente (DISABLE_DB=true)');
+}
 
 // Servir archivos estáticos (HTML, CSS, JS desde la carpeta 'public')
 app.use(express.static(path.join(__dirname, 'public')));
@@ -222,9 +227,11 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
         console.log(`> Fotos: ${files.length}`);
 
         if (!dbPool) {
-            return res.status(500).json({
+            return res.status(503).json({
                 success: false,
-                message: "Base de datos no configurada. Revisa DB_HOST/DB_USER/DB_NAME en tu .env"
+                message: dbDisabled
+                    ? "Base de datos desactivada temporalmente. Intenta más tarde."
+                    : "Base de datos no configurada. Revisa DB_HOST/DB_USER/DB_NAME en tu .env"
             });
         }
 
