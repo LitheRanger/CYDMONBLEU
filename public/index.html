@@ -1,0 +1,2075 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MON | BLEU - Portal de Devoluciones</title>
+    <style>
+        /* --- PALETA Y VARIABLES --- */
+        :root {
+            --primary: #000;
+            --secondary: #fff;
+            --text-primary: #000;
+            --text-secondary: #666;
+            --border-light: #e0e0e0;
+            --border-dark: #d0d0d0;
+            --bg-light: #f9f9f9;
+            --bg-lighter: #fafafa;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.15);
+            --transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            --error-color: #d32f2f;
+            --success-color: #388e3c;
+            --warning-color: #f57c00;
+            --info-color: #1976d2;
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --primary: #fff;
+                --secondary: #1a1a1a;
+                --text-primary: #f5f5f5;
+                --text-secondary: #b0b0b0;
+                --border-light: #404040;
+                --border-dark: #303030;
+                --bg-light: #2a2a2a;
+                --bg-lighter: #1f1f1f;
+                --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+                --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+                --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        /* --- RESET Y BASE --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-lighter) 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 24px 16px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* --- HEADER/LOGO --- */
+        .logo-header {
+            text-align: center;
+            margin-bottom: 48px;
+            display: flex;
+            justify-content: center;
+            animation: slideDown 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-25px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo-header svg {
+            max-width: 200px;
+            height: auto;
+        }
+
+        /* --- BARRA DE PROGRESO --- */
+        .progress-container {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 48px;
+            justify-content: center;
+            max-width: 350px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .progress-step {
+            height: 3px;
+            flex: 1;
+            background: var(--border-light);
+            border-radius: 2px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-step.active {
+            background: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .progress-step.active::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--primary);
+            animation: progress 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes progress {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+
+        /* --- TARJETAS --- */
+        .card {
+            background: var(--secondary);
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            margin-bottom: 24px;
+            padding: 32px;
+            border: 1px solid var(--border-light);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        /* --- TIPOGRAFÍA --- */
+        h1, h2, h3 {
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        h3 {
+            font-size: 24px;
+            margin-bottom: 28px;
+            color: var(--text-primary);
+        }
+
+        h4 {
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        /* --- INPUTS Y LABELS --- */
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+            text-transform: capitalize;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid var(--border-light);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            background: var(--secondary);
+            color: var(--text-primary);
+            transition: var(--transition);
+            margin-bottom: 16px;
+        }
+
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+        }
+
+        input[type="text"].error,
+        input[type="email"].error,
+        select.error,
+        textarea.error {
+            border-color: #ef4444;
+            background-color: #fef2f2;
+        }
+
+        /* --- BOTONES --- */
+        .btn {
+            background: var(--primary);
+            color: var(--secondary);
+            border: none;
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            transition: left 0.3s ease;
+        }
+
+        .btn:hover:not(:disabled)::before {
+            left: 100%;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* --- MENSAJES DE ERROR --- */
+        .error-message {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-size: 13px;
+            display: none;
+            border-left: 3px solid #dc2626;
+            animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* --- LISTA DE PRODUCTOS --- */
+        .product-row {
+            border: 1.5px solid var(--border-light);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            transition: var(--transition);
+            background: var(--secondary);
+        }
+
+        .product-row.active {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            background: var(--bg-lighter);
+        }
+
+        .prod-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            cursor: pointer;
+            gap: 12px;
+        }
+
+        .prod-header:hover {
+            background: var(--bg-lighter);
+        }
+
+        /* CHECKBOX CUSTOM */
+        .chk-box {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-dark);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: var(--transition);
+            background: var(--secondary);
+        }
+
+        .chk-box:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chk-box.checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .chk-box svg {
+            display: none;
+            width: 14px;
+            stroke: white;
+            stroke-width: 3;
+            fill: none;
+        }
+
+        .chk-box.checked svg {
+            display: block;
+            animation: checkmark 0.3s ease;
+        }
+
+        @keyframes checkmark {
+            from {
+                stroke-dashoffset: 20;
+            }
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .prod-img {
+            width: 64px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 8px;
+            background: var(--bg-light);
+            flex-shrink: 0;
+        }
+
+        .prod-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .prod-title {
+            font-weight: 700;
+            font-size: 15px;
+            text-transform: capitalize;
+            margin-bottom: 4px;
+        }
+
+        .prod-meta {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .prod-price {
+            font-weight: 700;
+            font-size: 15px;
+            white-space: nowrap;
+            margin-left: 12px;
+        }
+
+        /* EXPANDIBLE */
+        .prod-body {
+            display: none;
+            padding: 0 16px 20px 52px;
+            border-top: 1px solid var(--border-light);
+            margin-top: 8px;
+            animation: expandIn 0.3s ease;
+        }
+
+        .prod-body.open {
+            display: block;
+        }
+
+        @keyframes expandIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- GRID DE DECISIÓN --- */
+        .decision-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .decision-card {
+            border: 2px solid var(--border-light);
+            border-radius: 16px;
+            padding: 48px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            background: var(--secondary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .decision-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.02) 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .decision-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .decision-card:hover::before {
+            opacity: 1;
+        }
+
+        .decision-card:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* --- LISTA DE CAMBIOS POR PRODUCTO --- */
+        .change-items {
+            margin-top: 24px;
+            padding: 20px;
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            background: var(--secondary);
+            box-shadow: var(--shadow-sm);
+            display: none;
+        }
+
+        .change-items h4 {
+            margin: 0 0 16px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        .change-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .change-item:last-child {
+            border-bottom: none;
+        }
+
+        .change-item-meta {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .change-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: var(--bg-light);
+            white-space: nowrap;
+        }
+
+        .change-status.done {
+            background: rgba(56, 142, 60, 0.1);
+            color: var(--success-color);
+        }
+
+        .change-status.pending {
+            background: rgba(245, 124, 0, 0.1);
+            color: var(--warning-color);
+        }
+
+        .change-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .d-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+
+        .decision-card:hover .d-icon {
+            transform: scale(1.1);
+        }
+
+        .d-title {
+            font-weight: 800;
+            font-size: 20px;
+            display: block;
+            margin-bottom: 8px;
+            text-transform: capitalize;
+        }
+
+        .d-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* --- PANTALLA DE PAGO --- */
+        .payment-summary {
+            background: var(--bg-lighter);
+            border: 2px solid var(--border-light);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            max-width: 500px;
+            margin: 0 auto 32px;
+        }
+
+        .pay-amount {
+            font-size: 56px;
+            font-weight: 800;
+            margin: 24px 0;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, var(--primary) 0%, #333 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .pay-note {
+            background: #f0f0f0;
+            color: var(--primary);
+            padding: 14px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 28px;
+            display: inline-block;
+            border-left: 3px solid var(--primary);
+        }
+
+        .pay-desc {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            line-height: 1.6;
+        }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--secondary);
+            width: 100%;
+            max-width: 650px;
+            padding: 32px;
+            border-radius: 20px;
+            display: flex;
+            gap: 32px;
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .m-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-light);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: var(--transition);
+        }
+
+        .m-close:hover {
+            background: var(--primary);
+            color: var(--secondary);
+        }
+
+        .m-img {
+            width: 150px;
+            height: 150px;
+            border-radius: 12px;
+            object-fit: cover;
+            flex-shrink: 0;
+            box-shadow: var(--shadow-md);
+        }
+
+        .m-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .m-info h3 {
+            margin-bottom: 12px;
+        }
+
+        .size-grid {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .variant-section {
+            margin-bottom: 20px;
+        }
+
+        .variant-label {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .color-grid {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .color-btn {
+            height: 44px;
+            min-width: 44px;
+            border: 2px solid var(--border-dark);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--secondary);
+        }
+
+        .color-btn:hover:not(.disabled) {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .color-btn.selected {
+            background: var(--primary);
+            color: var(--secondary);
+            border-color: var(--primary);
+        }
+
+        .color-btn.disabled {
+            background: var(--bg-light);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            border-color: var(--border-light);
+            opacity: 0.5;
+        }
+
+        .size-btn {
+            min-width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--border-dark);
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 14px;
+            transition: var(--transition);
+            background: var(--secondary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .size-btn:hover:not(.disabled) {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .size-btn:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: -1px;
+        }
+
+        .size-btn.selected {
+            background: var(--primary);
+            color: var(--secondary);
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+        }
+
+        .size-btn.disabled {
+            background: var(--bg-light);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            border-color: var(--border-light);
+            opacity: 0.6;
+        }
+
+        /* --- NAVEGACIÓN --- */
+        .step-view {
+            display: none;
+            animation: fadeInStep 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .step-view.active {
+            display: block;
+        }
+
+        @keyframes fadeInStep {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- LOADING SPINNER --- */
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .loading-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* --- ERROR/SUCCESS TOAST --- */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--secondary);
+            border-left: 4px solid;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-md);
+            animation: slideInRight 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: auto;
+            max-width: 380px;
+            word-wrap: break-word;
+        }
+
+        .toast.error {
+            border-left-color: var(--error-color);
+            background: rgba(211, 47, 47, 0.05);
+            color: var(--error-color);
+        }
+
+        .toast.success {
+            border-left-color: var(--success-color);
+            background: rgba(56, 142, 60, 0.05);
+            color: var(--success-color);
+        }
+
+        .toast.warning {
+            border-left-color: var(--warning-color);
+            background: rgba(245, 124, 0, 0.05);
+            color: var(--warning-color);
+        }
+
+        .toast.info {
+            border-left-color: var(--info-color);
+            background: rgba(25, 118, 210, 0.05);
+            color: var(--info-color);
+        }
+
+        .toast-close {
+            cursor: pointer;
+            float: right;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            margin-left: 12px;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .toast.removing {
+            animation: slideOutRight 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* --- SKELETON LOADER --- */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-light) 0%, var(--bg-lighter) 50%, var(--bg-light) 100%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+        }
+
+        @keyframes skeleton-loading {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        .link-back {
+            display: block;
+            text-align: center;
+            margin-top: 28px;
+            color: var(--text-secondary);
+            text-decoration: underline;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .link-back:hover {
+            color: var(--primary);
+        }
+
+        /* --- PANTALLA DE ÉXITO --- */
+        #step-5 {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        #step-5 > div {
+            animation: successBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes successBounce {
+            0% { transform: scale(0.2); opacity: 0; }
+            60% { transform: scale(1.08); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        #step-5 > div > div:first-child {
+            font-size: 80px;
+            margin-bottom: 24px;
+            display: block;
+        }
+
+        #step-5 h1 {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        #step-5 p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        #step-5 a {
+            color: var(--primary);
+            font-weight: 700;
+            text-decoration: none;
+            transition: var(--transition);
+            font-size: 15px;
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 2px solid var(--primary);
+        }
+
+        #step-5 a:hover {
+            background: var(--primary);
+            color: var(--secondary);
+        }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 640px) {
+            body {
+                padding: 16px;
+            }
+
+            .card {
+                padding: 24px;
+            }
+
+            .logo-header svg {
+                max-width: 160px;
+            }
+
+            h3 {
+                font-size: 20px;
+                margin-bottom: 20px;
+            }
+
+            .decision-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .decision-card {
+                padding: 32px 20px;
+            }
+
+            .modal-content {
+                flex-direction: column;
+                padding: 24px;
+                gap: 20px;
+            }
+
+            .m-img {
+                width: 100%;
+                height: 220px;
+            }
+
+            .prod-header {
+                flex-wrap: wrap;
+            }
+
+            .prod-price {
+                margin-left: 0;
+                margin-top: 8px;
+                width: 100%;
+            }
+
+            .payment-summary {
+                padding: 28px;
+            }
+
+            .pay-amount {
+                font-size: 44px;
+            }
+
+            .progress-container {
+                gap: 8px;
+            }
+        }
+
+        /* --- PREVIEW DE FOTO --- */
+        .photo-preview {
+            margin-top: 16px;
+            padding: 12px;
+            background: var(--bg-light);
+            border: 1px dashed var(--border-light);
+            border-radius: 8px;
+            display: none;
+            text-align: center;
+        }
+
+        .photo-preview.active {
+            display: block;
+        }
+
+        .photo-preview img {
+            max-width: 120px;
+            max-height: 120px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .photo-preview p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .photo-remove {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 6px 12px;
+            background: var(--primary);
+            color: var(--secondary);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .photo-remove:hover {
+            opacity: 0.8;
+        }
+
+        /* --- RESUMEN DE PAGO --- */
+        .payment-items {
+            background: var(--bg-light);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .payment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 14px;
+        }
+
+        .payment-item:last-child {
+            border-bottom: none;
+        }
+
+        .payment-item-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .payment-item-reason {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: block;
+        }
+
+        .payment-item-type {
+            background: var(--primary);
+            color: var(--secondary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* --- TRACKING NUMBER --- */
+        .tracking-section {
+            background: var(--bg-light);
+            border-left: 3px solid var(--primary);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .tracking-number {
+            font-family: monospace;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 2px;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+
+        .tracking-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+
+<body>
+<div class="toast-container" id="toastContainer"></div>
+<div class="main-container">
+    <div class="logo-header">
+        <svg width="180" height="60" viewBox="0 0 180 60" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MON BLEU Logo">
+            <text x="10" y="45" font-size="32" font-weight="bold" fill="#000">MON|BLEU</text>
+        </svg>
+    </div>
+
+    <div class="progress-container">
+        <div class="progress-step active" id="p1"></div>
+        <div class="progress-step" id="p2"></div>
+        <div class="progress-step" id="p3"></div>
+        <div class="progress-step" id="p4"></div>
+    </div>
+
+    <div id="step-1" class="step-view active">
+        <div class="card" style="max-width: 450px; margin: 0 auto;">
+            <h3 style="text-align:center; margin-top:0;">Iniciar Solicitud</h3>
+            <label for="orden">Número de pedido</label>
+            <input type="text" id="orden" placeholder="#1001" maxlength="50" aria-label="Número de pedido" aria-required="true" aria-describedby="orden-help">
+            <small id="orden-help" style="display:block;color:var(--text-secondary);font-size:12px;margin-top:4px;">Puedes encontrarlo en tu correo de confirmación</small>
+            
+            <label for="email" style="margin-top:16px;">Correo electrónico</label>
+            <input type="email" id="email" placeholder="cliente@email.com" required aria-label="Correo electrónico asociado a la orden" aria-required="true" aria-describedby="email-help">
+            <small id="email-help" style="display:block;color:var(--text-secondary);font-size:12px;margin-top:4px;">El correo debe coincidir con tu pedido</small>
+            
+            <button class="btn" id="btn-search" aria-label="Buscar pedido con los datos ingresados">Buscar Pedido</button>
+            <div id="login-msg" class="error-message" aria-live="polite" aria-atomic="true" role="alert"></div>
+        </div>
+    </div>
+
+    <div id="step-2" class="step-view">
+        <h3 style="text-align:center;">¿Qué te gustaría regresar?</h3>
+        <div class="card" id="product-list-container" role="region" aria-label="Lista de productos disponibles para devolución"></div>
+        <div style="text-align:center;">
+            <button class="btn" id="btn-next-prod" style="max-width:300px;" aria-label="Continuar con los productos seleccionados">Siguiente</button>
+        </div>
+    </div>
+
+    <div id="step-3" class="step-view">
+        <h3 style="text-align:center;">Selecciona una opción</h3>
+        <div class="decision-grid" role="group" aria-label="Opciones de devolución o cambio">
+            <div class="decision-card" id="card-reembolso" tabindex="0" role="button" aria-label="Opción de reembolso - recibir dinero devuelto">
+                <span class="d-icon">🏷️</span>
+                <span class="d-title">Reembolso</span>
+                <span class="d-desc">Recibe un cupón por el valor total</span>
+            </div>
+            <div class="decision-card" id="card-cambio" tabindex="0" role="button">
+                <span class="d-icon">🔄</span>
+                <span class="d-title">Cambio</span>
+                <span class="d-desc">Cambiar por otra talla o color</span>
+            </div>
+        </div>
+        <div class="change-items" id="change-items" role="region" aria-label="Selecciona talla o color por producto">
+            <h4>Selecciona talla por producto</h4>
+            <div id="change-items-list"></div>
+            <div style="text-align:right; margin-top:16px;">
+                <button class="btn" id="btn-change-continue" aria-label="Continuar con los cambios seleccionados">Continuar con cambio</button>
+            </div>
+        </div>
+        <div class="link-back" id="link-back-3">Volver</div>
+    </div>
+
+    <div id="step-4" class="step-view">
+        <h3 style="text-align:center;">Resumen de Pago</h3>
+        <div class="payment-summary">
+            <h4 style="margin:0; color:#666; text-transform:uppercase; font-size:12px; letter-spacing:1px;">Detalles de tu solicitud</h4>
+            
+            <div class="payment-items" id="payment-items-list"></div>
+
+            <div style="border-top: 1px solid var(--border-light); padding-top: 20px; margin-top: 20px;">
+                <h4 style="margin:0 0 15px 0; color:#666; text-transform:uppercase; font-size:12px; letter-spacing:1px;">Costo de Guía</h4>
+                <div class="pay-amount">$150.00</div>
+                
+                <div id="pay-dynamic-text" class="pay-desc"></div>
+                
+                <div id="pay-promo-note" class="pay-note" style="display:none;"></div>
+
+                <button class="btn" id="btn-pay">Procesar Pago</button>
+            </div>
+        </div>
+        <div class="link-back" id="link-back-4">Volver</div>
+    </div>
+
+    <div id="step-5" class="step-view">
+        <div style="text-align:center; padding:40px 0;">
+            <div style="font-size:80px; margin-bottom:24px;">✅</div>
+            <h1 style="margin-bottom:12px;">¡Solicitud Enviada!</h1>
+            <p style="color:#666; margin-bottom:28px; font-size:16px;">Te hemos enviado un correo con los pasos siguientes.</p>
+            
+            <div class="tracking-section">
+                <div class="tracking-info">Número de seguimiento:</div>
+                <div class="tracking-number" id="tracking-number">---</div>
+                <div class="tracking-info" style="margin-top:12px;">Guarda este número para consultar el estado de tu devolución.</div>
+            </div>
+
+            <div id="return-summary" style="text-align: left; background: var(--bg-light); padding: 20px; border-radius: 12px; margin-bottom: 28px; max-width: 400px; margin-left: auto; margin-right: auto; font-size: 14px;">
+                <h4 style="margin: 0 0 12px 0; text-transform: uppercase; font-size: 12px;">Resumen</h4>
+                <div id="summary-content"></div>
+            </div>
+
+            <a href="/" style="color:black; font-weight:bold; text-decoration: none; display: inline-block; padding: 12px 24px; border: 2px solid var(--primary); border-radius: 8px; transition: all 0.3s;">Volver a la tienda</a>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-talla" role="dialog" aria-labelledby="m-name" aria-modal="true">
+    <div class="modal-content">
+        <button class="m-close" id="btn-close-modal" aria-label="Cerrar modal">×</button>
+        <img id="m-img" src="" alt="Producto" class="m-img">
+        <div class="m-info">
+            <h3 id="m-name" style="margin-top:0;">Nombre Producto</h3>
+            <div id="m-price" style="font-weight:bold; margin-bottom:15px;">$0.00</div>
+            <div style="margin-bottom: 20px; font-weight: 500; color: #666;">Selecciona nueva talla:</div>
+            <div class="size-grid" id="m-sizes"></div>
+            <button class="btn" style="margin-top:25px;" id="btn-confirm-size">Confirmar Cambio</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===== CONFIGURACIÓN =====
+    const API_BASE = (function() {
+        if (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) {
+            return process.env.REACT_APP_API_URL;
+        }
+        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        return isDev ? 'http://localhost:3000' : window.location.origin;
+    })();
+
+    // ===== ESTADO =====
+    let orderData = null;
+    let seleccion = {};
+    let cambioConfig = { itemIndex: null, nuevaVariantId: null, nuevaTalla: '' };
+    let tipoFinal = '';
+
+    // ===== TOAST SYSTEM =====
+    function showToast(message, type = 'info', duration = 4000) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+        
+        const closeBtn = document.createElement('span');
+        closeBtn.className = 'toast-close';
+        closeBtn.innerHTML = '✕';
+        closeBtn.setAttribute('aria-label', 'Cerrar notificación');
+        closeBtn.addEventListener('click', () => removeToast(toast));
+        
+        toast.textContent = message;
+        toast.appendChild(closeBtn);
+        container.appendChild(toast);
+        
+        if (duration > 0) {
+            setTimeout(() => removeToast(toast), duration);
+        }
+        
+        return toast;
+    }
+
+    function removeToast(toast) {
+        if (!toast) return;
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 350);
+    }
+
+    function showErrorToast(message) {
+        return showToast(message, 'error');
+    }
+
+    function showSuccessToast(message) {
+        return showToast(message, 'success');
+    }
+
+    function showWarningToast(message) {
+        return showToast(message, 'warning');
+    }
+
+    function showLoadingToast(message) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast info';
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        toast.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div>${message}</div>`;
+        container.appendChild(toast);
+        return toast;
+    }
+
+    // ===== UTILIDADES =====
+    function showError(elementId, message) {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.innerText = message;
+            el.classList.add('show');
+        }
+    }
+
+    function hideError(elementId) {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.classList.remove('show');
+            el.innerText = '';
+        }
+    }
+
+    function validateEmail(email) {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return re.test(email);
+    }
+
+    function nav(stepNumber) {
+        document.querySelectorAll('.step-view').forEach(s => s.classList.remove('active'));
+        document.getElementById(`step-${stepNumber}`).classList.add('active');
+        
+        document.querySelectorAll('.progress-step').forEach((el, i) => {
+            if(i < stepNumber) el.classList.add('active');
+            else el.classList.remove('active');
+        });
+        window.scrollTo(0,0);
+    }
+
+    // ===== PASO 1: LOGIN =====
+    async function buscarPedido() {
+        const orden = document.getElementById('orden').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const btn = document.getElementById('btn-search');
+        const msgEl = document.getElementById('login-msg');
+
+        hideError('login-msg');
+
+        // Validaciones
+        if (!orden) {
+            showErrorToast("❌ Por favor, ingresa el número de pedido");
+            return;
+        }
+        if (!email || !validateEmail(email)) {
+            showErrorToast("❌ Por favor, ingresa un correo válido (ej: nombre@ejemplo.com)");
+            return;
+        }
+
+        btn.disabled = true;
+        const originalText = btn.innerText;
+        btn.innerHTML = '<div class="loading-spinner" style="display:inline-block;margin-right:8px;"></div>Buscando...';
+
+        let loadingToast = null;
+
+        try {
+            loadingToast = showLoadingToast("Validando tu pedido...");
+
+            const res = await fetch(`${API_BASE}/api/validate-order`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                mode: 'cors',
+                body: JSON.stringify({ orderNumber: orden, email: email })
+            });
+            const data = await res.json();
+
+            removeToast(loadingToast);
+
+            if(data.valid) {
+                orderData = data;
+                showSuccessToast(`✓ ¡Bienvenido, ${data.customer}! Pedido encontrado`);
+                renderProductos();
+                setTimeout(() => nav(2), 500);
+            } else {
+                showErrorToast(`❌ ${data.message || "Pedido no encontrado. Verifica tu número de orden y correo"}`);
+            }
+        } catch(e) {
+            console.error('Error:', e);
+            removeToast(loadingToast);
+            showErrorToast("❌ Error de conexión. Por favor, verifica que el servidor esté activo e intenta nuevamente");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    }
+
+    // ===== PASO 2: RENDERIZAR PRODUCTOS =====
+    function renderProductos() {
+        const c = document.getElementById('product-list-container');
+        c.innerHTML = '';
+        
+        orderData.items.forEach((item, idx) => {
+            const row = document.createElement('div');
+            row.className = 'product-row';
+            row.id = `row-${idx}`;
+
+            const header = document.createElement('div');
+            header.className = 'prod-header';
+            header.innerHTML = `
+                <div class="chk-box" id="chk-${idx}" role="checkbox" aria-checked="false" tabindex="0">
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <img src="${item.image || ''}" alt="${item.name}" class="prod-img">
+                <div class="prod-info">
+                    <div class="prod-title">${item.name}</div>
+                    <div class="prod-meta">${item.current_variant_title || 'Unitalla'}</div>
+                </div>
+                <div class="prod-price">$${item.price}</div>
+            `;
+            
+            header.addEventListener('click', () => toggleRow(idx));
+            const chkbox = header.querySelector('.chk-box');
+            chkbox.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleRow(idx);
+                }
+            });
+
+            const body = document.createElement('div');
+            body.className = 'prod-body';
+            body.id = `body-${idx}`;
+            body.innerHTML = `
+                <label for="reason-${idx}">Razón (Requerido)</label>
+                <select id="reason-${idx}">
+                    <option value="">Selecciona...</option>
+                    <option value="Talla incorrecta">Talla incorrecta</option>
+                    <option value="No me gustó">No me gustó</option>
+                    <option value="Defecto">Defecto</option>
+                </select>
+                <label for="file-${idx}" style="margin-top:10px;">Subir foto</label>
+                <input type="file" id="file-${idx}" accept="image/*">
+            `;
+
+            const reasonSelect = body.querySelector(`#reason-${idx}`);
+            reasonSelect.addEventListener('change', () => updateData(idx));
+            const fileInput = body.querySelector(`#file-${idx}`);
+            fileInput.addEventListener('change', () => updateData(idx));
+
+            row.appendChild(header);
+            row.appendChild(body);
+            c.appendChild(row);
+        });
+    }
+
+    function toggleRow(idx) {
+        const chk = document.getElementById(`chk-${idx}`);
+        const body = document.getElementById(`body-${idx}`);
+        const row = document.getElementById(`row-${idx}`);
+
+        if(chk.classList.contains('checked')) {
+            chk.classList.remove('checked');
+            chk.setAttribute('aria-checked', 'false');
+            body.classList.remove('open');
+            row.classList.remove('active');
+            delete seleccion[idx];
+        } else {
+            chk.classList.add('checked');
+            chk.setAttribute('aria-checked', 'true');
+            body.classList.add('open');
+            row.classList.add('active');
+            seleccion[idx] = { reason: '', replacementVariantId: null, replacementTitle: '' };
+        }
+
+        const changeBox = document.getElementById('change-items');
+        if (changeBox && changeBox.style.display === 'block') {
+            renderChangeItems();
+        }
+    }
+
+    function updateData(idx) {
+        if(seleccion[idx]) {
+            seleccion[idx].reason = document.getElementById(`reason-${idx}`).value;
+            const fileInput = document.getElementById(`file-${idx}`);
+            if(fileInput.files[0]) {
+                const file = fileInput.files[0];
+                const maxSize = 5 * 1024 * 1024; // 5MB
+                
+                if (file.size > maxSize) {
+                    showError(`file-${idx}`, 'La foto no debe superar 5MB');
+                    seleccion[idx].file = null;
+                    document.getElementById(`preview-${idx}`).classList.remove('active');
+                    return;
+                }
+                
+                if (!file.type.startsWith('image/')) {
+                    showError(`file-${idx}`, 'Solo se aceptan imágenes');
+                    seleccion[idx].file = null;
+                    document.getElementById(`preview-${idx}`).classList.remove('active');
+                    return;
+                }
+                
+                seleccion[idx].file = file;
+                
+                // Preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const preview = document.getElementById(`preview-${idx}`);
+                    preview.innerHTML = `
+                        <img src="${e.target.result}" alt="Preview">
+                        <p>${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)</p>
+                        <button type="button" class="photo-remove" onclick="removePhoto(${idx})">Eliminar foto</button>
+                    `;
+                    preview.classList.add('active');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    }
+
+    function removePhoto(idx) {
+        const fileInput = document.getElementById(`file-${idx}`);
+        fileInput.value = '';
+        document.getElementById(`preview-${idx}`).classList.remove('active');
+        if (seleccion[idx]) {
+            seleccion[idx].file = null;
+        }
+    }
+
+    function validarSeleccion() {
+        const keys = Object.keys(seleccion);
+        if(keys.length === 0) {
+            showErrorToast("❌ Selecciona al menos un producto para continuar");
+            return;
+        }
+        
+        for(let k of keys) {
+            if(!seleccion[k].reason) {
+                showErrorToast("❌ Selecciona la razón de devolución para todos los productos");
+                return;
+            }
+        }
+        nav(3);
+    }
+
+    function iniciarCambio() {
+        tipoFinal = 'Cambio';
+        renderChangeItems();
+        const changeBox = document.getElementById('change-items');
+        if (changeBox) {
+            changeBox.style.display = 'block';
+            changeBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function renderChangeItems() {
+        const list = document.getElementById('change-items-list');
+        const changeBox = document.getElementById('change-items');
+        if (!list || !changeBox) return;
+
+        const keys = Object.keys(seleccion);
+        if (keys.length === 0) {
+            changeBox.style.display = 'none';
+            return;
+        }
+
+        list.innerHTML = '';
+        keys.forEach(idx => {
+            const item = orderData.items[idx];
+            const s = seleccion[idx];
+            const hasChange = !!s.replacementVariantId;
+
+            const row = document.createElement('div');
+            row.className = 'change-item';
+            row.innerHTML = `
+                <div style="flex:1;">
+                    <div style="font-weight:600;">${item.name}</div>
+                    <div class="change-item-meta">Actual: ${item.current_variant_title || 'Unitalla'}</div>
+                    <div class="change-item-meta">Nuevo: ${s.replacementTitle || 'Sin seleccionar'}</div>
+                </div>
+                <div class="change-actions">
+                    <span class="change-status ${hasChange ? 'done' : 'pending'}">${hasChange ? 'Listo' : 'Pendiente'}</span>
+                    <button class="btn" type="button" data-change-idx="${idx}" aria-label="Cambiar talla de ${item.name}">Elegir talla</button>
+                </div>
+            `;
+            list.appendChild(row);
+        });
+
+        list.querySelectorAll('button[data-change-idx]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = e.currentTarget.getAttribute('data-change-idx');
+                abrirModal(idx);
+            });
+        });
+    }
+
+    // ===== PASO 3: DECISIÓN Y MODAL =====
+    function abrirModal(idx) {
+        const targetIdx = (idx !== undefined && idx !== null) ? idx : Object.keys(seleccion)[0];
+        const item = orderData.items[targetIdx];
+        if (!item) {
+            showErrorToast("❌ Selecciona un producto para cambio");
+            return;
+        }
+        cambioConfig.itemIndex = targetIdx;
+        cambioConfig.nuevaVariantId = seleccion[targetIdx]?.replacementVariantId || null;
+        cambioConfig.nuevaTalla = seleccion[targetIdx]?.replacementTitle || '';
+
+        document.getElementById('modal-talla').style.display = 'flex';
+        document.getElementById('m-img').src = item.image || '';
+        document.getElementById('m-img').alt = item.name;
+        document.getElementById('m-name').innerText = item.name;
+        document.getElementById('m-price').innerText = `$${item.price}`;
+
+        const grid = document.getElementById('m-sizes');
+        grid.innerHTML = '';
+
+        if(item.available_variants && item.available_variants.length > 0) {
+            // Parsear variantes para extraer color y talla
+            const variants = item.available_variants.map(v => {
+                const parts = v.title.split('/').map(p => p.trim());
+                return {
+                    ...v,
+                    color: parts.length > 1 ? parts[0] : 'Único',
+                    size: parts.length > 1 ? parts[1] : parts[0]
+                };
+            });
+
+            // Agrupar por color
+            const byColor = {};
+            variants.forEach(v => {
+                if (!byColor[v.color]) byColor[v.color] = [];
+                byColor[v.color].push(v);
+            });
+
+            // Renderizar colores y tallas
+            Object.entries(byColor).forEach(([color, sizes]) => {
+                // Sección de color
+                if (Object.keys(byColor).length > 1) {
+                    const colorSection = document.createElement('div');
+                    colorSection.className = 'variant-section';
+                    
+                    const label = document.createElement('div');
+                    label.className = 'variant-label';
+                    label.innerText = `Color: ${color}`;
+                    colorSection.appendChild(label);
+                    
+                    // Botones de talla para este color
+                    const sizeContainer = document.createElement('div');
+                    sizeContainer.className = 'size-grid';
+                    
+                    sizes.forEach(v => {
+                        const btn = document.createElement('button');
+                        btn.className = 'size-btn';
+                        btn.innerText = v.size;
+                        btn.type = 'button';
+                        btn.dataset.title = v.title;
+                        btn.dataset.variantId = v.id;
+                        
+                        if(v.inventory <= 0) {
+                            btn.classList.add('disabled');
+                            btn.disabled = true;
+                            btn.title = 'Sin stock';
+                        } else {
+                            if (cambioConfig.nuevaVariantId && String(cambioConfig.nuevaVariantId) === String(v.id)) {
+                                btn.classList.add('selected');
+                            }
+                            btn.addEventListener('click', () => {
+                                document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+                                btn.classList.add('selected');
+                                cambioConfig.nuevaVariantId = v.id;
+                                cambioConfig.nuevaTalla = v.title;
+                            });
+                        }
+                        sizeContainer.appendChild(btn);
+                    });
+                    
+                    colorSection.appendChild(sizeContainer);
+                    grid.appendChild(colorSection);
+                } else {
+                    // Sin colores múltiples, mostrar solo tallas
+                    const label = document.createElement('div');
+                    label.className = 'variant-label';
+                    label.innerText = 'Selecciona una talla:';
+                    grid.appendChild(label);
+                    
+                    const sizeContainer = document.createElement('div');
+                    sizeContainer.className = 'size-grid';
+                    
+                    sizes.forEach(v => {
+                        const btn = document.createElement('button');
+                        btn.className = 'size-btn';
+                        btn.innerText = v.size;
+                        btn.type = 'button';
+                        btn.dataset.title = v.title;
+                        btn.dataset.variantId = v.id;
+                        
+                        if(v.inventory <= 0) {
+                            btn.classList.add('disabled');
+                            btn.disabled = true;
+                            btn.title = 'Sin stock';
+                        } else {
+                            if (cambioConfig.nuevaVariantId && String(cambioConfig.nuevaVariantId) === String(v.id)) {
+                                btn.classList.add('selected');
+                            }
+                            btn.addEventListener('click', () => {
+                                document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+                                btn.classList.add('selected');
+                                cambioConfig.nuevaVariantId = v.id;
+                                cambioConfig.nuevaTalla = v.title;
+                            });
+                        }
+                        sizeContainer.appendChild(btn);
+                    });
+                    
+                    grid.appendChild(sizeContainer);
+                }
+            });
+        } else {
+            grid.innerHTML = '<p style="color: #666;">No hay variantes disponibles</p>';
+        }
+        
+        document.getElementById('btn-close-modal').focus();
+    }
+
+
+
+    function cerrarModal() { 
+        document.getElementById('modal-talla').style.display = 'none';
+        // Return focus a decision card
+        document.getElementById('card-cambio').focus();
+    }
+
+    function confirmarCambio() {
+        if(!cambioConfig.nuevaVariantId) {
+            showErrorToast("❌ Selecciona una talla para continuar");
+            return;
+        }
+        if (seleccion[cambioConfig.itemIndex]) {
+            seleccion[cambioConfig.itemIndex].replacementVariantId = cambioConfig.nuevaVariantId;
+            seleccion[cambioConfig.itemIndex].replacementTitle = cambioConfig.nuevaTalla;
+        }
+        cerrarModal();
+        renderChangeItems();
+        showSuccessToast("✓ Cambio guardado para el producto seleccionado");
+    }
+
+    // ===== PASO 4: PAGO =====
+    function irAPago(tipo) {
+        tipoFinal = tipo;
+        const txt = document.getElementById('pay-dynamic-text');
+        const note = document.getElementById('pay-promo-note');
+
+        if (tipoFinal === 'Cambio') {
+            const keys = Object.keys(seleccion);
+            const missing = keys.filter(k => !seleccion[k].replacementVariantId);
+            if (missing.length > 0) {
+                showErrorToast("❌ Selecciona la nueva talla para todos los productos antes de continuar");
+                return;
+            }
+        }
+
+        // Generar resumen de items
+        const itemsList = document.getElementById('payment-items-list');
+        itemsList.innerHTML = '';
+
+        Object.keys(seleccion).forEach(idx => {
+            const item = orderData.items[idx];
+            const s = seleccion[idx];
+            const typeLabel = (tipoFinal === 'Cambio') ? 'Cambio' : 'Devolución';
+            
+            const html = `
+                <div class="payment-item">
+                    <div style="flex: 1;">
+                        <div class="payment-item-name">${item.name}</div>
+                        <span class="payment-item-reason">${s.reason}</span>
+                        ${tipoFinal === 'Cambio' ? `<div class="payment-item-reason" style="margin-top:6px;">Nueva talla: ${s.replacementTitle || 'N/A'}</div>` : ''}
+                    </div>
+                    <div class="payment-item-type">${typeLabel}</div>
+                </div>
+            `;
+            itemsList.innerHTML += html;
+        });
+
+        if(tipo === 'Reembolso') {
+            txt.innerHTML = "Al finalizar, se te enviará un <b>cupón de tienda</b> por el valor de tus productos.";
+            note.style.display = 'none';
+        } else {
+            txt.innerHTML = "Estás pagando solo la guía de devolución.";
+            note.style.display = 'inline-block';
+            note.innerText = "✨ ¡El envío de tu NUEVA talla es GRATIS!";
+        }
+        nav(4);
+    }
+
+    // ===== PASO 5: PROCESAR PAGO =====
+    async function procesarPago() {
+        const btn = document.getElementById('btn-pay');
+        btn.disabled = true;
+        const originalText = btn.innerText;
+        btn.innerHTML = '<div class="loading-spinner" style="display:inline-block;margin-right:8px;"></div>Procesando solicitud...';
+
+        const formData = new FormData();
+        formData.append('orderId', orderData.orderId);
+        formData.append('returnType', tipoFinal);
+        formData.append('contactEmail', document.getElementById('email').value);
+
+        const itemsPayload = [];
+        Object.keys(seleccion).forEach(idx => {
+            const s = seleccion[idx];
+            const original = orderData.items[idx];
+            
+            if(s.file) formData.append(`evidence_${original.id}`, s.file);
+
+            itemsPayload.push({
+                variantId: original.id,
+                reason: s.reason,
+                replacementVariantId: (tipoFinal === 'Cambio') ? s.replacementVariantId : null
+            });
+        });
+        formData.append('items', JSON.stringify(itemsPayload));
+
+        let loadingToast = showLoadingToast("Guardando tu solicitud...");
+
+        try {
+            // Paso 1: Guardar solicitud en DB
+            const res = await fetch(`${API_BASE}/api/submit-return`, {
+                method: 'POST',
+                mode: 'cors',
+                body: formData
+            });
+            const data = await res.json();
+            
+            removeToast(loadingToast);
+
+            if(data.success && data.requestId) {
+                // Paso 2: Crear sesión de Stripe Checkout
+                loadingToast = showLoadingToast("Redirigiendo a pago seguro...");
+                
+                const checkoutRes = await fetch(`${API_BASE}/api/create-checkout-session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    mode: 'cors',
+                    body: JSON.stringify({
+                        requestId: data.requestId,
+                        amount: data.paymentDetails.amount,
+                        currency: data.paymentDetails.currency.toLowerCase(),
+                        description: data.paymentDetails.description,
+                        orderId: orderData.orderId,
+                        contactEmail: document.getElementById('email').value
+                    })
+                });
+                
+                const checkoutData = await checkoutRes.json();
+                removeToast(loadingToast);
+                
+                if(checkoutData.success && checkoutData.url) {
+                    // Guardar tracking localmente antes de redirigir
+                    const trackingNumber = generateTrackingNumber();
+                    localStorage.setItem('mon_tracking', trackingNumber);
+                    localStorage.setItem('mon_request_id', data.requestId);
+                    localStorage.setItem('mon_order_data', JSON.stringify({
+                        orderId: orderData.orderId,
+                        items: Object.keys(seleccion).map(idx => ({
+                            name: orderData.items[idx].name,
+                            reason: seleccion[idx].reason,
+                            replacementTitle: seleccion[idx].replacementTitle
+                        })),
+                        tipo: tipoFinal
+                    }));
+                    
+                    showSuccessToast("✓ Redirigiendo a pago...");
+                    
+                    // Redirigir a Stripe Checkout
+                    setTimeout(() => {
+                        window.location.href = checkoutData.url;
+                    }, 800);
+                } else {
+                    showErrorToast(`❌ ${checkoutData.message || "Error al iniciar pago"}`);
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            } else {
+                showErrorToast(`❌ ${data.message || "Error al procesar la solicitud"}`);
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        } catch(e) {
+            console.error('Error:', e);
+            removeToast(loadingToast);
+            showErrorToast("❌ Error de conexión. Por favor, intenta nuevamente");
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    }
+
+    function generateTrackingNumber() {
+        const timestamp = Date.now().toString().slice(-6);
+        const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+        return `MON-${random}-${timestamp}`;
+    }
+
+    function generateSummary() {
+        const summaryEl = document.getElementById('summary-content');
+        let html = '';
+        
+        Object.keys(seleccion).forEach(idx => {
+            const item = orderData.items[idx];
+            const s = seleccion[idx];
+            const type = (tipoFinal === 'Cambio') ? 'Cambio' : 'Devolución';
+            
+            html += `
+                <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
+                    <div style="font-weight: 600; margin-bottom: 4px;">${item.name}</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">
+                        Razón: ${s.reason}<br>
+                        Tipo: ${type}
+                        ${tipoFinal === 'Cambio' ? `<br>Nueva talla: ${s.replacementTitle || 'N/A'}` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        summaryEl.innerHTML = html;
+    }
+
+    // ===== EVENT LISTENERS =====
+    document.addEventListener('DOMContentLoaded', () => {
+        // Paso 1
+        document.getElementById('btn-search').addEventListener('click', buscarPedido);
+        document.getElementById('email').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') buscarPedido();
+        });
+
+        // Paso 2
+        document.getElementById('btn-next-prod').addEventListener('click', validarSeleccion);
+
+        // Paso 3
+        document.getElementById('card-reembolso').addEventListener('click', () => {
+            const changeBox = document.getElementById('change-items');
+            if (changeBox) changeBox.style.display = 'none';
+            irAPago('Reembolso');
+        });
+        document.getElementById('card-reembolso').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                const changeBox = document.getElementById('change-items');
+                if (changeBox) changeBox.style.display = 'none';
+                irAPago('Reembolso');
+            }
+        });
+
+        document.getElementById('card-cambio').addEventListener('click', iniciarCambio);
+        document.getElementById('card-cambio').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                iniciarCambio();
+            }
+        });
+
+        document.getElementById('btn-change-continue').addEventListener('click', () => irAPago('Cambio'));
+
+        document.getElementById('link-back-3').addEventListener('click', () => nav(2));
+
+        // Paso 4
+        document.getElementById('btn-pay').addEventListener('click', procesarPago);
+        document.getElementById('link-back-4').addEventListener('click', () => nav(3));
+
+        // Modal
+        document.getElementById('btn-close-modal').addEventListener('click', cerrarModal);
+        document.getElementById('btn-confirm-size').addEventListener('click', confirmarCambio);
+        
+
+
+        // ESC cierra modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('modal-talla');
+                if (modal.style.display === 'flex') {
+                    cerrarModal();
+                }
+            }
+        });
+
+        // Click fuera del modal cierra
+        document.getElementById('modal-talla').addEventListener('click', (e) => {
+            if (e.target.id === 'modal-talla') {
+                cerrarModal();
+            }
+        });
+    });
+</script>
+
+
+</body>
+</html>
