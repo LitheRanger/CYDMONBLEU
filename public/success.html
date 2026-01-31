@@ -156,6 +156,21 @@
             font-weight: 800;
         }
 
+        .btn.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .label-section {
+            margin-top: 16px;
+        }
+
+        .label-note {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
         .btn:hover {
             transform: translateY(-2px);
         }
@@ -259,9 +274,17 @@
 
                     <p>Recibirás un correo con los detalles y las instrucciones para enviar tu producto.</p>
                     <p style="font-size:14px;">Guarda tu número de seguimiento para consultar el estado de tu solicitud.</p>
+
+                    <div class="label-section">
+                        <a id="btn-download-label" class="btn disabled" href="#">Descargar guía</a>
+                        <div id="label-note" class="label-note">Preparando tu guía...</div>
+                    </div>
                     
                     <a href="/" class="btn">Volver al inicio</a>
                 `;
+
+                const requestId = localStorage.getItem('mon_request_id');
+                await initLabelDownload(requestId);
 
                 // Limpiar localStorage
                 localStorage.removeItem('mon_tracking');
@@ -277,6 +300,63 @@
                     <p>Recibirás un correo con los detalles.</p>
                     <a href="/" class="btn">Volver al inicio</a>
                 `;
+            }
+        }
+
+        function base64ToBlob(base64, mime) {
+            const byteChars = atob(base64);
+            const byteNumbers = new Array(byteChars.length);
+            for (let i = 0; i < byteChars.length; i++) {
+                byteNumbers[i] = byteChars.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mime });
+        }
+
+        function getExtension(mime) {
+            if (!mime) return 'pdf';
+            const lower = mime.toLowerCase();
+            if (lower.includes('pdf')) return 'pdf';
+            if (lower.includes('png')) return 'png';
+            if (lower.includes('jpeg') || lower.includes('jpg')) return 'jpg';
+            return 'pdf';
+        }
+
+        async function initLabelDownload(requestId) {
+            const btn = document.getElementById('btn-download-label');
+            const note = document.getElementById('label-note');
+
+            if (!btn || !note) return;
+
+            if (!requestId) {
+                note.textContent = 'Guía no disponible en este momento.';
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/label/${encodeURIComponent(requestId)}`);
+                const data = await res.json();
+
+                if (!data.success || !data.labelBase64) {
+                    note.textContent = 'Tu guía aún no está lista. Intenta más tarde.';
+                    return;
+                }
+
+                const mime = data.labelMime || 'application/pdf';
+                const blob = base64ToBlob(data.labelBase64, mime);
+                const url = URL.createObjectURL(blob);
+                const ext = getExtension(mime);
+                const filename = `guia-${data.trackingNumber || 'fedex'}.${ext}`;
+
+                btn.classList.remove('disabled');
+                btn.href = url;
+                btn.download = filename;
+                note.textContent = data.trackingNumber
+                    ? `Tracking FedEx: ${data.trackingNumber}`
+                    : 'Guía lista para descargar.';
+            } catch (err) {
+                console.error('Error descargando guía:', err);
+                note.textContent = 'No se pudo obtener la guía. Intenta más tarde.';
             }
         }
 
