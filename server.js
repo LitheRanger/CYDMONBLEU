@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const mysql = require('mysql2/promise');
+const axios = require('axios');
 
 // Stripe (opcional - solo se inicializa si está configurado)
 const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
@@ -23,6 +24,85 @@ app.use((req, res, next) => {
     }
     return express.json()(req, res, next);
 });
+
+// --- PROXY MIDDLEWARE (cuando DISABLE_DB=true) ---
+// Si DISABLE_DB=true, redirige todas las peticiones /api/* al backend GESTOR
+const dbDisabledForProxy = String(process.env.DISABLE_DB || '').toLowerCase() === 'true';
+const gestorApiUrl = process.env.GESTOR_API_URL;
+
+if (dbDisabledForProxy && gestorApiUrl) {
+    console.log(`🔄 Modo proxy activado: redirigiendo /api/* a ${gestorApiUrl}`);
+    
+    app.use('/api', async (req, res, next) => {
+        try {
+            // Construir la URL de destino
+            const targetUrl = `${gestorApiUrl}${req.originalUrl}`;
+            
+            console.log(`[PROXY] ${req.method} ${req.originalUrl} -> ${targetUrl}`);
+            
+            // Preparar headers (excluir 'host' y otros headers problemáticos)
+            const headers = { ...req.headers };
+            delete headers.host;
+            delete headers['content-length'];
+            delete headers.connection;
+            
+            // Configuración de la petición al backend
+            const axiosConfig = {
+                method: req.method,
+                url: targetUrl,
+                headers: headers,
+                timeout: 30000, // 30 segundos
+                maxRedirects: 5,
+                validateStatus: () => true // No lanzar error en respuestas 4xx/5xx
+            };
+            
+            // Añadir body si existe (para POST, PUT, PATCH)
+            if (req.body && Object.keys(req.body).length > 0) {
+                axiosConfig.data = req.body;
+            }
+            
+            // Realizar la petición al backend
+            const response = await axios(axiosConfig);
+            
+            // Copiar headers de respuesta (excluir algunos)
+            const responseHeaders = { ...response.headers };
+            delete responseHeaders['content-encoding'];
+            delete responseHeaders['transfer-encoding'];
+            
+            // Enviar respuesta al cliente
+            res.status(response.status);
+            Object.keys(responseHeaders).forEach(key => {
+                res.setHeader(key, responseHeaders[key]);
+            });
+            res.send(response.data);
+            
+        } catch (error) {
+            console.error('[PROXY ERROR]', error.message);
+            
+            if (error.code === 'ECONNREFUSED') {
+                return res.status(503).json({
+                    success: false,
+                    message: 'Backend no disponible'
+                });
+            }
+            
+            if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+                return res.status(504).json({
+                    success: false,
+                    message: 'Timeout conectando con backend'
+                });
+            }
+            
+            res.status(500).json({
+                success: false,
+                message: 'Error en proxy',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    });
+} else if (dbDisabledForProxy && !gestorApiUrl) {
+    console.warn('⚠️ DISABLE_DB=true pero GESTOR_API_URL no está configurado');
+}
 
 // --- ADMIN BASIC AUTH ---
 const ADMIN_USER = process.env.ADMIN_USER;
