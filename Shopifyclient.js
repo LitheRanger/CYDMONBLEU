@@ -108,6 +108,11 @@ class ShopifyTokenManager {
       return null;
     }
   }
+
+  // 3. Verificar si el cliente está configurado
+  isConfigured() {
+    return !!(this.clientId && this.clientSecret && this.shop);
+  }
 }
 
 // Inicializamos la clase con las variables del .env

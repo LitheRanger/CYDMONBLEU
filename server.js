@@ -170,6 +170,14 @@ app.post('/api/validate-order', async (req, res) => {
         });
     }
 
+    // Verificar que Shopify esté configurado
+    if (!shopifyClient.isConfigured()) {
+        return res.status(503).json({
+            valid: false,
+            message: 'Shopify no está configurado. Contacta al administrador.'
+        });
+    }
+
     try {
         // A. Buscar la orden
         const order = await shopifyClient.getOrder(orderNumber);
@@ -471,7 +479,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         }
 
         // Generar guía de FedEx (si está configurado)
-        if (dbPool && requestId && fedexClient.isConfigured()) {
+        if (dbPool && requestId && fedexClient.isConfigured() && shopifyClient.isConfigured()) {
             try {
                 const order = await shopifyClient.getOrderById(orderId);
                 if (!order || !order.shipping_address) {
@@ -491,8 +499,13 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             } catch (labelErr) {
                 console.error('❌ Error generando guía FedEx:', labelErr.message || labelErr);
             }
-        } else if (!fedexClient.isConfigured()) {
-            console.warn('ℹ️ FedEx no configurado: no se generó guía');
+        } else {
+            const reasons = [];
+            if (!fedexClient.isConfigured()) reasons.push('FedEx no configurado');
+            if (!shopifyClient.isConfigured()) reasons.push('Shopify no configurado');
+            if (reasons.length > 0) {
+                console.warn(`ℹ️ No se generó guía: ${reasons.join(', ')}`);
+            }
         }
 
         // Aquí puedes agregar lógica para enviar email de confirmación
@@ -593,5 +606,10 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`--------------------------------------------------`);
     console.log(`🚀 Servidor MON|BLEU listo en http://localhost:${PORT}`);
+    console.log(`--------------------------------------------------`);
+    console.log(`📊 Base de datos: ${dbPool ? '✅ Configurada' : '⚠️  No configurada'}`);
+    console.log(`🛍️  Shopify: ${shopifyClient.isConfigured() ? '✅ Configurado' : '⚠️  No configurado'}`);
+    console.log(`📦 FedEx: ${fedexClient.isConfigured() ? '✅ Configurado' : '⚠️  No configurado'}`);
+    console.log(`💳 Stripe: ${stripe ? '✅ Configurado' : '⚠️  No configurado'}`);
     console.log(`--------------------------------------------------`);
 });
