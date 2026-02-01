@@ -27,10 +27,10 @@ app.use((req, res, next) => {
 
 // --- PROXY MIDDLEWARE (cuando DISABLE_DB=true) ---
 // Si DISABLE_DB=true, redirige todas las peticiones /api/* al backend GESTOR
-const dbDisabledForProxy = String(process.env.DISABLE_DB || '').toLowerCase() === 'true';
+const isProxyMode = String(process.env.DISABLE_DB || '').toLowerCase() === 'true';
 const gestorApiUrl = process.env.GESTOR_API_URL;
 
-if (dbDisabledForProxy && gestorApiUrl) {
+if (isProxyMode && gestorApiUrl) {
     console.log(`🔄 Modo proxy activado: redirigiendo /api/* a ${gestorApiUrl}`);
     
     app.use('/api', async (req, res, next) => {
@@ -41,10 +41,11 @@ if (dbDisabledForProxy && gestorApiUrl) {
             console.log(`[PROXY] ${req.method} ${req.originalUrl} -> ${targetUrl}`);
             
             // Preparar headers (excluir 'host' y otros headers problemáticos)
-            const headers = { ...req.headers };
-            delete headers.host;
-            delete headers['content-length'];
-            delete headers.connection;
+            const headers = Object.fromEntries(
+                Object.entries(req.headers).filter(
+                    ([key]) => !['host', 'content-length', 'connection'].includes(key)
+                )
+            );
             
             // Configuración de la petición al backend
             const axiosConfig = {
@@ -57,7 +58,7 @@ if (dbDisabledForProxy && gestorApiUrl) {
             };
             
             // Añadir body si existe (para POST, PUT, PATCH)
-            if (req.body && Object.keys(req.body).length > 0) {
+            if (req.body !== undefined && req.body !== null) {
                 axiosConfig.data = req.body;
             }
             
@@ -100,7 +101,7 @@ if (dbDisabledForProxy && gestorApiUrl) {
             });
         }
     });
-} else if (dbDisabledForProxy && !gestorApiUrl) {
+} else if (isProxyMode && !gestorApiUrl) {
     console.warn('⚠️ DISABLE_DB=true pero GESTOR_API_URL no está configurado');
 }
 

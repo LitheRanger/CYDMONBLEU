@@ -122,7 +122,7 @@ Para probar el modo proxy localmente antes de desplegar:
 
 ```bash
 # En el directorio del backend GESTORCYDMONBLEU
-export DATABASE_URL="postgresql://usuario:password@localhost:5432/gestor_db"
+export DATABASE_URL="postgresql://user:password@localhost:5432/gestor_db"
 export FLASK_ENV=development
 python app.py
 # Backend corriendo en http://localhost:5000
@@ -189,9 +189,9 @@ El proxy **excluye** headers problemáticos:
 
 ### Timeouts y errores
 
-- **Timeout**: 30 segundos
+- **Timeout**: 30 segundos de espera máxima para respuesta del backend
 - **Error de conexión**: Devuelve 503 "Backend no disponible"
-- **Timeout**: Devuelve 504 "Timeout conectando con backend"
+- **Timeout de conexión**: Devuelve 504 "Timeout conectando con backend"
 - **Otros errores**: Devuelve 500 "Error en proxy"
 
 ## Monitoreo
