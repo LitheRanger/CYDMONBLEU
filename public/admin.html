@@ -179,6 +179,51 @@
             color: var(--text-secondary);
         }
 
+        .loading {
+            padding: 16px;
+            text-align: center;
+            color: var(--text-secondary);
+            display: none;
+        }
+
+        .summary {
+            margin: 8px 0 12px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .pager-btn {
+            background: transparent;
+            border: 1px solid var(--border-light);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .pager-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 6px;
+            background: #e5e7eb;
+            color: #374151;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -277,6 +322,7 @@
                     <option value="">Todos los estados</option>
                     <option value="paid">Pagado</option>
                     <option value="pending">Pendiente</option>
+                    <option value="failed">Fallido</option>
                 </select>
                 <select id="filter-label">
                     <option value="">Todas las guías</option>
@@ -290,6 +336,8 @@
             </div>
         </div>
 
+        <div id="loading" class="loading">Cargando solicitudes…</div>
+        <div id="summary" class="summary"></div>
         <table class="table" id="table">
             <thead>
                 <tr>
@@ -298,6 +346,7 @@
                     <th>Contacto</th>
                     <th>Tipo</th>
                     <th>Pago</th>
+                    <th>Monto</th>
                     <th>Guía</th>
                     <th>Fecha</th>
                     <th>Acciones</th>
@@ -306,6 +355,11 @@
             <tbody id="tbody"></tbody>
         </table>
         <div id="empty" class="empty" style="display:none;">Sin resultados</div>
+        <div class="pagination" id="pagination" style="display:none;">
+            <button class="pager-btn" id="prev-page">◀ Anterior</button>
+            <div class="muted" id="page-info">Página 1</div>
+            <button class="pager-btn" id="next-page">Siguiente ▶</button>
+        </div>
     </div>
 
     <div class="modal" id="modal">
@@ -325,11 +379,19 @@
         })();
 
         let requests = [];
+        let filteredRequests = [];
+        let currentPage = 1;
+        const pageSize = 50;
 
         function formatDate(value) {
             if (!value) return '';
             const d = new Date(value);
             return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+        }
+
+        function formatCurrency(value) {
+            const n = Number(value || 0);
+            return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
         }
 
         function badge(status) {
@@ -351,6 +413,20 @@
             document.getElementById('labeled-count').textContent = labeled;
         }
 
+        function updateSummary(data) {
+            const summary = document.getElementById('summary');
+            summary.textContent = `Mostrando ${data.length} de ${requests.length} solicitudes`;
+        }
+
+        function updatePagination(data) {
+            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+            if (currentPage > totalPages) currentPage = totalPages;
+            document.getElementById('page-info').textContent = `Página ${currentPage} de ${totalPages}`;
+            document.getElementById('prev-page').disabled = currentPage <= 1;
+            document.getElementById('next-page').disabled = currentPage >= totalPages;
+            document.getElementById('pagination').style.display = data.length > pageSize ? 'flex' : 'none';
+        }
+
         function render(data) {
             const tbody = document.getElementById('tbody');
             tbody.innerHTML = '';
@@ -361,7 +437,10 @@
             }
             document.getElementById('empty').style.display = 'none';
 
-            data.forEach(r => {
+            const start = (currentPage - 1) * pageSize;
+            const pageData = data.slice(start, start + pageSize);
+
+            pageData.forEach(r => {
                 const tr = document.createElement('tr');
                 const labelBadge = r.tracking_number
                     ? `<span class="badge success" style="background:#dcfce7;color:${r.carrier === 'FEDEX' ? '#ca8a04' : '#16a34a'};">${r.carrier || 'Generada'}</span>`
@@ -373,6 +452,7 @@
                     <td class="muted">${r.contact_email || '—'}</td>
                     <td>${r.return_type || '—'}</td>
                     <td>${badge(r.payment_status)}</td>
+                    <td>${formatCurrency(r.amount)}</td>
                     <td>${labelBadge}</td>
                     <td class="muted">${formatDate(r.created_at)}</td>
                     <td>
@@ -385,19 +465,29 @@
                 `;
                 tbody.appendChild(tr);
             });
+
+            updateSummary(data);
+            updatePagination(data);
         }
 
         async function loadRequests() {
             try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('btn-refresh').disabled = true;
                 const res = await fetch(`${API_BASE}/api/admin/requests`);
                 const data = await res.json();
                 if (data.success) {
                     requests = data.data || [];
                     updateStats();
                     applyFilter();
+                } else {
+                    console.error('Error loading:', data.message || 'Error desconocido');
                 }
             } catch (e) {
                 console.error('Error loading:', e);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('btn-refresh').disabled = false;
             }
         }
 
@@ -414,7 +504,9 @@
                 if (label === 'no' && r.tracking_number) return false;
                 return true;
             });
-            render(filtered);
+            filteredRequests = filtered;
+            currentPage = 1;
+            render(filteredRequests);
         }
 
         async function viewDetail(requestId) {
@@ -425,6 +517,13 @@
 
                 const r = data.data;
                 const items = (r.items || []).map(i => `<div class="muted">- ${i.reason || 'Sin razón'}</div>`).join('');
+                const files = (r.files || []).map(f => {
+                    const isImage = (f.mimetype || '').startsWith('image/');
+                    if (isImage) {
+                        return `<div style="margin:6px 0;"><img src="/${f.path}" alt="foto" style="max-width:100%;border-radius:6px;border:1px solid #e5e7eb;" /></div>`;
+                    }
+                    return `<div class="muted">Archivo: ${f.originalname || f.filename || '—'}</div>`;
+                }).join('') || '<span class="muted">Sin archivos</span>';
 
                 document.getElementById('detail-id').textContent = r.id;
                 document.getElementById('detail-body').innerHTML = `
@@ -446,11 +545,19 @@
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Monto</div>
-                        <div>$${r.amount || '0.00'}</div>
+                        <div>${formatCurrency(r.amount)}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Stripe Session</div>
+                        <div>${r.stripe_session_id ? `<span class="tag">${r.stripe_session_id}</span>` : '<span class="muted">—</span>'}</div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Items</div>
                         <div>${items}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Archivos</div>
+                        <div>${files}</div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Tracking</div>
@@ -508,7 +615,8 @@
 
         function exportCSV() {
             const headers = ['ID', 'Orden', 'Correo', 'Tipo', 'Pago', 'Monto', 'Tracking', 'Fecha'];
-            const rows = requests.map(r => [
+            const source = filteredRequests.length ? filteredRequests : requests;
+            const rows = source.map(r => [
                 r.id,
                 r.order_id,
                 r.contact_email,
@@ -539,6 +647,20 @@
         document.getElementById('filter-status').addEventListener('change', applyFilter);
         document.getElementById('filter-label').addEventListener('change', applyFilter);
         document.getElementById('close-modal').addEventListener('click', () => document.getElementById('modal').classList.remove('show'));
+        document.getElementById('prev-page').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                render(filteredRequests.length ? filteredRequests : requests);
+            }
+        });
+        document.getElementById('next-page').addEventListener('click', () => {
+            const data = filteredRequests.length ? filteredRequests : requests;
+            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+            if (currentPage < totalPages) {
+                currentPage++;
+                render(data);
+            }
+        });
 
         document.getElementById('tbody').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-action]');
