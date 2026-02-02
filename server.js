@@ -4,7 +4,10 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const mysql = require('mysql2/promise');
+
+// Detectar si es PostgreSQL o MySQL
+const isPostgreSQL = (process.env.DATABASE_URL || '').includes('postgresql://');
+const db = isPostgreSQL ? require('pg').Pool : require('mysql2/promise');
 
 // Stripe (opcional - solo se inicializa si está configurado)
 const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
@@ -50,73 +53,77 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-// --- DB CONFIG (MySQL) ---
+// --- DB CONFIG ---
 const dbDisabled = String(process.env.DISABLE_DB || '').toLowerCase() === 'true';
-const hasDbConfig = !dbDisabled && !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME);
-const dbPool = hasDbConfig ? mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-}) : null;
 
-async function initDb() {
-    if (!dbPool) return;
-    const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS returns_requests (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            order_id VARCHAR(64) NOT NULL,
-            contact_email VARCHAR(255) NOT NULL,
-            return_type VARCHAR(32) NOT NULL,
-            items_json JSON NOT NULL,
-            files_json JSON NULL,
-            amount DECIMAL(10,2) NOT NULL,
-            payment_status VARCHAR(32) DEFAULT 'pending',
-            stripe_session_id VARCHAR(255) NULL,
-            carrier VARCHAR(32) NULL,
-            tracking_number VARCHAR(64) NULL,
-            label_base64 MEDIUMTEXT NULL,
-            label_mime VARCHAR(64) NULL,
-            label_created_at TIMESTAMP NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `;
+let dbPool = null;
 
-    try {
-        await dbPool.execute(createTableSQL);
-
-        const dbName = process.env.DB_NAME;
-        if (dbName) {
-            await ensureColumn(dbName, 'returns_requests', 'carrier', 'VARCHAR(32) NULL');
-            await ensureColumn(dbName, 'returns_requests', 'tracking_number', 'VARCHAR(64) NULL');
-            await ensureColumn(dbName, 'returns_requests', 'label_base64', 'MEDIUMTEXT NULL');
-            await ensureColumn(dbName, 'returns_requests', 'label_mime', 'VARCHAR(64) NULL');
-            await ensureColumn(dbName, 'returns_requests', 'label_created_at', 'TIMESTAMP NULL');
+if (!dbDisabled) {
+    if (isPostgreSQL) {
+        // PostgreSQL (Neon)
+        dbPool = new db({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+        });
+    } else {
+        // MySQL local
+        const mysql = require('mysql2/promise');
+        const hasDbConfig = !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME);
+        if (hasDbConfig) {
+            dbPool = mysql.createPool({
+                host: process.env.DB_HOST,
+                user: process.env.DB_USER,
+                password: process.env.DB_PASSWORD || '',
+                database: process.env.DB_NAME,
+                port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+                waitForConnections: true,
+                connectionLimit: 10,
+                queueLimit: 0
+            });
         }
-        console.log('✅ DB lista: tabla returns_requests verificada');
-    } catch (err) {
-        console.error('❌ Error inicializando DB:', err);
     }
 }
 
-async function ensureColumn(dbName, tableName, columnName, columnDef) {
+async function initDb() {
     if (!dbPool) return;
+    
     try {
-        const [rows] = await dbPool.execute(
-            `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-            [dbName, tableName, columnName]
-        );
-        if (rows && rows[0] && rows[0].cnt === 0) {
-            await dbPool.execute(
-                `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`
+        if (isPostgreSQL) {
+            // PostgreSQL - verificar que las tablas existan
+            const result = await dbPool.query(
+                `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='returns_requests')`
             );
+            if (result.rows[0].exists) {
+                console.log('✅ DB lista: tabla returns_requests verificada (PostgreSQL)');
+            } else {
+                console.warn('⚠️ Tabla returns_requests no existe en PostgreSQL - ejecuta migración en Neon');
+            }
+        } else {
+            // MySQL
+            const createTableSQL = `
+                CREATE TABLE IF NOT EXISTS returns_requests (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    order_id VARCHAR(64) NOT NULL,
+                    contact_email VARCHAR(255) NOT NULL,
+                    return_type VARCHAR(32) NOT NULL,
+                    items_json JSON NOT NULL,
+                    files_json JSON NULL,
+                    amount DECIMAL(10,2) NOT NULL,
+                    payment_status VARCHAR(32) DEFAULT 'pending',
+                    stripe_session_id VARCHAR(255) NULL,
+                    carrier VARCHAR(32) NULL,
+                    tracking_number VARCHAR(64) NULL,
+                    label_base64 MEDIUMTEXT NULL,
+                    label_mime VARCHAR(64) NULL,
+                    label_created_at TIMESTAMP NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            `;
+            await dbPool.execute(createTableSQL);
+            console.log('✅ DB lista: tabla returns_requests verificada (MySQL)');
         }
     } catch (err) {
-        console.warn(`⚠️ No se pudo verificar/agregar columna ${columnName}:`, err.message);
+        console.error('❌ Error inicializando DB:', err.message);
     }
 }
 
@@ -124,6 +131,25 @@ if (!dbDisabled) {
     initDb();
 } else {
     console.warn('⚠️ Base de datos desactivada temporalmente (DISABLE_DB=true)');
+}
+
+// Helper para abstraer diferencias entre MySQL y PostgreSQL
+async function executeQuery(sql, params) {
+    if (!dbPool) throw new Error('Database not configured');
+    
+    if (isPostgreSQL) {
+        // Convertir ? a $1, $2, etc para PostgreSQL
+        let pgSql = sql;
+        let paramIndex = 1;
+        pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+        
+        const result = await dbPool.query(pgSql, params);
+        // Normalizar resultado para que sea compatible con MySQL
+        return [result.rows, result.rowCount];
+    } else {
+        // MySQL - usar como está
+        return await dbPool.execute(sql, params);
+    }
 }
 
 // Servir archivos estáticos (HTML, CSS, JS desde la carpeta 'public')
@@ -308,7 +334,7 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
             path: f.path
         }));
 
-        const [result] = await dbPool.execute(
+        const [result] = await executeQuery(
             `INSERT INTO returns_requests (order_id, contact_email, return_type, items_json, files_json, amount)
              VALUES (?, ?, ?, ?, ?, ?)` ,
             [
@@ -325,7 +351,7 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
         res.json({
             success: true,
             message: "Solicitud procesada",
-            requestId: result.insertId,
+            requestId: isPostgreSQL ? result[0]?.id : result.insertId,
             nextStep: "PAYMENT",
             paymentDetails: {
                 amount: amountToPay,
@@ -531,12 +557,13 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
             return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
         }
 
-        const [rows] = await dbPool.execute(
+        const [rows] = await executeQuery(
             `SELECT id, order_id, contact_email, return_type, items_json, amount, payment_status, stripe_session_id,
                     carrier, tracking_number, label_created_at, created_at
              FROM returns_requests
              ORDER BY created_at DESC
-             LIMIT 500`
+             LIMIT 500`,
+            []
         );
 
         const data = (rows || []).map(r => ({
@@ -559,7 +586,7 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
             return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
         }
 
-        const [rows] = await dbPool.execute(
+        const [rows] = await executeQuery(
             `SELECT * FROM returns_requests WHERE id = ? LIMIT 1`,
             [req.params.requestId]
         );
@@ -597,7 +624,7 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
         }
 
         const requestId = req.params.requestId;
-        const [rows] = await dbPool.execute(
+        const [rows] = await executeQuery(
             `SELECT * FROM returns_requests WHERE id = ? LIMIT 1`,
             [requestId]
         );
@@ -619,9 +646,10 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
             return res.status(400).json({ success: false, message: 'FedEx no generó tracking' });
         }
 
-        await dbPool.execute(
-            `UPDATE returns_requests SET carrier = 'FEDEX', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = NOW() WHERE id = ?`,
-            [label.trackingNumber, label.labelBase64, label.labelMime, requestId]
+        const now = new Date().toISOString();
+        await executeQuery(
+            `UPDATE returns_requests SET carrier = 'FEDEX', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
+            [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
         );
 
         res.json({
@@ -643,7 +671,7 @@ app.get('/api/label/:requestId', async (req, res) => {
         }
 
         const { requestId } = req.params;
-        const [rows] = await dbPool.execute(
+        const [rows] = await executeQuery(
             `SELECT carrier, tracking_number, label_base64, label_mime FROM returns_requests WHERE id = ? LIMIT 1`,
             [requestId]
         );
