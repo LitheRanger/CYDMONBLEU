@@ -53,44 +53,90 @@
             padding: 24px 28px;
         }
 
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: var(--secondary);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+            border: 1px solid var(--border-light);
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 800;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
         .toolbar {
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 16px;
+            background: var(--secondary);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .toolbar input,
+        .toolbar select {
+            padding: 8px 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            font-size: 13px;
         }
 
         .toolbar input {
-            padding: 10px 12px;
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            min-width: 240px;
+            min-width: 200px;
         }
 
         .btn {
             background: var(--primary);
             color: var(--secondary);
-            padding: 10px 14px;
+            padding: 8px 12px;
             border: 0;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
             font-weight: 800;
+            font-size: 13px;
         }
+
+        .btn:hover { opacity: 0.9; }
 
         .table {
             width: 100%;
             border-collapse: collapse;
             background: var(--secondary);
             border: 1px solid var(--border-light);
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
         }
 
         .table th,
         .table td {
-            padding: 12px;
+            padding: 10px;
             border-bottom: 1px solid var(--border-light);
             text-align: left;
             font-size: 13px;
@@ -99,8 +145,8 @@
 
         .badge {
             padding: 4px 8px;
-            border-radius: 999px;
-            font-size: 12px;
+            border-radius: 6px;
+            font-size: 11px;
             font-weight: 700;
             display: inline-block;
         }
@@ -108,24 +154,91 @@
         .badge.paid { background: #dcfce7; color: var(--success); }
         .badge.pending { background: #fef3c7; color: var(--warning); }
         .badge.failed { background: #fee2e2; color: var(--danger); }
+        .badge.no-label { background: #e5e7eb; color: #4b5563; }
 
         .muted { color: var(--text-secondary); font-size: 12px; }
-        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
         .link-btn {
             background: transparent;
             color: var(--primary);
             border: 1px solid var(--primary);
-            padding: 6px 8px;
-            border-radius: 6px;
+            padding: 4px 8px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
+            transition: all 0.2s;
         }
+
+        .link-btn:hover { background: var(--primary); color: var(--secondary); }
+        .link-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .empty {
             padding: 32px;
             text-align: center;
             color: var(--text-secondary);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show { display: flex; }
+
+        .modal-content {
+            background: var(--secondary);
+            padding: 28px;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 12px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 800;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .detail-row {
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .detail-label {
+            font-weight: 700;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
         }
     </style>
 </head>
@@ -136,9 +249,45 @@
     </header>
 
     <div class="container">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="total">0</div>
+                <div class="stat-label">Total Solicitudes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="paid-count">0</div>
+                <div class="stat-label">Pagadas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="pending-count">0</div>
+                <div class="stat-label">Pendientes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="labeled-count">0</div>
+                <div class="stat-label">Con Guía</div>
+            </div>
+        </div>
+
         <div class="toolbar">
-            <input type="text" id="search" placeholder="Buscar por orden, correo o tracking..." />
-            <button class="btn" id="btn-refresh">Actualizar</button>
+            <div class="toolbar-group" style="flex: 1;">
+                <input type="text" id="search" placeholder="Buscar por orden, correo o tracking..." />
+            </div>
+            <div class="toolbar-group">
+                <select id="filter-status">
+                    <option value="">Todos los estados</option>
+                    <option value="paid">Pagado</option>
+                    <option value="pending">Pendiente</option>
+                </select>
+                <select id="filter-label">
+                    <option value="">Todas las guías</option>
+                    <option value="yes">Con guía</option>
+                    <option value="no">Sin guía</option>
+                </select>
+            </div>
+            <div class="toolbar-group">
+                <button class="btn" id="btn-refresh">Actualizar</button>
+                <button class="btn" id="btn-export">Exportar CSV</button>
+            </div>
         </div>
 
         <table class="table" id="table">
@@ -149,8 +298,7 @@
                     <th>Contacto</th>
                     <th>Tipo</th>
                     <th>Pago</th>
-                    <th>Tracking</th>
-                    <th>Items</th>
+                    <th>Guía</th>
                     <th>Fecha</th>
                     <th>Acciones</th>
                 </tr>
@@ -158,6 +306,16 @@
             <tbody id="tbody"></tbody>
         </table>
         <div id="empty" class="empty" style="display:none;">Sin resultados</div>
+    </div>
+
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Detalle Solicitud #<span id="detail-id">—</span></h2>
+                <button class="close-btn" id="close-modal">×</button>
+            </div>
+            <div id="detail-body"></div>
+        </div>
     </div>
 
     <script>
@@ -171,7 +329,7 @@
         function formatDate(value) {
             if (!value) return '';
             const d = new Date(value);
-            return d.toLocaleString();
+            return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
         }
 
         function badge(status) {
@@ -179,6 +337,18 @@
             if (s === 'paid') return '<span class="badge paid">Pagado</span>';
             if (s === 'failed') return '<span class="badge failed">Fallido</span>';
             return '<span class="badge pending">Pendiente</span>';
+        }
+
+        function updateStats() {
+            const total = requests.length;
+            const paid = requests.filter(r => r.payment_status === 'paid').length;
+            const pending = requests.filter(r => r.payment_status === 'pending').length;
+            const labeled = requests.filter(r => r.tracking_number).length;
+
+            document.getElementById('total').textContent = total;
+            document.getElementById('paid-count').textContent = paid;
+            document.getElementById('pending-count').textContent = pending;
+            document.getElementById('labeled-count').textContent = labeled;
         }
 
         function render(data) {
@@ -193,20 +363,23 @@
 
             data.forEach(r => {
                 const tr = document.createElement('tr');
-                const items = (r.items || []).map(i => i.variantId || i.id || '').filter(Boolean);
+                const labelBadge = r.tracking_number
+                    ? `<span class="badge success" style="background:#dcfce7;color:${r.carrier === 'FEDEX' ? '#ca8a04' : '#16a34a'};">${r.carrier || 'Generada'}</span>`
+                    : '<span class="badge no-label">Sin guía</span>';
 
                 tr.innerHTML = `
                     <td>${r.id}</td>
-                    <td>${r.order_id || ''}</td>
-                    <td>${r.contact_email || ''}<div class="muted">${r.return_type || ''}</div></td>
-                    <td>${r.return_type || ''}</td>
+                    <td><strong>${r.order_id || '—'}</strong></td>
+                    <td class="muted">${r.contact_email || '—'}</td>
+                    <td>${r.return_type || '—'}</td>
                     <td>${badge(r.payment_status)}</td>
-                    <td>${r.tracking_number || '<span class="muted">Sin guía</span>'}</td>
-                    <td class="muted">${items.length ? items.join(', ') : '—'}</td>
+                    <td>${labelBadge}</td>
                     <td class="muted">${formatDate(r.created_at)}</td>
                     <td>
                         <div class="actions">
-                            <button class="link-btn" data-id="${r.id}" data-action="label">Descargar guía</button>
+                            <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
+                            <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
+                            <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
                         </div>
                     </td>
                 `;
@@ -215,50 +388,166 @@
         }
 
         async function loadRequests() {
-            const res = await fetch(`${API_BASE}/api/admin/requests`);
-            const data = await res.json();
-            if (data.success) {
-                requests = data.data || [];
-                applyFilter();
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests`);
+                const data = await res.json();
+                if (data.success) {
+                    requests = data.data || [];
+                    updateStats();
+                    applyFilter();
+                }
+            } catch (e) {
+                console.error('Error loading:', e);
             }
         }
 
         function applyFilter() {
             const q = (document.getElementById('search').value || '').toLowerCase();
+            const status = document.getElementById('filter-status').value;
+            const label = document.getElementById('filter-label').value;
+
             const filtered = requests.filter(r => {
                 const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
-                return hay.includes(q);
+                if (!hay.includes(q)) return false;
+                if (status && r.payment_status !== status) return false;
+                if (label === 'yes' && !r.tracking_number) return false;
+                if (label === 'no' && r.tracking_number) return false;
+                return true;
             });
             render(filtered);
         }
 
-        async function downloadLabel(requestId) {
-            const res = await fetch(`${API_BASE}/api/label/${encodeURIComponent(requestId)}`);
-            const data = await res.json();
-            if (!data.success || !data.labelBase64) {
-                alert('Guía no disponible');
-                return;
+        async function viewDetail(requestId) {
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}`);
+                const data = await res.json();
+                if (!data.success) return;
+
+                const r = data.data;
+                const items = (r.items || []).map(i => `<div class="muted">- ${i.reason || 'Sin razón'}</div>`).join('');
+
+                document.getElementById('detail-id').textContent = r.id;
+                document.getElementById('detail-body').innerHTML = `
+                    <div class="detail-row">
+                        <div class="detail-label">Orden</div>
+                        <div>${r.order_id}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Correo</div>
+                        <div>${r.contact_email}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Tipo</div>
+                        <div>${r.return_type}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Pago</div>
+                        <div>${badge(r.payment_status)}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Monto</div>
+                        <div>$${r.amount || '0.00'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Items</div>
+                        <div>${items}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Tracking</div>
+                        <div>${r.tracking_number || '<span class="muted">Sin guía</span>'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Creada</div>
+                        <div>${formatDate(r.created_at)}</div>
+                    </div>
+                `;
+                document.getElementById('modal').classList.add('show');
+            } catch (e) {
+                console.error('Error:', e);
             }
-            const byteChars = atob(data.labelBase64);
-            const byteNumbers = new Array(byteChars.length);
-            for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
-            const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.labelMime || 'application/pdf' });
+        }
+
+        async function downloadLabel(requestId) {
+            try {
+                const res = await fetch(`${API_BASE}/api/label/${encodeURIComponent(requestId)}`);
+                const data = await res.json();
+                if (!data.success || !data.labelBase64) {
+                    alert('Guía no disponible');
+                    return;
+                }
+                const byteChars = atob(data.labelBase64);
+                const byteNumbers = new Array(byteChars.length);
+                for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+                const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.labelMime || 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `guia-${data.trackingNumber || requestId}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        }
+
+        async function retryLabel(requestId) {
+            if (!confirm('¿Regenerar guía FedEx?')) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/retry-label`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`Guía regenerada: ${data.trackingNumber}`);
+                    loadRequests();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        }
+
+        function exportCSV() {
+            const headers = ['ID', 'Orden', 'Correo', 'Tipo', 'Pago', 'Monto', 'Tracking', 'Fecha'];
+            const rows = requests.map(r => [
+                r.id,
+                r.order_id,
+                r.contact_email,
+                r.return_type,
+                r.payment_status,
+                r.amount,
+                r.tracking_number || '—',
+                new Date(r.created_at).toISOString()
+            ]);
+
+            let csv = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `guia-${data.trackingNumber || requestId}.pdf`;
+            a.download = `devoluciones-${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             URL.revokeObjectURL(url);
         }
 
         document.getElementById('btn-refresh').addEventListener('click', loadRequests);
+        document.getElementById('btn-export').addEventListener('click', exportCSV);
         document.getElementById('search').addEventListener('input', applyFilter);
+        document.getElementById('filter-status').addEventListener('change', applyFilter);
+        document.getElementById('filter-label').addEventListener('change', applyFilter);
+        document.getElementById('close-modal').addEventListener('click', () => document.getElementById('modal').classList.remove('show'));
 
         document.getElementById('tbody').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action="label"]');
+            const btn = e.target.closest('button[data-action]');
             if (!btn) return;
             const id = btn.getAttribute('data-id');
-            downloadLabel(id);
+            const action = btn.getAttribute('data-action');
+            if (action === 'detail') viewDetail(id);
+            else if (action === 'label') downloadLabel(id);
+            else if (action === 'retry') retryLabel(id);
         });
 
         loadRequests();

@@ -536,7 +536,7 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
                     carrier, tracking_number, label_created_at, created_at
              FROM returns_requests
              ORDER BY created_at DESC
-             LIMIT 200`
+             LIMIT 500`
         );
 
         const data = (rows || []).map(r => ({
@@ -550,6 +550,88 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
     } catch (err) {
         console.error('Error admin list:', err);
         res.status(500).json({ success: false, message: 'Error obteniendo solicitudes' });
+    }
+});
+
+app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const [rows] = await dbPool.execute(
+            `SELECT * FROM returns_requests WHERE id = ? LIMIT 1`,
+            [req.params.requestId]
+        );
+
+        if (!rows || !rows[0]) {
+            return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+        }
+
+        const row = rows[0];
+        res.json({
+            success: true,
+            data: {
+                ...row,
+                items: (() => {
+                    try { return JSON.parse(row.items_json || '[]'); } catch { return []; }
+                })(),
+                files: (() => {
+                    try { return JSON.parse(row.files_json || '[]'); } catch { return []; }
+                })()
+            }
+        });
+    } catch (err) {
+        console.error('Error admin detail:', err);
+        res.status(500).json({ success: false, message: 'Error obteniendo detalle' });
+    }
+});
+
+app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool || !fedexClient.isConfigured()) {
+            return res.status(503).json({
+                success: false,
+                message: 'FedEx no configurado o DB no disponible'
+            });
+        }
+
+        const requestId = req.params.requestId;
+        const [rows] = await dbPool.execute(
+            `SELECT * FROM returns_requests WHERE id = ? LIMIT 1`,
+            [requestId]
+        );
+
+        if (!rows || !rows[0]) {
+            return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+        }
+
+        const request = rows[0];
+        const order = await shopifyClient.getOrderById(request.order_id);
+
+        if (!order || !order.shipping_address) {
+            return res.status(400).json({ success: false, message: 'No se pudo obtener dirección' });
+        }
+
+        const label = await fedexClient.createReturnLabel({ order, requestId });
+
+        if (!label || !label.trackingNumber) {
+            return res.status(400).json({ success: false, message: 'FedEx no generó tracking' });
+        }
+
+        await dbPool.execute(
+            `UPDATE returns_requests SET carrier = 'FEDEX', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = NOW() WHERE id = ?`,
+            [label.trackingNumber, label.labelBase64, label.labelMime, requestId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Guía regenerada',
+            trackingNumber: label.trackingNumber
+        });
+    } catch (err) {
+        console.error('Error retry label:', err);
+        res.status(500).json({ success: false, message: err.message || 'Error regenerando guía' });
     }
 });
 

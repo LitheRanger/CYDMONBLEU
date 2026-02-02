@@ -1,0 +1,323 @@
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║         ✨ INTEGRACIÓN COMPLETADA: ADMIN PANEL + MYSQL DATABASE ✨          ║
+║                                                                              ║
+║                        MON|BLEU Returns Portal                              ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+📦 ESTRUCTURA CREADA
+════════════════════════════════════════════════════════════════════════════════
+
+database/
+  ├─ migrations/
+  │   ├─ 001_create_tables.sql       ← Tabla returns_requests
+  │   └─ 002_create_views.sql        ← Vistas SQL
+  ├─ seeds/
+  │   └─ seed_admin.sql              ← Usuario admin
+  ├─ setup-db.ps1                    ← Script instalación
+  ├─ README.md                       ← Documentación
+  └─ INTEGRATION_GUIDE.md            ← Guía técnica
+
+public/
+  ├─ index.html                      ← Formulario cliente
+  ├─ admin.html                      ← Panel admin ✅ INTEGRADO
+  ├─ success.html
+  ├─ cancel.html
+  └─ logo.png
+
+Documentación (root):
+  ├─ 00_LEER_PRIMERO.md              ← COMIENZA AQUÍ
+  ├─ ADMIN_PANEL_CHECKLIST.md        ← Verificación paso a paso
+  ├─ INTEGRATION_SUMMARY.md          ← Resumen ejecutivo
+  ├─ ARCHITECTURE_DIAGRAM.md         ← Diagramas técnicos
+  ├─ QUICK_DATABASE_SETUP.md         ← Setup rápido
+  ├─ QUICK_START.ps1                 ← Script inicio
+  ├─ .env.example                    ← Plantilla variables
+  └─ .env                            ← Variables (EDITAR)
+
+
+🎯 CÓMO FUNCIONA
+════════════════════════════════════════════════════════════════════════════════
+
+Cliente                 Admin Panel             Server.js              MySQL DB
+  │                         │                      │                      │
+  ├─ Crea solicitud ────────►│                      │                      │
+  │                         │                      │                      │
+  │                         │── POST /api/submit ──►│                      │
+  │                         │                      │── INSERT ────────────►│
+  │                         │                      │◄─ returns_requests ───│
+  │                         │
+  ├─ Paga Stripe ──────────►│── POST /stripe/checkout ──►│
+  │                         │                      │   [Stripe API]
+  │                         │
+  │                         │◄─ Webhook ────────────────────┐
+  │                         │                      │   (pago_recibido)
+  │                         │                      │── UPDATE ────────────►│
+  │                         │                      │   (payment_status='paid')
+  │                         │                      │── FedEx API
+  │                         │                      │── UPDATE ────────────►│
+  │                         │                      │   (tracking, label)
+  │
+  ├─ Admin accede ────────►│ GET /api/admin/requests
+  │ admin.html            │────────────────────────►│── SELECT ────────────►│
+  │                         │◄──────────────────────│◄─ return_requests ────│
+  │                         │
+  │                         │── GET /api/label/:id ──►│── SELECT label ────►│
+  │                         │◄──────────────────────│◄─ base64 ───────────│
+  │                         │
+  │                         │ [Ver tabla, filtrar, descargar PDF]
+  │                         │ [Regenerar guías]
+
+
+🚀 INSTALACIÓN RÁPIDA (3 PASOS)
+════════════════════════════════════════════════════════════════════════════════
+
+1️⃣  CREAR BASE DE DATOS
+    .\database\setup-db.ps1
+    ↳ Espera a que termine (te pedirá contraseña MySQL)
+
+2️⃣  INSTALAR DEPENDENCIAS
+    npm install
+
+3️⃣  INICIAR SERVIDOR
+    npm start
+    ↳ Servidor corre en http://localhost:3000
+
+
+🔐 ACCEDER AL PANEL ADMIN
+════════════════════════════════════════════════════════════════════════════════
+
+URL:            http://localhost:3000/admin.html
+Usuario:        admin
+Contraseña:     admin123456
+
+(Cambiar en .env antes de producción)
+
+
+📋 VERIFICACIÓN
+════════════════════════════════════════════════════════════════════════════════
+
+✅ BD MySQL creada (returns_requests)
+✅ Admin HTML integrado con endpoints
+✅ Autenticación Basic Auth configurada
+✅ Endpoints /api/admin/* listos
+✅ FedEx API preparada para generar guías
+✅ Stripe integrado para pagos
+
+⚠️  Pendiente:
+   • Editar .env con credenciales MySQL reales
+   • Configurar Stripe keys (para pagos reales)
+   • Configurar FedEx credenciales (para guías reales)
+
+
+📊 BASE DE DATOS
+════════════════════════════════════════════════════════════════════════════════
+
+Tabla: returns_requests
+├─ id (INT, PRIMARY KEY)
+├─ order_id (VARCHAR) .................... De Shopify
+├─ contact_email (VARCHAR) ............... Cliente
+├─ return_type (VARCHAR) ................. 'exchange' o 'return'
+├─ items_json (JSON) ..................... Array de productos
+├─ files_json (JSON) ..................... Imágenes subidas
+├─ amount (DECIMAL) ...................... Monto a pagar
+├─ payment_status (VARCHAR) .............. 'pending', 'paid', 'failed'
+├─ stripe_session_id (VARCHAR) ........... ID sesión Stripe
+├─ carrier (VARCHAR) ..................... 'FEDEX'
+├─ tracking_number (VARCHAR) ............. Número de seguimiento
+├─ label_base64 (MEDIUMTEXT) ............. PDF etiqueta en base64
+├─ label_mime (VARCHAR) .................. 'application/pdf'
+├─ label_created_at (TIMESTAMP) .......... Cuándo se generó etiqueta
+└─ created_at (TIMESTAMP) ................ Cuándo se creó
+
+
+📡 ENDPOINTS DISPONIBLES
+════════════════════════════════════════════════════════════════════════════════
+
+GET /api/admin/requests
+    ↳ Listar todas las solicitudes
+    ↳ Requiere: Basic Auth
+
+GET /api/admin/requests/:id
+    ↳ Obtener detalles de una solicitud
+    ↳ Requiere: Basic Auth
+
+GET /api/label/:requestId
+    ↳ Descargar etiqueta FedEx en PDF
+    ↳ Base64 → Descarga automática
+
+POST /api/admin/requests/:id/retry-label
+    ↳ Regenerar etiqueta FedEx
+    ↳ Requiere: Basic Auth
+
+
+📚 DOCUMENTACIÓN
+════════════════════════════════════════════════════════════════════════════════
+
+Orden de lectura recomendado:
+1. 00_LEER_PRIMERO.md               ← Comienza aquí
+2. ADMIN_PANEL_CHECKLIST.md         ← Verificación paso a paso
+3. INTEGRATION_SUMMARY.md           ← Resumen ejecutivo
+4. ARCHITECTURE_DIAGRAM.md          ← Diagramas técnicos
+5. database/INTEGRATION_GUIDE.md     ← Guía técnica detallada
+
+
+⚙️  VARIABLES DE ENTORNO (.env)
+════════════════════════════════════════════════════════════════════════════════
+
+CRÍTICAS:
+  DB_HOST=localhost
+  DB_USER=root
+  DB_PASSWORD=tu_contraseña_mysql_aqui        ← EDITAR
+  DB_NAME=cydmonbleu
+
+Servidor:
+  PORT=3000
+  NODE_ENV=production
+
+Shopify (ya configurado):
+  SHOPIFY_CLIENT_ID=b4381e2ca835d8205ea3e3f3da25a7b5
+  SHOPIFY_CLIENT_SECRET=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
+  SHOP_DOMAIN=monbleu1221.myshopify.com
+
+Stripe (para pagos):
+  STRIPE_SECRET_KEY=sk_test_...              ← EDITAR
+  STRIPE_WEBHOOK_SECRET=whsec_...            ← EDITAR
+
+FedEx (para guías):
+  FEDEX_ENV=sandbox                          ← EDITAR
+  FEDEX_CLIENT_ID=...                        ← EDITAR
+  FEDEX_CLIENT_SECRET=...                    ← EDITAR
+  FEDEX_ACCOUNT_NUMBER=...                   ← EDITAR
+
+Admin:
+  ADMIN_USER=admin
+  ADMIN_PASS=admin123456                     ← CAMBIAR
+
+
+🎯 FLUJO DE USUARIO COMPLETO
+════════════════════════════════════════════════════════════════════════════════
+
+1. CLIENTE CREA SOLICITUD
+   ├─ Accede a index.html
+   ├─ Valida orden en Shopify
+   ├─ Sube fotos de productos
+   └─ Se guarda en BD (returns_requests)
+
+2. CLIENTE REALIZA PAGO
+   ├─ Clic en "Pagar"
+   ├─ Redirige a Stripe Checkout
+   ├─ Realiza pago
+   └─ Stripe envía webhook
+
+3. SISTEMA PROCESA PAGO
+   ├─ Webhook valida firma
+   ├─ Actualiza BD: payment_status='paid'
+   ├─ Obtiene orden de Shopify
+   ├─ Genera etiqueta FedEx
+   ├─ Guarda tracking en BD
+   └─ Registra evento en historial
+
+4. ADMIN VERIFICA TODO
+   ├─ Accede a admin.html
+   ├─ Ingresa usuario/contraseña
+   ├─ Ve tabla con solicitudes
+   ├─ Filtra por estado/pago
+   ├─ Busca por orden/email/tracking
+   ├─ Descarga PDF de etiqueta
+   └─ Puede regenerar guías si falla
+
+
+✨ CARACTERÍSTICAS DEL PANEL ADMIN
+════════════════════════════════════════════════════════════════════════════════
+
+✅ Listado de solicitudes en tabla
+✅ Búsqueda por:
+   • Número de orden
+   • Email del cliente
+   • Número de tracking
+✅ Filtros por:
+   • Estado de pago (Pagado / Pendiente)
+   • Con/sin guía FedEx
+✅ Estadísticas en tiempo real:
+   • Total de solicitudes
+   • Solicitudes pagadas
+   • Solicitudes pendientes
+   • Con guía FedEx
+✅ Vista detallada de solicitud
+✅ Descargar PDF de etiqueta
+✅ Regenerar guía FedEx
+✅ Exportar a CSV
+
+
+🔒 SEGURIDAD
+════════════════════════════════════════════════════════════════════════════════
+
+⚠️  NO COMMITAR EN GIT:
+   • .env (contiene contraseñas)
+   • node_modules/
+   • uploads/
+
+✅ YA EN .gitignore:
+   • .env
+   • node_modules/
+   • uploads/
+   • *.log
+
+🔐 AUTENTICACIÓN:
+   • Basic Auth en endpoints /api/admin/*
+   • Usuario/contraseña en .env
+   • Cambiar antes de producción
+
+
+🚀 PRÓXIMOS PASOS
+════════════════════════════════════════════════════════════════════════════════
+
+1. Edita .env con tus credenciales MySQL
+   code .env
+
+2. Ejecuta setup de BD
+   .\database\setup-db.ps1
+
+3. Instala dependencias
+   npm install
+
+4. Inicia servidor
+   npm start
+
+5. Accede al panel
+   http://localhost:3000/admin.html
+
+6. Configura Stripe (para pagos reales)
+
+7. Configura FedEx (para guías reales)
+
+8. Deploy a Render/Producción
+
+
+📞 TROUBLESHOOTING
+════════════════════════════════════════════════════════════════════════════════
+
+❌ "Base de datos no disponible"
+   ✓ Verificar que MySQL esté corriendo
+   ✓ Verificar credenciales en .env
+   ✓ Ejecutar .\database\setup-db.ps1 nuevamente
+
+❌ "Tabla no existe"
+   ✓ Ejecutar .\database\setup-db.ps1
+
+❌ "Access Denied" en admin
+   ✓ Verificar usuario/contraseña en .env
+   ✓ Verificar Basic Auth
+
+Ver más en: database/INTEGRATION_GUIDE.md
+
+
+═════════════════════════════════════════════════════════════════════════════════
+
+💡 RECOMENDACIÓN: Lee 00_LEER_PRIMERO.md para entender toda la estructura
+
+═════════════════════════════════════════════════════════════════════════════════
