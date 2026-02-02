@@ -44,8 +44,9 @@ Secret key:       sk_test_51QiH8xDX...  (empieza con sk_test_)
 1. En Dashboard, ve a **"Developers"** → **"Webhooks"**
 2. Click **"Add endpoint"**
 3. Configuración:
-   - **Endpoint URL**: `http://localhost:3000/api/stripe-webhook`
-     *(o tu URL de producción cuando deploys)*
+   - **Endpoint URL**: 
+     - **PRODUCCIÓN**: `https://cydmonbleu.onrender.com/api/stripe-webhook`
+     - **Local/Test**: `http://localhost:3000/api/stripe-webhook`
    - **Description**: `MON|BLEU Returns Portal`
    - **Events to send**:
      - Selecciona: `checkout.session.completed`
@@ -53,6 +54,10 @@ Secret key:       sk_test_51QiH8xDX...  (empieza con sk_test_)
      - Selecciona: `payment_intent.payment_failed`
 4. Click **"Add endpoint"**
 5. **Copia el "Signing secret"** (empieza con `whsec_...`)
+
+**⚠️ IMPORTANTE:** Necesitarás crear **dos webhooks separados**:
+- Uno para producción (https://cydmonbleu.onrender.com)
+- Otro para desarrollo local (http://localhost:3000)
 
 ### 5. Actualizar .env
 

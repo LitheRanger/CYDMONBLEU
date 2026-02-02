@@ -133,7 +133,8 @@ DISABLE_DB=false
    - `Publishable key` (pk_test_...)
    - `Secret key` (sk_test_...)
 6. Ve a **Developers** → **Webhooks**
-7. Add endpoint: `http://localhost:3000/api/stripe-webhook`
+7. Add endpoint: `https://cydmonbleu.onrender.com/api/stripe-webhook`
+   - Para desarrollo local: `http://localhost:3000/api/stripe-webhook`
 8. Selecciona eventos:
    - `checkout.session.completed`
    - `payment_intent.succeeded`
