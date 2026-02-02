@@ -113,10 +113,11 @@ class ShopifyTokenManager {
 // Inicializamos la clase con las variables del .env
 const shopifyClientId = process.env.SHOPIFY_CLIENT_ID;
 const shopifyClientSecret = process.env.SHOPIFY_CLIENT_SECRET;
-const shopifyShop = process.env.SHOPIFY_SHOP;
+// Soportar tanto SHOP_DOMAIN como SHOPIFY_SHOP
+const shopifyShop = (process.env.SHOP_DOMAIN || process.env.SHOPIFY_SHOP || '').replace('.myshopify.com', '');
 
 if (!shopifyClientId || !shopifyClientSecret || !shopifyShop) {
-  console.warn('⚠️ Shopify no configurado. Define SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET y SHOPIFY_SHOP en .env');
+  console.warn('⚠️ Shopify no configurado. Define SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET y SHOP_DOMAIN (o SHOPIFY_SHOP) en .env');
 }
 
 const shopifyClient = new ShopifyTokenManager(
