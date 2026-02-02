@@ -334,24 +334,28 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
             path: f.path
         }));
 
-        const [result] = await executeQuery(
-            `INSERT INTO returns_requests (order_id, contact_email, return_type, items_json, files_json, amount)
-             VALUES (?, ?, ?, ?, ?, ?)` ,
-            [
-                String(orderId || ''),
-                String(contactEmail || ''),
-                String(returnType || ''),
-                JSON.stringify(items),
-                JSON.stringify(filesMeta),
-                amountToPay
-            ]
-        );
+        const insertSQL = isPostgreSQL 
+            ? `INSERT INTO returns_requests (order_id, contact_email, return_type, items_json, files_json, amount)
+               VALUES (?, ?, ?, ?, ?, ?) RETURNING id`
+            : `INSERT INTO returns_requests (order_id, contact_email, return_type, items_json, files_json, amount)
+               VALUES (?, ?, ?, ?, ?, ?)`;
+        
+        const [result] = await executeQuery(insertSQL, [
+            String(orderId || ''),
+            String(contactEmail || ''),
+            String(returnType || ''),
+            JSON.stringify(items),
+            JSON.stringify(filesMeta),
+            amountToPay
+        ]);
+
+        const requestId = isPostgreSQL ? result[0]?.id : result.insertId;
 
         // Respuesta al Frontend
         res.json({
             success: true,
             message: "Solicitud procesada",
-            requestId: isPostgreSQL ? result[0]?.id : result.insertId,
+            requestId: requestId,
             nextStep: "PAYMENT",
             paymentDetails: {
                 amount: amountToPay,
