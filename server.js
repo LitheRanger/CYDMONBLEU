@@ -627,16 +627,41 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
         }
 
         const row = rows[0];
+        const parsedItems = (() => {
+            try { return JSON.parse(row.items_json || '[]'); } catch { return []; }
+        })();
+        const parsedFiles = (() => {
+            try { return JSON.parse(row.files_json || '[]'); } catch { return []; }
+        })();
+
+        let itemsSelected = parsedItems;
+        try {
+            const order = await shopifyClient.getOrderById(row.order_id);
+            if (order && Array.isArray(order.line_items)) {
+                itemsSelected = parsedItems.map((item) => {
+                    const line = order.line_items.find(li => String(li.variant_id) === String(item.variantId || item.id));
+                    return {
+                        ...item,
+                        name: line?.name || line?.title || item.name || 'Producto',
+                        current_variant_title: line?.variant_title || item.current_variant_title || 'Variante',
+                        quantity: line?.quantity || item.quantity || 1,
+                        price: line?.price || item.price,
+                        product_id: line?.product_id || item.product_id,
+                        sku: line?.sku || item.sku
+                    };
+                });
+            }
+        } catch (e) {
+            console.warn('No se pudo enriquecer items desde Shopify:', e?.message || e);
+        }
+
         res.json({
             success: true,
             data: {
                 ...row,
-                items: (() => {
-                    try { return JSON.parse(row.items_json || '[]'); } catch { return []; }
-                })(),
-                files: (() => {
-                    try { return JSON.parse(row.files_json || '[]'); } catch { return []; }
-                })()
+                items: parsedItems,
+                items_selected: itemsSelected,
+                files: parsedFiles
             }
         });
     } catch (err) {

@@ -743,7 +743,15 @@
                 if (!data.success) return;
 
                 const r = data.data;
-                const items = (r.items || []).map(i => `<div class="muted">- ${i.reason || 'Sin razón'}</div>`).join('');
+                const itemsSource = r.items_selected || r.items || [];
+                const items = itemsSource.map(i => {
+                    const name = i.name || 'Producto';
+                    const variant = i.current_variant_title || 'Variante';
+                    const qty = i.quantity || 1;
+                    const reason = i.reason || 'Sin razón';
+                    const replacement = i.replacementVariantId ? ` • Cambio a ID: ${i.replacementVariantId}` : '';
+                    return `<div class="muted">- ${name} (${variant}) x${qty} • ${reason}${replacement}</div>`;
+                }).join('') || '<span class="muted">Sin items</span>';
                 const files = (r.files || []).map(f => {
                     const isImage = (f.mimetype || '').startsWith('image/');
                     if (isImage) {
