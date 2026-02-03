@@ -660,6 +660,7 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
             if (order && Array.isArray(order.line_items)) {
                 itemsSelected = await Promise.all(parsedItems.map(async (item) => {
                     const line = order.line_items.find(li => String(li.variant_id) === String(item.variantId || item.id));
+                    
                     let replacementTitle = item.replacementTitle || '';
                     if (!replacementTitle && item.replacementVariantId) {
                         const replacementVariant = await getVariant(item.replacementVariantId);
@@ -672,9 +673,12 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
                         currentVariantTitle = originalVariant?.title || '';
                     }
 
+                    // Priorizar nombre del payload, luego de line, luego fallback
+                    const productName = item.name || line?.title || line?.name || 'Producto';
+
                     return {
                         ...item,
-                        name: line?.name || line?.title || item.name || 'Producto',
+                        name: productName,
                         current_variant_title: currentVariantTitle || 'Variante',
                         quantity: line?.quantity || item.quantity || 1,
                         price: line?.price || item.price,
@@ -697,8 +701,12 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
                         currentVariantTitle = originalVariant?.title || '';
                     }
 
+                    // Usar nombre del payload si existe
+                    const productName = item.name || 'Producto';
+
                     return {
                         ...item,
+                        name: productName,
                         current_variant_title: currentVariantTitle || 'Variante',
                         replacementTitle
                     };

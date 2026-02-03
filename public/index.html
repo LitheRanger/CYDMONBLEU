@@ -1923,6 +1923,10 @@
 
             itemsPayload.push({
                 variantId: original.id,
+                name: original.name || 'Producto',
+                current_variant_title: original.current_variant_title || '',
+                quantity: original.quantity || 1,
+                price: original.price,
                 reason: s.reason,
                 replacementVariantId: (tipoFinal === 'Cambio') ? s.replacementVariantId : null,
                 replacementTitle: (tipoFinal === 'Cambio') ? (s.replacementTitle || '') : ''
