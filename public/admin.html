@@ -789,16 +789,26 @@
                 if (!data.success) return;
 
                 const r = data.data;
-                const itemsSource = r.items_selected || r.items || [];
+                let itemsSource = r.items_selected || r.items || [];
+                if (!Array.isArray(itemsSource) || itemsSource.length === 0) {
+                    try {
+                        const parsed = JSON.parse(r.items_json || '[]');
+                        itemsSource = Array.isArray(parsed) ? parsed : [];
+                    } catch {
+                        itemsSource = [];
+                    }
+                }
                 const isCambio = String(r.return_type || '').toLowerCase() === 'cambio';
                 const items = itemsSource.map(i => {
                     const name = i.name || 'Producto';
                     const variant = i.current_variant_title || 'Variante';
                     const qty = i.quantity || 1;
                     const reason = i.reason || 'Sin razón';
-                    const replacementDisplay = i.replacementTitle
-                        ? i.replacementTitle
-                        : (i.replacementVariantId ? `ID ${i.replacementVariantId}` : 'No seleccionado');
+                    const replacementTitle = i.replacementTitle || i.replacement_title || i.replacementVariantTitle || '';
+                    const replacementId = i.replacementVariantId || i.replacement_variant_id || '';
+                    const replacementDisplay = replacementTitle
+                        ? replacementTitle
+                        : (replacementId ? `ID ${replacementId}` : 'No seleccionado');
                     const replacementLine = isCambio
                         ? `<div class="muted" style="margin-left:12px;">Reemplazo: ${replacementDisplay}</div>`
                         : '';
