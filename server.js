@@ -853,6 +853,125 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
     }
 });
 
+// --- ADMIN MIGRATION: Enriquecer todos los items existentes desde Shopify ---
+app.post('/api/admin/migrate-enrich-items', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        console.log('🔄 Iniciando migración de enriquecimiento de items...');
+
+        const [allRequests] = await executeQuery(
+            `SELECT id, order_id, items_json FROM returns_requests`,
+            []
+        );
+
+        if (!allRequests || allRequests.length === 0) {
+            return res.json({ success: true, message: 'No hay solicitudes para migrar', updated: 0 });
+        }
+
+        let updated = 0;
+        const variantCache = new Map();
+
+        const getVariant = async (variantId) => {
+            if (!variantId) return null;
+            const key = String(variantId);
+            if (variantCache.has(key)) return variantCache.get(key);
+            const v = await shopifyClient.getVariantById(variantId);
+            variantCache.set(key, v);
+            return v;
+        };
+
+        for (const request of allRequests) {
+            try {
+                let items = [];
+                if (typeof request.items_json === 'string') {
+                    items = JSON.parse(request.items_json || '[]');
+                } else {
+                    items = Array.isArray(request.items_json) ? request.items_json : [];
+                }
+
+                if (!Array.isArray(items) || items.length === 0) continue;
+
+                // Obtener orden de Shopify
+                let order = await shopifyClient.getOrderById(request.order_id);
+                if (!order) {
+                    const rawOrderId = String(request.order_id || '').trim();
+                    const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
+                    order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
+                }
+
+                // Enriquecer items
+                const enrichedItems = await Promise.all(
+                    items.map(async (item) => {
+                        // Si ya tiene nombre completo, no hacer nada
+                        if (item.name && item.name !== 'Producto') {
+                            return item;
+                        }
+
+                        let enriched = { ...item };
+
+                        // Buscar en order line_items
+                        if (order && Array.isArray(order.line_items)) {
+                            const line = order.line_items.find(li => 
+                                String(li.variant_id) === String(item.variantId || item.id)
+                            );
+                            if (line) {
+                                enriched.name = line.title || line.name || item.name || 'Producto';
+                                enriched.current_variant_title = line.variant_title || item.current_variant_title || '';
+                                enriched.quantity = line.quantity || item.quantity || 1;
+                                enriched.price = line.price || item.price;
+                            }
+                        }
+
+                        // Enriquecer replacement si existe
+                        if (item.replacementVariantId && !item.replacementTitle) {
+                            const replacementVariant = await getVariant(item.replacementVariantId);
+                            if (replacementVariant) {
+                                enriched.replacementTitle = replacementVariant.title || '';
+                            }
+                        }
+
+                        // Enriquecer current variant title si falta
+                        if (!enriched.current_variant_title && (item.variantId || item.id)) {
+                            const originalVariant = await getVariant(item.variantId || item.id);
+                            if (originalVariant) {
+                                enriched.current_variant_title = originalVariant.title || '';
+                            }
+                        }
+
+                        return enriched;
+                    })
+                );
+
+                // Actualizar en BD
+                await executeQuery(
+                    `UPDATE returns_requests SET items_json = ? WHERE id = ?`,
+                    [JSON.stringify(enrichedItems), request.id]
+                );
+
+                updated++;
+                console.log(`✓ Request ${request.id} actualizado`);
+
+            } catch (itemErr) {
+                console.error(`Error procesando request ${request.id}:`, itemErr?.message || itemErr);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Migración completada. ${updated} de ${allRequests.length} solicitudes actualizadas.`,
+            updated,
+            total: allRequests.length
+        });
+
+    } catch (err) {
+        console.error('Error en migración:', err);
+        res.status(500).json({ success: false, message: 'Error en migración', error: err?.message });
+    }
+});
+
 // --- 7. OBTENER GUÍA GENERADA ---
 app.get('/api/label/:requestId', async (req, res) => {
     try {
