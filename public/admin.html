@@ -549,6 +549,10 @@
             return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
         }
 
+        function normalizeType(value) {
+            return String(value || '').trim().toLowerCase();
+        }
+
         function badge(status) {
             const s = String(status || 'pending').toLowerCase();
             if (s === 'paid') return '<span class="badge paid">Pagado</span>';
@@ -675,8 +679,8 @@
                 const data = await res.json();
                 if (data.success) {
                     requests = data.data || [];
-                    cambios = requests.filter(r => r.return_type === 'cambio');
-                    reembolsos = requests.filter(r => r.return_type === 'reembolso');
+                    cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio');
+                    reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso');
                     completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed');
                     updateStats();
                     applyFilter();
@@ -749,8 +753,9 @@
                     const variant = i.current_variant_title || 'Variante';
                     const qty = i.quantity || 1;
                     const reason = i.reason || 'Sin razón';
-                    const replacement = i.replacementVariantId ? ` • Cambio a ID: ${i.replacementVariantId}` : '';
-                    return `<div class="muted">- ${name} (${variant}) x${qty} • ${reason}${replacement}</div>`;
+                    const replacementTitle = i.replacementTitle ? ` • Cambio a: ${i.replacementTitle}` : '';
+                    const replacementId = !replacementTitle && i.replacementVariantId ? ` • Cambio a ID: ${i.replacementVariantId}` : '';
+                    return `<div class="muted">- ${name} (${variant}) x${qty} • ${reason}${replacementTitle}${replacementId}</div>`;
                 }).join('') || '<span class="muted">Sin items</span>';
                 const files = (r.files || []).map(f => {
                     const isImage = (f.mimetype || '').startsWith('image/');

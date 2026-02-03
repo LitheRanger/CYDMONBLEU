@@ -590,7 +590,7 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
 
         const [rows] = await executeQuery(
             `SELECT id, order_id, contact_email, return_type, items_json, amount, payment_status, stripe_session_id,
-                    carrier, tracking_number, label_created_at, created_at, admin_status
+                    carrier, tracking_number, label_created_at, created_at, admin_status, refund_status
              FROM returns_requests
              ORDER BY created_at DESC
              LIMIT 500`,
