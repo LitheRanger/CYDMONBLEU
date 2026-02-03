@@ -786,18 +786,28 @@
             try {
                 const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}`);
                 const data = await res.json();
-                if (!data.success) return;
+                if (!data.success) {
+                    console.error('Error fetching detail:', data);
+                    return;
+                }
 
                 const r = data.data;
+                console.log('📋 Detail recibido:', r);
                 let itemsSource = r.items_selected || r.items || [];
+                console.log('Items source (1):', itemsSource);
+                
                 if (!Array.isArray(itemsSource) || itemsSource.length === 0) {
                     try {
                         const parsed = JSON.parse(r.items_json || '[]');
                         itemsSource = Array.isArray(parsed) ? parsed : [];
-                    } catch {
+                        console.log('Items parsed from JSON:', itemsSource);
+                    } catch (e) {
+                        console.error('Error parsing items_json:', e);
                         itemsSource = [];
                     }
                 }
+                console.log('Final itemsSource:', itemsSource);
+                
                 const isCambio = String(r.return_type || '').toLowerCase() === 'cambio';
                 const items = itemsSource.map(i => {
                     const name = i.name || 'Producto';

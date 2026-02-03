@@ -706,6 +706,7 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
             }
         } catch (e) {
             console.warn('No se pudo enriquecer items desde Shopify:', e?.message || e);
+            itemsSelected = parsedItems;
         }
 
         res.json({
