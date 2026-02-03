@@ -568,10 +568,6 @@
             document.getElementById(`next-${tabName}`).disabled = newPage >= totalPages;
             document.getElementById(`pagination-${tabName}`).style.display = data.length > pageSize ? 'flex' : 'none';
         }
-            document.getElementById('prev-page').disabled = currentPage <= 1;
-            document.getElementById('next-page').disabled = currentPage >= totalPages;
-            document.getElementById('pagination').style.display = data.length > pageSize ? 'flex' : 'none';
-        }
 
         function renderTab(tabName, data) {
             const tbody = document.getElementById(`tbody-${tabName}`);
