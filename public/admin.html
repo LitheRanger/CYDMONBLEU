@@ -363,6 +363,16 @@
             font-weight: 700;
             font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
         }
+
+        .group-header {
+            background: #f3f4f6;
+            font-weight: 600;
+            color: #666;
+            font-size: 12px;
+            padding: 10px;
+            border: none;
+            border-top: 2px solid #e5e7eb;
+        }
     </style>
 </head>
 <body>
@@ -637,40 +647,69 @@
             const start = (currentPage - 1) * pageSize;
             const pageData = data.slice(start, start + pageSize);
 
-            pageData.forEach(r => {
-                const tr = document.createElement('tr');
-                const labelBadge = r.tracking_number
-                    ? `<span class="badge success" style="background:#dcfce7;color:${r.carrier === 'FEDEX' ? '#ca8a04' : '#16a34a'};">${r.carrier || 'Generada'}</span>`
-                    : '<span class="badge no-label">Sin guía</span>';
+            // Si es cambios, agrupar por refund_status
+            if (tabName === 'cambios') {
+                const grouped = {
+                    pending_receipt: pageData.filter(r => r.refund_status === 'pending_receipt'),
+                    pending_shipment: pageData.filter(r => r.refund_status === 'pending_shipment')
+                };
 
-                const isCambio = tabName === 'cambios';
-                const isCompletadas = tabName === 'completadas';
-                const actions = `
-                    <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
-                    <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
-                    <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
-                    ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
-                    ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
-                `;
+                // Renderizar grupos con encabezados
+                ['pending_receipt', 'pending_shipment'].forEach(status => {
+                    const items = grouped[status];
+                    if (items.length > 0) {
+                    // Encabezado de grupo
+                        const headerTr = document.createElement('tr');
+                        headerTr.className = 'group-header';
+                        headerTr.innerHTML = `
+                            <td colspan="9" style="padding:10px;border:none;color:#666;font-size:12px;">
+                                ${status === 'pending_receipt' ? '📥 Por Recibir' : '📦 Por Enviar'}
+                            </td>
+                        `;
+                        tbody.appendChild(headerTr);
 
-                tr.innerHTML = `
-                    <td>${r.id}</td>
-                    <td><strong>${r.order_id || '—'}</strong></td>
-                    <td class="muted">${r.contact_email || '—'}</td>
-                    ${tabName === 'completadas' ? `<td>${r.return_type || '—'}</td>` : ''}
-                    <td>${badge(r.payment_status)}</td>
-                    ${isCambio ? `<td>${refundBadge(r.refund_status)}</td>` : ''}
-                    <td>${formatCurrency(r.amount)}</td>
-                    <td>${labelBadge}</td>
-                    <td class="muted">${formatDate(r.created_at)}</td>
-                    <td><div class="actions">${actions}</div></td>
-                `;
-                tbody.appendChild(tr);
-            });
+                        // Filas de items
+                        items.forEach(r => renderRow(r, tabName, tbody));
+                    }
+                });
+            } else {
+                // Otros tabs: renderizar sin agrupar
+                pageData.forEach(r => renderRow(r, tabName, tbody));
+            }
 
             updateSummaryTab(tabName, data);
             updatePaginationTab(tabName, data);
         }
+
+        function renderRow(r, tabName, tbody) {
+            const tr = document.createElement('tr');
+            const labelBadge = r.tracking_number
+                ? `<span class="badge success" style="background:#dcfce7;color:${r.carrier === 'FEDEX' ? '#ca8a04' : '#16a34a'};">${r.carrier || 'Generada'}</span>`
+                : '<span class="badge no-label">Sin guía</span>';
+
+            const isCambio = tabName === 'cambios';
+            const isCompletadas = tabName === 'completadas';
+            const actions = `
+                <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
+                <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
+                <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
+                ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
+                ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
+            `;
+
+            tr.innerHTML = `
+                <td>${r.id}</td>
+                <td><strong>${r.order_id || '—'}</strong></td>
+                <td class="muted">${r.contact_email || '—'}</td>
+                ${tabName === 'completadas' ? `<td>${r.return_type || '—'}</td>` : ''}
+                <td>${badge(r.payment_status)}</td>
+                ${isCambio ? `<td>${refundBadge(r.refund_status)}</td>` : ''}
+                <td>${formatCurrency(r.amount)}</td>
+                <td>${labelBadge}</td>
+                <td class="muted">${formatDate(r.created_at)}</td>
+                <td><div class="actions">${actions}</div></td>
+            `;
+            tbody.appendChild(tr);
 
         async function loadRequests() {
             try {
@@ -679,8 +718,9 @@
                 const data = await res.json();
                 if (data.success) {
                     requests = data.data || [];
-                    cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio');
-                    reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso');
+                    // Excluir completadas de cambios y reembolsos
+                    cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio' && String(r.admin_status || '').toLowerCase() !== 'completed');
+                    reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso' && String(r.admin_status || '').toLowerCase() !== 'completed');
                     completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed');
                     updateStats();
                     applyFilter();
