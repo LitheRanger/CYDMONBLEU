@@ -251,6 +251,46 @@
             cursor: not-allowed;
         }
 
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid var(--border-light);
+            background: var(--secondary);
+            padding: 0 16px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-weight: 700;
+            color: var(--text-secondary);
+            border-bottom: 3px solid transparent;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-btn:hover {
+            color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+
         .tag {
             display: inline-block;
             padding: 2px 6px;
@@ -368,7 +408,7 @@
                     <option value="no">Sin guía</option>
                 </select>
                 <select id="filter-refund">
-                    <option value="">Todos los reembolsos</option>
+                    <option value="">Todos los estados</option>
                     <option value="pending_receipt">Por Recibir</option>
                     <option value="pending_shipment">Por Enviar</option>
                 </select>
@@ -379,30 +419,64 @@
             </div>
         </div>
 
-        <div id="loading" class="loading">Cargando solicitudes…</div>
-        <div id="summary" class="summary"></div>
-        <table class="table" id="table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Orden</th>
-                    <th>Contacto</th>
-                    <th>Tipo</th>
-                    <th>Pago</th>
-                    <th>Reembolso</th>
-                    <th>Monto</th>
-                    <th>Guía</th>
-                    <th>Fecha</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="tbody"></tbody>
-        </table>
-        <div id="empty" class="empty" style="display:none;">Sin resultados</div>
-        <div class="pagination" id="pagination" style="display:none;">
-            <button class="pager-btn" id="prev-page">◀ Anterior</button>
-            <div class="muted" id="page-info">Página 1</div>
-            <button class="pager-btn" id="next-page">Siguiente ▶</button>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="cambios">📦 Cambios</button>
+            <button class="tab-btn" data-tab="reembolsos">💵 Reembolsos</button>
+        </div>
+
+        <!-- TAB: CAMBIOS -->
+        <div class="tab-content active" id="tab-cambios">
+            <div id="loading-cambios" class="loading">Cargando cambios…</div>
+            <div id="summary-cambios" class="summary"></div>
+            <table class="table" id="table-cambios">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Orden</th>
+                        <th>Contacto</th>
+                        <th>Pago</th>
+                        <th>Estado</th>
+                        <th>Monto</th>
+                        <th>Guía</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-cambios"></tbody>
+            </table>
+            <div id="empty-cambios" class="empty" style="display:none;">Sin cambios registrados</div>
+            <div class="pagination" id="pagination-cambios" style="display:none;">
+                <button class="pager-btn" id="prev-cambios">◀ Anterior</button>
+                <div class="muted" id="page-info-cambios">Página 1</div>
+                <button class="pager-btn" id="next-cambios">Siguiente ▶</button>
+            </div>
+        </div>
+
+        <!-- TAB: REEMBOLSOS -->
+        <div class="tab-content" id="tab-reembolsos">
+            <div id="loading-reembolsos" class="loading">Cargando reembolsos…</div>
+            <div id="summary-reembolsos" class="summary"></div>
+            <table class="table" id="table-reembolsos">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Orden</th>
+                        <th>Contacto</th>
+                        <th>Pago</th>
+                        <th>Monto</th>
+                        <th>Guía</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-reembolsos"></tbody>
+            </table>
+            <div id="empty-reembolsos" class="empty" style="display:none;">Sin reembolsos registrados</div>
+            <div class="pagination" id="pagination-reembolsos" style="display:none;">
+                <button class="pager-btn" id="prev-reembolsos">◀ Anterior</button>
+                <div class="muted" id="page-info-reembolsos">Página 1</div>
+                <button class="pager-btn" id="next-reembolsos">Siguiente ▶</button>
+            </div>
         </div>
     </div>
 
@@ -423,8 +497,13 @@
         })();
 
         let requests = [];
-        let filteredRequests = [];
-        let currentPage = 1;
+        let cambios = [];
+        let reembolsos = [];
+        let filteredCambios = [];
+        let filteredReembolsos = [];
+        let currentTabCambios = 1;
+        let currentTabReembolsos = 1;
+        let activeTab = 'cambios';
         const pageSize = 50;
 
         function formatDate(value) {
@@ -470,30 +549,44 @@
             document.getElementById('labeled-count').textContent = labeled;
         }
 
-        function updateSummary(data) {
-            const summary = document.getElementById('summary');
-            summary.textContent = `Mostrando ${data.length} de ${requests.length} solicitudes`;
+        function updateSummaryTab(tabName, data) {
+            const summary = document.getElementById(`summary-${tabName}`);
+            const total = tabName === 'cambios' ? cambios.length : reembolsos.length;
+            summary.textContent = `Mostrando ${data.length} de ${total} solicitudes`;
         }
 
-        function updatePagination(data) {
+        function updatePaginationTab(tabName, data) {
+            const currentPage = tabName === 'cambios' ? currentTabCambios : currentTabReembolsos;
             const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-            if (currentPage > totalPages) currentPage = totalPages;
-            document.getElementById('page-info').textContent = `Página ${currentPage} de ${totalPages}`;
+            const newPage = currentPage > totalPages ? totalPages : currentPage;
+            
+            if (tabName === 'cambios') currentTabCambios = newPage;
+            else currentTabReembolsos = newPage;
+
+            document.getElementById(`page-info-${tabName}`).textContent = `Página ${newPage} de ${totalPages}`;
+            document.getElementById(`prev-${tabName}`).disabled = newPage <= 1;
+            document.getElementById(`next-${tabName}`).disabled = newPage >= totalPages;
+            document.getElementById(`pagination-${tabName}`).style.display = data.length > pageSize ? 'flex' : 'none';
+        }
             document.getElementById('prev-page').disabled = currentPage <= 1;
             document.getElementById('next-page').disabled = currentPage >= totalPages;
             document.getElementById('pagination').style.display = data.length > pageSize ? 'flex' : 'none';
         }
 
-        function render(data) {
-            const tbody = document.getElementById('tbody');
+        function renderTab(tabName, data) {
+            const tbody = document.getElementById(`tbody-${tabName}`);
+            const empty = document.getElementById(`empty-${tabName}`);
             tbody.innerHTML = '';
 
             if (!data.length) {
-                document.getElementById('empty').style.display = 'block';
+                empty.style.display = 'block';
+                updateSummaryTab(tabName, []);
+                updatePaginationTab(tabName, []);
                 return;
             }
-            document.getElementById('empty').style.display = 'none';
+            empty.style.display = 'none';
 
+            const currentPage = tabName === 'cambios' ? currentTabCambios : currentTabReembolsos;
             const start = (currentPage - 1) * pageSize;
             const pageData = data.slice(start, start + pageSize);
 
@@ -503,41 +596,42 @@
                     ? `<span class="badge success" style="background:#dcfce7;color:${r.carrier === 'FEDEX' ? '#ca8a04' : '#16a34a'};">${r.carrier || 'Generada'}</span>`
                     : '<span class="badge no-label">Sin guía</span>';
 
+                const isCambio = tabName === 'cambios';
+                const actions = `
+                    <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
+                    <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
+                    <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
+                    ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
+                    <button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>
+                `;
+
                 tr.innerHTML = `
                     <td>${r.id}</td>
                     <td><strong>${r.order_id || '—'}</strong></td>
                     <td class="muted">${r.contact_email || '—'}</td>
-                    <td>${r.return_type || '—'}</td>
                     <td>${badge(r.payment_status)}</td>
-                    <td>${refundBadge(r.refund_status)}</td>
+                    ${isCambio ? `<td>${refundBadge(r.refund_status)}</td>` : ''}
                     <td>${formatCurrency(r.amount)}</td>
                     <td>${labelBadge}</td>
                     <td class="muted">${formatDate(r.created_at)}</td>
-                    <td>
-                        <div class="actions">
-                            <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
-                            <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
-                            <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
-                            ${r.return_type === 'cambio' ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
-                            <button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>
-                        </div>
-                    </td>
+                    <td><div class="actions">${actions}</div></td>
                 `;
                 tbody.appendChild(tr);
             });
 
-            updateSummary(data);
-            updatePagination(data);
+            updateSummaryTab(tabName, data);
+            updatePaginationTab(tabName, data);
         }
 
         async function loadRequests() {
             try {
-                document.getElementById('loading').style.display = 'block';
                 document.getElementById('btn-refresh').disabled = true;
                 const res = await fetch(`${API_BASE}/api/admin/requests`);
                 const data = await res.json();
                 if (data.success) {
                     requests = data.data || [];
+                    cambios = requests.filter(r => r.return_type === 'cambio');
+                    reembolsos = requests.filter(r => r.return_type === 'reembolso');
                     updateStats();
                     applyFilter();
                 } else {
@@ -546,7 +640,6 @@
             } catch (e) {
                 console.error('Error loading:', e);
             } finally {
-                document.getElementById('loading').style.display = 'none';
                 document.getElementById('btn-refresh').disabled = false;
             }
         }
@@ -557,7 +650,8 @@
             const label = document.getElementById('filter-label').value;
             const refund = document.getElementById('filter-refund').value;
 
-            const filtered = requests.filter(r => {
+            // Filtrar CAMBIOS
+            filteredCambios = cambios.filter(r => {
                 const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
                 if (status && r.payment_status !== status) return false;
@@ -566,9 +660,21 @@
                 if (refund && r.refund_status !== refund) return false;
                 return true;
             });
-            filteredRequests = filtered;
-            currentPage = 1;
-            render(filteredRequests);
+
+            // Filtrar REEMBOLSOS
+            filteredReembolsos = reembolsos.filter(r => {
+                const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+                if (status && r.payment_status !== status) return false;
+                if (label === 'yes' && !r.tracking_number) return false;
+                if (label === 'no' && r.tracking_number) return false;
+                return true;
+            });
+
+            currentTabCambios = 1;
+            currentTabReembolsos = 1;
+            renderTab('cambios', filteredCambios);
+            renderTab('reembolsos', filteredReembolsos);
         }
 
         async function viewDetail(requestId) {
@@ -730,7 +836,12 @@
 
         function exportCSV() {
             const headers = ['ID', 'Orden', 'Correo', 'Tipo', 'Pago', 'Estado', 'Monto', 'Tracking', 'Fecha'];
-            const source = filteredRequests.length ? filteredRequests : requests;
+            let source = [];
+            if (activeTab === 'cambios') {
+                source = filteredCambios.length ? filteredCambios : cambios;
+            } else {
+                source = filteredReembolsos.length ? filteredReembolsos : reembolsos;
+            }
             const rows = source.map(r => [
                 r.id,
                 r.order_id,
@@ -757,6 +868,52 @@
             URL.revokeObjectURL(url);
         }
 
+        // Manejo de tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tabName = e.target.getAttribute('data-tab');
+                activeTab = tabName;
+                
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                e.target.classList.add('active');
+                document.getElementById(`tab-${tabName}`).classList.add('active');
+            });
+        });
+
+        // Event listeners para cambios
+        document.getElementById('prev-cambios').addEventListener('click', () => {
+            if (currentTabCambios > 1) {
+                currentTabCambios--;
+                renderTab('cambios', filteredCambios.length ? filteredCambios : cambios);
+            }
+        });
+        document.getElementById('next-cambios').addEventListener('click', () => {
+            const data = filteredCambios.length ? filteredCambios : cambios;
+            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+            if (currentTabCambios < totalPages) {
+                currentTabCambios++;
+                renderTab('cambios', data);
+            }
+        });
+
+        // Event listeners para reembolsos
+        document.getElementById('prev-reembolsos').addEventListener('click', () => {
+            if (currentTabReembolsos > 1) {
+                currentTabReembolsos--;
+                renderTab('reembolsos', filteredReembolsos.length ? filteredReembolsos : reembolsos);
+            }
+        });
+        document.getElementById('next-reembolsos').addEventListener('click', () => {
+            const data = filteredReembolsos.length ? filteredReembolsos : reembolsos;
+            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+            if (currentTabReembolsos < totalPages) {
+                currentTabReembolsos++;
+                renderTab('reembolsos', data);
+            }
+        });
+
         document.getElementById('btn-refresh').addEventListener('click', loadRequests);
         document.getElementById('btn-export').addEventListener('click', exportCSV);
         document.getElementById('search').addEventListener('input', applyFilter);
@@ -764,22 +921,8 @@
         document.getElementById('filter-label').addEventListener('change', applyFilter);
         document.getElementById('filter-refund').addEventListener('change', applyFilter);
         document.getElementById('close-modal').addEventListener('click', () => document.getElementById('modal').classList.remove('show'));
-        document.getElementById('prev-page').addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                render(filteredRequests.length ? filteredRequests : requests);
-            }
-        });
-        document.getElementById('next-page').addEventListener('click', () => {
-            const data = filteredRequests.length ? filteredRequests : requests;
-            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-            if (currentPage < totalPages) {
-                currentPage++;
-                render(data);
-            }
-        });
 
-        document.getElementById('tbody').addEventListener('click', (e) => {
+        document.getElementById('tbody-cambios').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-action]');
             if (!btn) return;
             const id = btn.getAttribute('data-id');
@@ -789,6 +932,17 @@
             else if (action === 'retry') retryLabel(id);
             else if (action === 'complete') completeRequest(id);
             else if (action === 'refund-status') changeRefundStatus(id);
+        });
+
+        document.getElementById('tbody-reembolsos').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            const id = btn.getAttribute('data-id');
+            const action = btn.getAttribute('data-action');
+            if (action === 'detail') viewDetail(id);
+            else if (action === 'label') downloadLabel(id);
+            else if (action === 'retry') retryLabel(id);
+            else if (action === 'complete') completeRequest(id);
         });
 
         loadRequests();
