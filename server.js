@@ -14,7 +14,7 @@ const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STR
 
 // Importamos tu cliente robusto de Shopify
 const shopifyClient = require('./Shopifyclient.js');
-const fedexClient = require('./fedexClient.js');
+const myeshipClient = require('./myeshipClient.js');
 
 const app = express();
 app.use(cors());
@@ -530,30 +530,30 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             }
         }
 
-        // Generar guía de FedEx (si está configurado)
-        if (dbPool && requestId && fedexClient.isConfigured()) {
+        // Generar guía de MyeShip (si está configurado)
+        if (dbPool && requestId && myeshipClient.isConfigured()) {
             try {
                 const order = await shopifyClient.getOrderById(orderId);
                 if (!order || !order.shipping_address) {
                     console.warn('⚠️ No se pudo obtener dirección de envío de la orden');
                 } else {
-                    const label = await fedexClient.createReturnLabel({ order, requestId });
+                    const label = await myeshipClient.createReturnLabel({ order, requestId });
                     if (label && label.trackingNumber) {
                         const now = new Date().toISOString();
                         await executeQuery(
-                            `UPDATE returns_requests SET carrier = 'FEDEX', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
+                            `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
                             [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
                         );
-                        console.log(`📦 Guía FedEx generada: ${label.trackingNumber}`);
+                        console.log(`📦 Guía MyeShip generada: ${label.trackingNumber} (${label.provider} - ${label.serviceName})`);
                     } else {
-                        console.warn('⚠️ FedEx respondió sin tracking');
+                        console.warn('⚠️ MyeShip respondió sin tracking');
                     }
                 }
             } catch (labelErr) {
-                console.error('❌ Error generando guía FedEx:', labelErr.message || labelErr);
+                console.error('❌ Error generando guía MyeShip:', labelErr.message || labelErr);
             }
-        } else if (!fedexClient.isConfigured()) {
-            console.warn('ℹ️ FedEx no configurado: no se generó guía');
+        } else if (!myeshipClient.isConfigured()) {
+            console.warn('ℹ️ MyeShip no configurado: no se generó guía');
         }
 
         // Aquí puedes agregar lógica para enviar email de confirmación
@@ -806,10 +806,10 @@ app.post('/api/admin/requests/:requestId/refund-status', requireAdmin, async (re
 
 app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req, res) => {
     try {
-        if (!dbPool || !fedexClient.isConfigured()) {
+        if (!dbPool || !myeshipClient.isConfigured()) {
             return res.status(503).json({
                 success: false,
-                message: 'FedEx no configurado o DB no disponible'
+                message: 'MyeShip no configurado o DB no disponible'
             });
         }
 
@@ -830,15 +830,15 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
             return res.status(400).json({ success: false, message: 'No se pudo obtener dirección' });
         }
 
-        const label = await fedexClient.createReturnLabel({ order, requestId });
+        const label = await myeshipClient.createReturnLabel({ order, requestId });
 
         if (!label || !label.trackingNumber) {
-            return res.status(400).json({ success: false, message: 'FedEx no generó tracking' });
+            return res.status(400).json({ success: false, message: 'MyeShip no generó tracking' });
         }
 
         const now = new Date().toISOString();
         await executeQuery(
-            `UPDATE returns_requests SET carrier = 'FEDEX', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
+            `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
             [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
         );
 

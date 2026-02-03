@@ -2,7 +2,7 @@
 
 ## 📊 Descripción General
 
-**MON|BLEU Returns Portal** - Sistema integral de devoluciones y cambios con integraciones Shopify, Stripe y FedEx.
+**MON|BLEU Returns Portal** - Sistema integral de devoluciones y cambios con integraciones Shopify, Stripe y MyeShip.
 
 ### Dos Aplicaciones Integradas:
 
@@ -12,7 +12,7 @@
 - ✅ Validación de órdenes Shopify
 - ✅ Upload de fotos de evidencia
 - ✅ Pago con Stripe ($150 flat)
-- ✅ Generación de etiquetas FedEx
+- ✅ Generación de etiquetas MyeShip
 - ✅ Admin dashboard con filtros y exportar CSV
 
 #### 2️⃣ **GESTORCYDMONBLEU** (Flask / Python) - RECIÉN MEJORADO
@@ -21,7 +21,7 @@
 - ✅ Kanban board (Pendiente → Aprobado → Rechazado)
 - ✅ Historial detallado de acciones
 - ✅ Webhook receptor de CYDMONBLEU
-- ✅ Integración Stripe + FedEx
+- ✅ Integración Stripe + MyeShip
 - ✅ API REST para consultas
 
 ---
@@ -36,7 +36,7 @@
 │  2. Sube fotos de evidencia                                      │
 │  3. Selecciona items a devolver                                  │
 │  4. Paga con Stripe ($150)                                       │
-│  5. Se genera guía FedEx automáticamente                         │
+│  5. Se genera guía MyeShip automáticamente                       │
 └───────────────────────┬─────────────────────────────────────────┘
                         │
                         │ WEBHOOK JSON
@@ -49,7 +49,7 @@
 │  ✅ /api/validate-order        → Shopify                        │
 │  ✅ /api/submit-return         → Upload fotos                   │
 │  ✅ /api/create-checkout-session → Stripe                       │
-│  ✅ /api/stripe-webhook        → Trigger FedEx label            │
+│  ✅ /api/stripe-webhook        → Trigger MyeShip label          │
 │  ✅ /admin                     → Dashboard admin                │
 └───────────────────────┬─────────────────────────────────────────┘
                         │
@@ -101,7 +101,7 @@
 | `public/index.html` | Portal cliente (CYDMONBLEU) | ✅ Con preview de fotos |
 | `public/success.html` | Página éxito (CYDMONBLEU) | ✅ Con descarga de guía |
 | `.env.example` | Variables de entorno | ✅ Actualizado |
-| `fedexClient.js` | Integración FedEx OAuth | ✅ Completo |
+| `myeshipClient.js` | Integración MyeShip API | ✅ Completo |
 | `Shopifyclient.js` | Integración Shopify API | ✅ Funcional |
 
 ---
@@ -122,7 +122,7 @@ Cliente → index.html
 Cliente → Stripe Checkout (test mode)
   ├─ Payment Info
   ├─ Webhook → /api/stripe-webhook (server.js)
-  ├─ Genera FedEx label → fedexClient.js
+  ├─ Genera MyeShip label → myeshipClient.js
   └─ Guarda en DB: tracking_number, label_base64
 ```
 
@@ -133,7 +133,7 @@ Admin → /admin (Node.js)
   ├─ Busca por orden/email/tracking
   ├─ Filtra por: estado pago, existencia guía
   ├─ Ver detalle
-  ├─ Descargar guía FedEx
+  ├─ Descargar guía MyeShip
   ├─ Reintentar generación
   └─ Exportar CSV
 ```
@@ -187,7 +187,7 @@ return_requests {
   stripe_session_id    VARCHAR(150)           ← Session ID Stripe (NUEVO)
   
   -- Envío
-  carrier              VARCHAR(50)            ← FEDEX (NUEVO)
+  carrier              VARCHAR(50)            ← MYESHIP (NUEVO)
   tracking_number      VARCHAR(50)            ← Número tracking (NUEVO)
   label_base64         TEXT                   ← PDF en base64 (NUEVO)
   label_mime           VARCHAR(50)            ← application/pdf (NUEVO)
@@ -258,12 +258,10 @@ SHOPIFY_CLIENT_ID=...
 SHOPIFY_CLIENT_SECRET=...
 SHOPIFY_SHOP=your-store.myshopify.com
 
-# FedEx
-FEDEX_ENV=sandbox|production
-FEDEX_CLIENT_ID=...
-FEDEX_CLIENT_SECRET=...
-FEDEX_ACCOUNT_NUMBER=...
-FEDEX_SERVICE_TYPE=FEDEX_GROUND
+# MyeShip
+MYESHIP_API_KEY=...
+MYESHIP_ENV=production
+MYESHIP_AUTO_SELECT_CHEAPEST=false
 RETURN_COMPANY_NAME=MON BLEU
 RETURN_PHONE=+34600000000
 RETURN_ADDRESS1=Calle Principal 123
@@ -342,7 +340,7 @@ WEBHOOK_API_KEY=webhook-demo-key
 - [ ] Desplegar GESTORCYDMONBLEU en Render
 - [ ] Configurar variables de entorno en Render
 - [ ] Probar pago Stripe end-to-end
-- [ ] Activar webhooks FedEx production
+- [ ] Activar webhooks MyeShip (si aplica)
 
 ---
 
@@ -357,7 +355,7 @@ WEBHOOK_API_KEY=webhook-demo-key
 | BD Transacciones | MySQL | ⚠️ Configurable |
 | BD Admin | PostgreSQL/Neon | ✅ Listo |
 | Pagos | Stripe API | ✅ Listo (test) |
-| Envíos | FedEx API | ✅ Listo (sandbox) |
+| Envíos | MyeShip API | ✅ Listo (sandbox) |
 | Órdenes | Shopify API | ✅ Listo |
 | Hosting | Render.com | ✅ Listo |
 | Versionamiento | GitHub | ✅ Listo |

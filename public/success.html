@@ -346,13 +346,13 @@
                 const blob = base64ToBlob(data.labelBase64, mime);
                 const url = URL.createObjectURL(blob);
                 const ext = getExtension(mime);
-                const filename = `guia-${data.trackingNumber || 'fedex'}.${ext}`;
+                const filename = `guia-${data.trackingNumber || 'myeship'}.${ext}`;
 
                 btn.classList.remove('disabled');
                 btn.href = url;
                 btn.download = filename;
                 note.textContent = data.trackingNumber
-                    ? `Tracking FedEx: ${data.trackingNumber}`
+                    ? `Tracking MyeShip: ${data.trackingNumber}`
                     : 'Guía lista para descargar.';
             } catch (err) {
                 console.error('Error descargando guía:', err);

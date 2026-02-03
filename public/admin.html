@@ -188,6 +188,8 @@
 
         .muted { color: var(--text-secondary); font-size: 12px; }
         .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .clickable-row { cursor: pointer; }
+        .clickable-row:hover { background: #f8fafc; }
 
         .link-btn {
             background: transparent;
@@ -683,14 +685,15 @@
 
         function renderRow(r, tabName, tbody) {
             const tr = document.createElement('tr');
+            tr.classList.add('clickable-row');
+            tr.setAttribute('data-request-id', r.id);
             const labelBadge = r.tracking_number
-                ? `<span class="badge success" style="background:#dcfce7;color:${r.carrier === 'FEDEX' ? '#ca8a04' : '#16a34a'};">${r.carrier || 'Generada'}</span>`
+                ? `<span class="badge success" style="background:#dcfce7;color:#16a34a;">${r.carrier || 'Generada'}</span>`
                 : '<span class="badge no-label">Sin guía</span>';
 
             const isCambio = tabName === 'cambios';
             const isCompletadas = tabName === 'completadas';
             const actions = `
-                <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
                 <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
                 <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
                 ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
@@ -923,7 +926,7 @@
         }
 
         async function retryLabel(requestId) {
-            if (!confirm('¿Regenerar guía FedEx?')) return;
+            if (!confirm('¿Regenerar guía MyeShip?')) return;
             try {
                 const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/retry-label`, { method: 'POST' });
                 const data = await res.json();
@@ -1109,35 +1112,50 @@
 
         document.getElementById('tbody-cambios').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-action]');
-            if (!btn) return;
-            const id = btn.getAttribute('data-id');
-            const action = btn.getAttribute('data-action');
-            if (action === 'detail') viewDetail(id);
-            else if (action === 'label') downloadLabel(id);
-            else if (action === 'retry') retryLabel(id);
-            else if (action === 'complete') completeRequest(id);
-            else if (action === 'refund-status') changeRefundStatus(id);
+            if (btn) {
+                const id = btn.getAttribute('data-id');
+                const action = btn.getAttribute('data-action');
+                if (action === 'label') downloadLabel(id);
+                else if (action === 'retry') retryLabel(id);
+                else if (action === 'complete') completeRequest(id);
+                else if (action === 'refund-status') changeRefundStatus(id);
+                return;
+            }
+            const row = e.target.closest('tr[data-request-id]');
+            if (!row) return;
+            const id = row.getAttribute('data-request-id');
+            if (id) viewDetail(id);
         });
 
         document.getElementById('tbody-reembolsos').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-action]');
-            if (!btn) return;
-            const id = btn.getAttribute('data-id');
-            const action = btn.getAttribute('data-action');
-            if (action === 'detail') viewDetail(id);
-            else if (action === 'label') downloadLabel(id);
-            else if (action === 'retry') retryLabel(id);
-            else if (action === 'complete') completeRequest(id);
+            if (btn) {
+                const id = btn.getAttribute('data-id');
+                const action = btn.getAttribute('data-action');
+                if (action === 'label') downloadLabel(id);
+                else if (action === 'retry') retryLabel(id);
+                else if (action === 'complete') completeRequest(id);
+                return;
+            }
+            const row = e.target.closest('tr[data-request-id]');
+            if (!row) return;
+            const id = row.getAttribute('data-request-id');
+            if (id) viewDetail(id);
         });
 
         document.getElementById('tbody-completadas').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-action]');
-            if (!btn) return;
-            const id = btn.getAttribute('data-id');
-            const action = btn.getAttribute('data-action');
-            if (action === 'detail') viewDetail(id);
-            else if (action === 'label') downloadLabel(id);
-            else if (action === 'retry') retryLabel(id);
+            if (btn) {
+                const id = btn.getAttribute('data-id');
+                const action = btn.getAttribute('data-action');
+                if (action === 'label') downloadLabel(id);
+                else if (action === 'retry') retryLabel(id);
+                return;
+            }
+            const row = e.target.closest('tr[data-request-id]');
+            if (!row) return;
+            const id = row.getAttribute('data-request-id');
+            if (id) viewDetail(id);
         });
 
         // Inicializar tabs y cargar datos

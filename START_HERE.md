@@ -99,11 +99,10 @@ STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# FedEx (opcional - para etiquetas)
-FEDEX_ENV=sandbox
-FEDEX_CLIENT_ID=
-FEDEX_CLIENT_SECRET=
-FEDEX_ACCOUNT_NUMBER=
+# MyeShip (opcional - para etiquetas)
+MYESHIP_API_KEY=
+MYESHIP_ENV=production
+MYESHIP_AUTO_SELECT_CHEAPEST=false
 
 # Admin
 ADMIN_USER=admin
@@ -217,7 +216,7 @@ CYDMONBLEU/
 ├── uploads/                    ← Fotos clientes
 │
 ├── Shopifyclient.js           ← API Shopify
-├── fedexClient.js             ← API FedEx
+├── myeshipClient.js           ← API MyeShip
 │
 └── docs/                       ← Documentación
     ├── NEON_SETUP_GUIDE.md
@@ -265,7 +264,7 @@ mysql -u root -p -e "DROP DATABASE cydmonbleu;"
    ↓
 5. Webhook confirma pago
    ↓
-6. Sistema genera guía FedEx automáticamente
+6. Sistema genera guía MyeShip automáticamente
    ↓
 7. Cliente recibe email con guía
    ↓
@@ -365,7 +364,7 @@ Ver [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) para más detalles.
 - ✅ Razón de devolución
 - ✅ Cambio de talla (si aplica)
 - ✅ Pago con Stripe ($150)
-- ✅ Generación automática guía FedEx
+- ✅ Generación automática guía MyeShip
 
 ### Panel Admin:
 - ✅ Dashboard con estadísticas
@@ -374,13 +373,13 @@ Ver [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) para más detalles.
 - ✅ Filtros por estado
 - ✅ Ver detalles completos
 - ✅ Descargar guía PDF
-- ✅ Regenerar guía FedEx
+- ✅ Regenerar guía MyeShip
 - ✅ Exportar a CSV
 
 ### Integraciones:
 - ✅ Shopify API - Validar órdenes
 - ✅ Stripe API - Procesar pagos
-- ✅ FedEx API - Generar etiquetas
+- ✅ MyeShip API - Generar etiquetas
 - ✅ PostgreSQL/MySQL - Base de datos
 
 ---

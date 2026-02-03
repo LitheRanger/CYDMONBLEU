@@ -32,11 +32,10 @@ STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# FedEx (PRODUCCIÓN)
-FEDEX_ENV=production
-FEDEX_CLIENT_ID=tu_client_id_real
-FEDEX_CLIENT_SECRET=tu_secret_real
-FEDEX_ACCOUNT_NUMBER=tu_numero_cuenta
+# MyeShip (PRODUCCIÓN)
+MYESHIP_API_KEY=tu_api_key_real
+MYESHIP_ENV=production
+MYESHIP_AUTO_SELECT_CHEAPEST=false
 
 # Admin Panel
 ADMIN_USER=admin
@@ -148,7 +147,7 @@ Verás queries y performance de la BD.
 - [ ] Webhook secret es el de producción
 - [ ] `NODE_ENV=production`
 - [ ] `.env` NO está en GitHub (verificado en `.gitignore`)
-- [ ] FedEx keys son de producción (no sandbox)
+- [ ] MyeShip API key es de producción (no sandbox)
 - [ ] Database connection usa SSL (`?sslmode=require`)
 
 ---
