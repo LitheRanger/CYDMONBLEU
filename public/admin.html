@@ -797,13 +797,20 @@
                 console.log('Items source (1):', itemsSource);
                 
                 if (!Array.isArray(itemsSource) || itemsSource.length === 0) {
-                    try {
-                        const parsed = JSON.parse(r.items_json || '[]');
-                        itemsSource = Array.isArray(parsed) ? parsed : [];
-                        console.log('Items parsed from JSON:', itemsSource);
-                    } catch (e) {
-                        console.error('Error parsing items_json:', e);
-                        itemsSource = [];
+                    // items_json puede venir ya parseado (PostgreSQL JSONB) o como string
+                    if (typeof r.items_json === 'string') {
+                        try {
+                            const parsed = JSON.parse(r.items_json);
+                            itemsSource = Array.isArray(parsed) ? parsed : [];
+                            console.log('Items parsed from JSON string:', itemsSource);
+                        } catch (e) {
+                            console.error('Error parsing items_json:', e);
+                            itemsSource = [];
+                        }
+                    } else if (r.items_json && typeof r.items_json === 'object') {
+                        // Ya viene parseado (PostgreSQL)
+                        itemsSource = Array.isArray(r.items_json) ? r.items_json : [];
+                        console.log('Items already parsed (JSONB):', itemsSource);
                     }
                 }
                 console.log('Final itemsSource:', itemsSource);
