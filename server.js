@@ -338,17 +338,7 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
             });
         }
 
-        // Evitar órdenes duplicadas
-        const [existing] = await executeQuery(
-            `SELECT id FROM returns_requests WHERE order_id = ? LIMIT 1`,
-            [String(orderId || '')]
-        );
-        if (existing && existing[0] && existing[0].id) {
-            return res.status(409).json({
-                success: false,
-                message: "Esta orden ya fue registrada."
-            });
-        }
+        // Permitir órdenes duplicadas (validación desactivada temporalmente)
 
         // Guardar en DB
         const filesMeta = (files || []).map(f => ({
