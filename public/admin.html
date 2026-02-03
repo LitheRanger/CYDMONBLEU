@@ -790,14 +790,22 @@
 
                 const r = data.data;
                 const itemsSource = r.items_selected || r.items || [];
+                const isCambio = String(r.return_type || '').toLowerCase() === 'cambio';
                 const items = itemsSource.map(i => {
                     const name = i.name || 'Producto';
                     const variant = i.current_variant_title || 'Variante';
                     const qty = i.quantity || 1;
                     const reason = i.reason || 'Sin razón';
-                    const replacementTitle = i.replacementTitle ? ` • Cambio a: ${i.replacementTitle}` : '';
-                    const replacementId = !replacementTitle && i.replacementVariantId ? ` • Cambio a ID: ${i.replacementVariantId}` : '';
-                    return `<div class="muted">- ${name} (${variant}) x${qty} • ${reason}${replacementTitle}${replacementId}</div>`;
+                    const replacementDisplay = i.replacementTitle
+                        ? i.replacementTitle
+                        : (i.replacementVariantId ? `ID ${i.replacementVariantId}` : 'No seleccionado');
+                    const replacementLine = isCambio
+                        ? `<div class="muted" style="margin-left:12px;">Reemplazo: ${replacementDisplay}</div>`
+                        : '';
+                    return `
+                        <div class="muted">- ${name} (${variant}) x${qty} • ${reason}</div>
+                        ${replacementLine}
+                    `;
                 }).join('') || '<span class="muted">Sin items</span>';
                 const files = (r.files || []).map(f => {
                     const isImage = (f.mimetype || '').startsWith('image/');

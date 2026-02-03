@@ -640,20 +640,69 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
 
         let itemsSelected = parsedItems;
         try {
-            const order = await shopifyClient.getOrderById(row.order_id);
+            let order = await shopifyClient.getOrderById(row.order_id);
+            if (!order) {
+                const rawOrderId = String(row.order_id || '').trim();
+                const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
+                order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
+            }
+
+            const variantCache = new Map();
+            const getVariant = async (variantId) => {
+                if (!variantId) return null;
+                const key = String(variantId);
+                if (variantCache.has(key)) return variantCache.get(key);
+                const v = await shopifyClient.getVariantById(variantId);
+                variantCache.set(key, v);
+                return v;
+            };
+
             if (order && Array.isArray(order.line_items)) {
-                itemsSelected = parsedItems.map((item) => {
+                itemsSelected = await Promise.all(parsedItems.map(async (item) => {
                     const line = order.line_items.find(li => String(li.variant_id) === String(item.variantId || item.id));
+                    let replacementTitle = item.replacementTitle || '';
+                    if (!replacementTitle && item.replacementVariantId) {
+                        const replacementVariant = await getVariant(item.replacementVariantId);
+                        replacementTitle = replacementVariant?.title || '';
+                    }
+
+                    let currentVariantTitle = line?.variant_title || item.current_variant_title || '';
+                    if (!currentVariantTitle && (item.variantId || item.id)) {
+                        const originalVariant = await getVariant(item.variantId || item.id);
+                        currentVariantTitle = originalVariant?.title || '';
+                    }
+
                     return {
                         ...item,
                         name: line?.name || line?.title || item.name || 'Producto',
-                        current_variant_title: line?.variant_title || item.current_variant_title || 'Variante',
+                        current_variant_title: currentVariantTitle || 'Variante',
                         quantity: line?.quantity || item.quantity || 1,
                         price: line?.price || item.price,
                         product_id: line?.product_id || item.product_id,
-                        sku: line?.sku || item.sku
+                        sku: line?.sku || item.sku,
+                        replacementTitle
                     };
-                });
+                }));
+            } else {
+                itemsSelected = await Promise.all(parsedItems.map(async (item) => {
+                    let replacementTitle = item.replacementTitle || '';
+                    if (!replacementTitle && item.replacementVariantId) {
+                        const replacementVariant = await getVariant(item.replacementVariantId);
+                        replacementTitle = replacementVariant?.title || '';
+                    }
+
+                    let currentVariantTitle = item.current_variant_title || '';
+                    if (!currentVariantTitle && (item.variantId || item.id)) {
+                        const originalVariant = await getVariant(item.variantId || item.id);
+                        currentVariantTitle = originalVariant?.title || '';
+                    }
+
+                    return {
+                        ...item,
+                        current_variant_title: currentVariantTitle || 'Variante',
+                        replacementTitle
+                    };
+                }));
             }
         } catch (e) {
             console.warn('No se pudo enriquecer items desde Shopify:', e?.message || e);

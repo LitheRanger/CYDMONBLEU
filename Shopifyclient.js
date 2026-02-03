@@ -98,6 +98,17 @@ class ShopifyTokenManager {
     }
   }
 
+  // 1.2 Buscar Variante por ID (Para mostrar talla/color en cambios)
+  async getVariantById(variantId) {
+    try {
+      const data = await this.makeRequest(`/admin/api/2024-01/variants/${variantId}.json`);
+      return data.variant || null;
+    } catch (e) {
+      console.error(`Error buscando variante ${variantId}`);
+      return null;
+    }
+  }
+
   // 2. Obtener Detalles de Producto (Para el Modal de Tallas)
   async getProductDetails(productId) {
     try {
