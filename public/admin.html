@@ -422,6 +422,7 @@
         <div class="tabs">
             <button class="tab-btn active" data-tab="cambios">📦 Cambios</button>
             <button class="tab-btn" data-tab="reembolsos">💵 Reembolsos</button>
+            <button class="tab-btn" data-tab="completadas">✅ Completadas</button>
         </div>
 
         <!-- TAB: CAMBIOS -->
@@ -478,6 +479,34 @@
                 <button class="pager-btn" id="next-reembolsos">Siguiente ▶</button>
             </div>
         </div>
+
+        <!-- TAB: COMPLETADAS -->
+        <div class="tab-content" id="tab-completadas">
+            <div id="loading-completadas" class="loading">Cargando completadas…</div>
+            <div id="summary-completadas" class="summary"></div>
+            <table class="table" id="table-completadas">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Orden</th>
+                        <th>Contacto</th>
+                        <th>Tipo</th>
+                        <th>Pago</th>
+                        <th>Monto</th>
+                        <th>Guía</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-completadas"></tbody>
+            </table>
+            <div id="empty-completadas" class="empty" style="display:none;">Sin completadas</div>
+            <div class="pagination" id="pagination-completadas" style="display:none;">
+                <button class="pager-btn" id="prev-completadas">◀ Anterior</button>
+                <div class="muted" id="page-info-completadas">Página 1</div>
+                <button class="pager-btn" id="next-completadas">Siguiente ▶</button>
+            </div>
+        </div>
     </div>
 
     <div class="modal" id="modal">
@@ -499,10 +528,13 @@
         let requests = [];
         let cambios = [];
         let reembolsos = [];
+        let completadas = [];
         let filteredCambios = [];
         let filteredReembolsos = [];
+        let filteredCompletadas = [];
         let currentTabCambios = 1;
         let currentTabReembolsos = 1;
+        let currentTabCompletadas = 1;
         let activeTab = 'cambios';
         const pageSize = 50;
 
@@ -551,17 +583,24 @@
 
         function updateSummaryTab(tabName, data) {
             const summary = document.getElementById(`summary-${tabName}`);
-            const total = tabName === 'cambios' ? cambios.length : reembolsos.length;
+            if (!summary) return;
+            let total = 0;
+            if (tabName === 'cambios') total = cambios.length;
+            else if (tabName === 'reembolsos') total = reembolsos.length;
+            else if (tabName === 'completadas') total = completadas.length;
             summary.textContent = `Mostrando ${data.length} de ${total} solicitudes`;
         }
 
         function updatePaginationTab(tabName, data) {
-            const currentPage = tabName === 'cambios' ? currentTabCambios : currentTabReembolsos;
+            const currentPage = tabName === 'cambios'
+                ? currentTabCambios
+                : (tabName === 'reembolsos' ? currentTabReembolsos : currentTabCompletadas);
             const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
             const newPage = currentPage > totalPages ? totalPages : currentPage;
             
             if (tabName === 'cambios') currentTabCambios = newPage;
-            else currentTabReembolsos = newPage;
+            else if (tabName === 'reembolsos') currentTabReembolsos = newPage;
+            else currentTabCompletadas = newPage;
 
             document.getElementById(`page-info-${tabName}`).textContent = `Página ${newPage} de ${totalPages}`;
             document.getElementById(`prev-${tabName}`).disabled = newPage <= 1;
@@ -588,7 +627,9 @@
             }
             empty.style.display = 'none';
 
-            const currentPage = tabName === 'cambios' ? currentTabCambios : currentTabReembolsos;
+            const currentPage = tabName === 'cambios'
+                ? currentTabCambios
+                : (tabName === 'reembolsos' ? currentTabReembolsos : currentTabCompletadas);
             const start = (currentPage - 1) * pageSize;
             const pageData = data.slice(start, start + pageSize);
 
@@ -599,18 +640,20 @@
                     : '<span class="badge no-label">Sin guía</span>';
 
                 const isCambio = tabName === 'cambios';
+                const isCompletadas = tabName === 'completadas';
                 const actions = `
                     <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
                     <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
                     <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
                     ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
-                    <button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>
+                    ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
                 `;
 
                 tr.innerHTML = `
                     <td>${r.id}</td>
                     <td><strong>${r.order_id || '—'}</strong></td>
                     <td class="muted">${r.contact_email || '—'}</td>
+                    ${tabName === 'completadas' ? `<td>${r.return_type || '—'}</td>` : ''}
                     <td>${badge(r.payment_status)}</td>
                     ${isCambio ? `<td>${refundBadge(r.refund_status)}</td>` : ''}
                     <td>${formatCurrency(r.amount)}</td>
@@ -634,6 +677,7 @@
                     requests = data.data || [];
                     cambios = requests.filter(r => r.return_type === 'cambio');
                     reembolsos = requests.filter(r => r.return_type === 'reembolso');
+                    completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed');
                     updateStats();
                     applyFilter();
                 } else {
@@ -673,10 +717,23 @@
                 return true;
             });
 
+            // Filtrar COMPLETADAS
+            filteredCompletadas = completadas.filter(r => {
+                const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+                if (status && r.payment_status !== status) return false;
+                if (label === 'yes' && !r.tracking_number) return false;
+                if (label === 'no' && r.tracking_number) return false;
+                if (refund && r.refund_status !== refund) return false;
+                return true;
+            });
+
             currentTabCambios = 1;
             currentTabReembolsos = 1;
+            currentTabCompletadas = 1;
             renderTab('cambios', filteredCambios);
             renderTab('reembolsos', filteredReembolsos);
+            renderTab('completadas', filteredCompletadas);
         }
 
         async function viewDetail(requestId) {
@@ -841,8 +898,10 @@
             let source = [];
             if (activeTab === 'cambios') {
                 source = filteredCambios.length ? filteredCambios : cambios;
-            } else {
+            } else if (activeTab === 'reembolsos') {
                 source = filteredReembolsos.length ? filteredReembolsos : reembolsos;
+            } else {
+                source = filteredCompletadas.length ? filteredCompletadas : completadas;
             }
             const rows = source.map(r => [
                 r.id,
@@ -934,6 +993,22 @@
             }
         });
 
+        // Event listeners para completadas
+        document.getElementById('prev-completadas').addEventListener('click', () => {
+            if (currentTabCompletadas > 1) {
+                currentTabCompletadas--;
+                renderTab('completadas', filteredCompletadas.length ? filteredCompletadas : completadas);
+            }
+        });
+        document.getElementById('next-completadas').addEventListener('click', () => {
+            const data = filteredCompletadas.length ? filteredCompletadas : completadas;
+            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+            if (currentTabCompletadas < totalPages) {
+                currentTabCompletadas++;
+                renderTab('completadas', data);
+            }
+        });
+
         document.getElementById('btn-refresh').addEventListener('click', loadRequests);
         document.getElementById('btn-export').addEventListener('click', exportCSV);
         document.getElementById('search').addEventListener('input', applyFilter);
@@ -963,6 +1038,16 @@
             else if (action === 'label') downloadLabel(id);
             else if (action === 'retry') retryLabel(id);
             else if (action === 'complete') completeRequest(id);
+        });
+
+        document.getElementById('tbody-completadas').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            const id = btn.getAttribute('data-id');
+            const action = btn.getAttribute('data-action');
+            if (action === 'detail') viewDetail(id);
+            else if (action === 'label') downloadLabel(id);
+            else if (action === 'retry') retryLabel(id);
         });
 
         // Inicializar tabs y cargar datos
