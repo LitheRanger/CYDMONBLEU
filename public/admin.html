@@ -367,6 +367,11 @@
                     <option value="yes">Con guía</option>
                     <option value="no">Sin guía</option>
                 </select>
+                <select id="filter-refund">
+                    <option value="">Todos los reembolsos</option>
+                    <option value="pending_receipt">Por Recibir</option>
+                    <option value="pending_shipment">Por Enviar</option>
+                </select>
             </div>
             <div class="toolbar-group">
                 <button class="btn" id="btn-refresh">Actualizar</button>
@@ -384,7 +389,7 @@
                     <th>Contacto</th>
                     <th>Tipo</th>
                     <th>Pago</th>
-                    <th>Estado</th>
+                    <th>Reembolso</th>
                     <th>Monto</th>
                     <th>Guía</th>
                     <th>Fecha</th>
@@ -446,6 +451,13 @@
             return '<span class="badge pending">Abierta</span>';
         }
 
+        function refundBadge(status) {
+            const s = String(status || 'pending_receipt').toLowerCase();
+            if (s === 'pending_receipt') return '<span class="badge pending">Por Recibir</span>';
+            if (s === 'pending_shipment') return '<span class="badge warning" style="background:#fef3c7;color:#92400e;">Por Enviar</span>';
+            return '<span class="badge pending">Por Recibir</span>';
+        }
+
         function updateStats() {
             const total = requests.length;
             const paid = requests.filter(r => r.payment_status === 'paid').length;
@@ -497,7 +509,7 @@
                     <td class="muted">${r.contact_email || '—'}</td>
                     <td>${r.return_type || '—'}</td>
                     <td>${badge(r.payment_status)}</td>
-                    <td>${adminBadge(r.admin_status)}</td>
+                    <td>${refundBadge(r.refund_status)}</td>
                     <td>${formatCurrency(r.amount)}</td>
                     <td>${labelBadge}</td>
                     <td class="muted">${formatDate(r.created_at)}</td>
@@ -506,6 +518,7 @@
                             <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
                             <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
                             <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
+                            ${r.return_type === 'cambio' ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
                             <button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>
                         </div>
                     </td>
@@ -542,6 +555,7 @@
             const q = (document.getElementById('search').value || '').toLowerCase();
             const status = document.getElementById('filter-status').value;
             const label = document.getElementById('filter-label').value;
+            const refund = document.getElementById('filter-refund').value;
 
             const filtered = requests.filter(r => {
                 const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
@@ -549,6 +563,7 @@
                 if (status && r.payment_status !== status) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
                 if (label === 'no' && r.tracking_number) return false;
+                if (refund && r.refund_status !== refund) return false;
                 return true;
             });
             filteredRequests = filtered;
@@ -615,6 +630,10 @@
                         <div>${r.tracking_number || '<span class="muted">Sin guía</span>'}</div>
                     </div>
                     <div class="detail-row">
+                        <div class="detail-label">Estado Reembolso</div>
+                        <div>${refundBadge(r.refund_status)}</div>
+                    </div>
+                    <div class="detail-row">
                         <div class="detail-label">Creada</div>
                         <div>${formatDate(r.created_at)}</div>
                     </div>
@@ -655,6 +674,35 @@
                 const data = await res.json();
                 if (data.success) {
                     alert(`Guía regenerada: ${data.trackingNumber}`);
+                    loadRequests();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        }
+
+        async function changeRefundStatus(requestId) {
+            // Obtener solicitud para saber estado actual
+            const req = requests.find(r => r.id == requestId);
+            if (!req) return;
+
+            const currentStatus = req.refund_status || 'pending_receipt';
+            const newStatus = currentStatus === 'pending_receipt' ? 'pending_shipment' : 'pending_receipt';
+            
+            const statusLabel = newStatus === 'pending_receipt' ? 'Por Recibir' : 'Por Enviar';
+            if (!confirm(`¿Cambiar estado a "${statusLabel}"?`)) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/refund-status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Estado actualizado correctamente');
                     loadRequests();
                 } else {
                     alert(`Error: ${data.message}`);
@@ -714,6 +762,7 @@
         document.getElementById('search').addEventListener('input', applyFilter);
         document.getElementById('filter-status').addEventListener('change', applyFilter);
         document.getElementById('filter-label').addEventListener('change', applyFilter);
+        document.getElementById('filter-refund').addEventListener('change', applyFilter);
         document.getElementById('close-modal').addEventListener('click', () => document.getElementById('modal').classList.remove('show'));
         document.getElementById('prev-page').addEventListener('click', () => {
             if (currentPage > 1) {
@@ -739,6 +788,7 @@
             else if (action === 'label') downloadLabel(id);
             else if (action === 'retry') retryLabel(id);
             else if (action === 'complete') completeRequest(id);
+            else if (action === 'refund-status') changeRefundStatus(id);
         });
 
         loadRequests();

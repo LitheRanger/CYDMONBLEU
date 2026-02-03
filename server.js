@@ -664,6 +664,59 @@ app.post('/api/admin/requests/:requestId/complete', requireAdmin, async (req, re
     }
 });
 
+app.post('/api/admin/requests/:requestId/refund-status', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const requestId = req.params.requestId;
+        const { status } = req.body;
+
+        // Obtener solicitud actual para validar tipo
+        const [rows] = await executeQuery(
+            `SELECT return_type FROM returns_requests WHERE id = ? LIMIT 1`,
+            [requestId]
+        );
+
+        if (!rows || !rows[0]) {
+            return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+        }
+
+        const returnType = rows[0].return_type || 'reembolso';
+        
+        // Para reembolsos: solo permitir 'pending_receipt'
+        if (returnType === 'reembolso' && status !== 'pending_receipt') {
+            return res.status(400).json({
+                success: false,
+                message: 'Los reembolsos solo pueden estar en estado "Por Recibir"'
+            });
+        }
+
+        // Para cambios: permitir ambos estados
+        if (returnType === 'cambio' && !['pending_receipt', 'pending_shipment'].includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Estado inválido para cambios'
+            });
+        }
+
+        await executeQuery(
+            `UPDATE returns_requests SET refund_status = ? WHERE id = ?`,
+            [status, requestId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Estado actualizado correctamente',
+            refund_status: status
+        });
+    } catch (err) {
+        console.error('Error updating refund status:', err);
+        res.status(500).json({ success: false, message: 'Error actualizando estado' });
+    }
+});
+
 app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req, res) => {
     try {
         if (!dbPool || !fedexClient.isConfigured()) {
