@@ -1924,7 +1924,8 @@
             itemsPayload.push({
                 variantId: original.id,
                 reason: s.reason,
-                replacementVariantId: (tipoFinal === 'Cambio') ? s.replacementVariantId : null
+                replacementVariantId: (tipoFinal === 'Cambio') ? s.replacementVariantId : null,
+                replacementTitle: (tipoFinal === 'Cambio') ? (s.replacementTitle || '') : ''
             });
         });
         formData.append('items', JSON.stringify(itemsPayload));

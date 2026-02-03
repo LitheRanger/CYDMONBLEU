@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS returns_requests (
     payment_status VARCHAR(32) DEFAULT 'pending',  -- pending, paid, failed
     stripe_session_id VARCHAR(255),
     admin_status VARCHAR(32) DEFAULT 'open',  -- open, completed
+    refund_status VARCHAR(32) DEFAULT 'pending_receipt',  -- pending_receipt, pending_shipment
     
     -- Envío (FedEx)
     carrier VARCHAR(32),  -- FEDEX, UPS, etc.
@@ -42,7 +43,8 @@ CREATE TABLE IF NOT EXISTS returns_requests (
     INDEX idx_tracking_number (tracking_number),
     
     -- Constraints
-    CONSTRAINT chk_payment_status CHECK (payment_status IN ('pending', 'paid', 'failed'))
+    CONSTRAINT chk_payment_status CHECK (payment_status IN ('pending', 'paid', 'failed')),
+    CONSTRAINT chk_refund_status CHECK (refund_status IN ('pending_receipt', 'pending_shipment'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. CREAR TABLA RETURNS_REQUEST_HISTORIAL

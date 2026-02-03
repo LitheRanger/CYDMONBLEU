@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS returns_requests (
     payment_status VARCHAR(32) DEFAULT 'pending',
     stripe_session_id VARCHAR(255),
     admin_status VARCHAR(32) DEFAULT 'open',
+    refund_status VARCHAR(32) DEFAULT 'pending_receipt',
     
     -- Envío (FedEx)
     carrier VARCHAR(32),
@@ -35,7 +36,8 @@ CREATE TABLE IF NOT EXISTS returns_requests (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     -- Constraints
-    CONSTRAINT chk_payment_status CHECK (payment_status IN ('pending', 'paid', 'failed'))
+    CONSTRAINT chk_payment_status CHECK (payment_status IN ('pending', 'paid', 'failed')),
+    CONSTRAINT chk_refund_status CHECK (refund_status IN ('pending_receipt', 'pending_shipment'))
 );
 
 -- Índices

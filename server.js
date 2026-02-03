@@ -98,6 +98,10 @@ async function initDb() {
                 await dbPool.query(
                     `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS admin_status VARCHAR(32) DEFAULT 'open'`
                 );
+                // Agregar columna refund_status si no existe
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS refund_status VARCHAR(32) DEFAULT 'pending_receipt'`
+                );
                 console.log('✅ DB lista: tabla returns_requests verificada (PostgreSQL)');
             } else {
                 console.warn('⚠️ Tabla returns_requests no existe en PostgreSQL - ejecuta migración en Neon');
@@ -132,6 +136,16 @@ async function initDb() {
             if (cols && cols[0] && cols[0].cnt === 0) {
                 await dbPool.execute(
                     `ALTER TABLE returns_requests ADD COLUMN admin_status VARCHAR(32) DEFAULT 'open'`
+                );
+            }
+            // Agregar columna refund_status si no existe
+            const [refundCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'refund_status']
+            );
+            if (refundCols && refundCols[0] && refundCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN refund_status VARCHAR(32) DEFAULT 'pending_receipt'`
                 );
             }
             console.log('✅ DB lista: tabla returns_requests verificada (MySQL)');
