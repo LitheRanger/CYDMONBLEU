@@ -156,7 +156,7 @@ async function initDb() {
 }
 
 if (!dbDisabled) {
-    initDb();
+    // DB será inicializada en startServer()
 } else {
     console.warn('⚠️ Base de datos desactivada temporalmente (DISABLE_DB=true)');
 }
@@ -831,9 +831,24 @@ app.get('/api/label/:requestId', async (req, res) => {
 });
 
 // --- 4. INICIAR SERVIDOR ---
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`--------------------------------------------------`);
-    console.log(`🚀 Servidor MON|BLEU listo en http://localhost:${PORT}`);
-    console.log(`--------------------------------------------------`);
-});
+async function startServer() {
+    try {
+        // Esperar a que se inicialice la BD
+        if (!dbDisabled) {
+            await initDb();
+            console.log('✅ Inicialización de BD completada');
+        }
+        
+        const PORT = process.env.PORT || 3000;
+        app.listen(PORT, () => {
+            console.log(`--------------------------------------------------`);
+            console.log(`🚀 Servidor MON|BLEU listo en http://localhost:${PORT}`);
+            console.log(`--------------------------------------------------`);
+        });
+    } catch (err) {
+        console.error('❌ Error al iniciar servidor:', err);
+        process.exit(1);
+    }
+}
+
+startServer();
