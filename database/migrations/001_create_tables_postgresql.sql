@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS returns_requests (
     amount DECIMAL(10, 2) NOT NULL,
     payment_status VARCHAR(32) DEFAULT 'pending',
     stripe_session_id VARCHAR(255),
+    admin_status VARCHAR(32) DEFAULT 'open',
     
     -- Envío (FedEx)
     carrier VARCHAR(32),

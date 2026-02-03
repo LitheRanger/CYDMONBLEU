@@ -384,6 +384,7 @@
                     <th>Contacto</th>
                     <th>Tipo</th>
                     <th>Pago</th>
+                    <th>Estado</th>
                     <th>Monto</th>
                     <th>Guía</th>
                     <th>Fecha</th>
@@ -439,6 +440,12 @@
             return '<span class="badge pending">Pendiente</span>';
         }
 
+        function adminBadge(status) {
+            const s = String(status || 'open').toLowerCase();
+            if (s === 'completed') return '<span class="badge paid">Completada</span>';
+            return '<span class="badge pending">Abierta</span>';
+        }
+
         function updateStats() {
             const total = requests.length;
             const paid = requests.filter(r => r.payment_status === 'paid').length;
@@ -490,6 +497,7 @@
                     <td class="muted">${r.contact_email || '—'}</td>
                     <td>${r.return_type || '—'}</td>
                     <td>${badge(r.payment_status)}</td>
+                    <td>${adminBadge(r.admin_status)}</td>
                     <td>${formatCurrency(r.amount)}</td>
                     <td>${labelBadge}</td>
                     <td class="muted">${formatDate(r.created_at)}</td>
@@ -498,6 +506,7 @@
                             <button class="link-btn" data-id="${r.id}" data-action="detail">Ver</button>
                             <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
                             <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
+                            <button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>
                         </div>
                     </td>
                 `;
@@ -582,6 +591,10 @@
                         <div>${badge(r.payment_status)}</div>
                     </div>
                     <div class="detail-row">
+                        <div class="detail-label">Estado</div>
+                        <div>${adminBadge(r.admin_status)}</div>
+                    </div>
+                    <div class="detail-row">
                         <div class="detail-label">Monto</div>
                         <div>${formatCurrency(r.amount)}</div>
                     </div>
@@ -651,8 +664,24 @@
             }
         }
 
+        async function completeRequest(requestId) {
+            if (!confirm('¿Marcar solicitud como completada?')) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/complete`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Solicitud marcada como completada');
+                    loadRequests();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        }
+
         function exportCSV() {
-            const headers = ['ID', 'Orden', 'Correo', 'Tipo', 'Pago', 'Monto', 'Tracking', 'Fecha'];
+            const headers = ['ID', 'Orden', 'Correo', 'Tipo', 'Pago', 'Estado', 'Monto', 'Tracking', 'Fecha'];
             const source = filteredRequests.length ? filteredRequests : requests;
             const rows = source.map(r => [
                 r.id,
@@ -660,6 +689,7 @@
                 r.contact_email,
                 r.return_type,
                 r.payment_status,
+                r.admin_status || 'open',
                 r.amount,
                 r.tracking_number || '—',
                 new Date(r.created_at).toISOString()
@@ -708,6 +738,7 @@
             if (action === 'detail') viewDetail(id);
             else if (action === 'label') downloadLabel(id);
             else if (action === 'retry') retryLabel(id);
+            else if (action === 'complete') completeRequest(id);
         });
 
         loadRequests();

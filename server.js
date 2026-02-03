@@ -94,6 +94,10 @@ async function initDb() {
                 `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='returns_requests')`
             );
             if (result.rows[0].exists) {
+                // Agregar columna admin_status si no existe
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS admin_status VARCHAR(32) DEFAULT 'open'`
+                );
                 console.log('✅ DB lista: tabla returns_requests verificada (PostgreSQL)');
             } else {
                 console.warn('⚠️ Tabla returns_requests no existe en PostgreSQL - ejecuta migración en Neon');
@@ -120,6 +124,16 @@ async function initDb() {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             `;
             await dbPool.execute(createTableSQL);
+            // Agregar columna admin_status si no existe
+            const [cols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'admin_status']
+            );
+            if (cols && cols[0] && cols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN admin_status VARCHAR(32) DEFAULT 'open'`
+                );
+            }
             console.log('✅ DB lista: tabla returns_requests verificada (MySQL)');
         }
     } catch (err) {
@@ -324,6 +338,18 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
             });
         }
 
+        // Evitar órdenes duplicadas
+        const [existing] = await executeQuery(
+            `SELECT id FROM returns_requests WHERE order_id = ? LIMIT 1`,
+            [String(orderId || '')]
+        );
+        if (existing && existing[0] && existing[0].id) {
+            return res.status(409).json({
+                success: false,
+                message: "Esta orden ya fue registrada."
+            });
+        }
+
         // Guardar en DB
         const filesMeta = (files || []).map(f => ({
             fieldname: f.fieldname,
@@ -490,7 +516,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         // Actualizar DB con estado de pago
         if (dbPool && requestId) {
             try {
-                await dbPool.execute(
+                await executeQuery(
                     `UPDATE returns_requests SET payment_status = 'paid', stripe_session_id = ? WHERE id = ?`,
                     [session.id, requestId]
                 );
@@ -509,9 +535,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                 } else {
                     const label = await fedexClient.createReturnLabel({ order, requestId });
                     if (label && label.trackingNumber) {
-                        await dbPool.execute(
-                            `UPDATE returns_requests SET carrier = 'FEDEX', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = NOW() WHERE id = ?`,
-                            [label.trackingNumber, label.labelBase64, label.labelMime, requestId]
+                        const now = new Date().toISOString();
+                        await executeQuery(
+                            `UPDATE returns_requests SET carrier = 'FEDEX', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
+                            [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
                         );
                         console.log(`📦 Guía FedEx generada: ${label.trackingNumber}`);
                     } else {
@@ -563,7 +590,7 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
 
         const [rows] = await executeQuery(
             `SELECT id, order_id, contact_email, return_type, items_json, amount, payment_status, stripe_session_id,
-                    carrier, tracking_number, label_created_at, created_at
+                    carrier, tracking_number, label_created_at, created_at, admin_status
              FROM returns_requests
              ORDER BY created_at DESC
              LIMIT 500`,
@@ -615,6 +642,25 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
     } catch (err) {
         console.error('Error admin detail:', err);
         res.status(500).json({ success: false, message: 'Error obteniendo detalle' });
+    }
+});
+
+app.post('/api/admin/requests/:requestId/complete', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const requestId = req.params.requestId;
+        await executeQuery(
+            `UPDATE returns_requests SET admin_status = 'completed' WHERE id = ?`,
+            [requestId]
+        );
+
+        res.json({ success: true, message: 'Solicitud marcada como completada' });
+    } catch (err) {
+        console.error('Error complete request:', err);
+        res.status(500).json({ success: false, message: 'Error marcando como completada' });
     }
 });
 
