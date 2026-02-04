@@ -106,6 +106,29 @@
             color: var(--primary);
         }
 
+        .tracking-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .tracking-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border-light, #e0e0e0);
+            background: var(--secondary);
+            color: var(--text-primary);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
         .summary {
             text-align: left;
             margin: 24px 0;
@@ -228,7 +251,7 @@
                     return;
                 }
 
-                const trackingNumber = localStorage.getItem('mon_tracking') || 'MON-XXXXXX-XXXXXX';
+                const trackingNumber = '—';
                 const orderData = JSON.parse(localStorage.getItem('mon_order_data') || '{}');
 
                 let summaryHtml = '';
@@ -256,7 +279,11 @@
                     
                     <div class="tracking">
                         <div class="tracking-label">Tu número de seguimiento:</div>
-                        <div class="tracking-number">${trackingNumber}</div>
+                        <div class="tracking-number" id="tracking-number">${trackingNumber}</div>
+                        <div class="tracking-actions">
+                            <button class="tracking-btn" id="btn-copy-tracking" type="button">Copiar</button>
+                            <a class="tracking-btn" id="btn-track-link" href="#" target="_blank" rel="noopener">Rastrear</a>
+                        </div>
                     </div>
 
                     ${summaryHtml}
@@ -274,6 +301,19 @@
 
                 const requestId = localStorage.getItem('mon_request_id');
                 await initLabelDownload(requestId);
+
+                const copyBtn = document.getElementById('btn-copy-tracking');
+                const trackLink = document.getElementById('btn-track-link');
+                if (copyBtn) {
+                    copyBtn.setAttribute('disabled', 'disabled');
+                    copyBtn.style.opacity = '0.6';
+                    copyBtn.style.pointerEvents = 'none';
+                }
+                if (trackLink) {
+                    trackLink.setAttribute('aria-disabled', 'true');
+                    trackLink.style.opacity = '0.6';
+                    trackLink.style.pointerEvents = 'none';
+                }
 
                 // Limpiar localStorage
                 localStorage.removeItem('mon_tracking');
@@ -314,6 +354,9 @@
         async function initLabelDownload(requestId) {
             const btn = document.getElementById('btn-download-label');
             const note = document.getElementById('label-note');
+            const trackingEl = document.getElementById('tracking-number');
+            const copyBtn = document.getElementById('btn-copy-tracking');
+            const trackLink = document.getElementById('btn-track-link');
 
             if (!btn || !note) return;
 
@@ -326,7 +369,45 @@
                 const res = await fetch(`${API_BASE}/api/label/${encodeURIComponent(requestId)}`);
                 const data = await res.json();
 
-                if (!data.success || !data.labelBase64) {
+                if (!data.success) {
+                    note.textContent = 'Tu guía aún no está lista. Intenta más tarde.';
+                    return;
+                }
+
+                if (data.trackingNumber && trackingEl) {
+                    trackingEl.textContent = data.trackingNumber;
+                }
+
+                if (data.trackingNumber && trackLink) {
+                    trackLink.href = `https://track.myeship.co/track?no=${encodeURIComponent(data.trackingNumber)}`;
+                    trackLink.setAttribute('aria-disabled', 'false');
+                    trackLink.style.opacity = '1';
+                    trackLink.style.pointerEvents = 'auto';
+                }
+
+                if (data.trackingNumber && copyBtn) {
+                    copyBtn.removeAttribute('disabled');
+                    copyBtn.style.opacity = '1';
+                    copyBtn.style.pointerEvents = 'auto';
+                    copyBtn.addEventListener('click', async () => {
+                        try {
+                            await navigator.clipboard.writeText(data.trackingNumber);
+                            copyBtn.textContent = 'Copiado';
+                            setTimeout(() => (copyBtn.textContent = 'Copiar'), 1200);
+                        } catch (e) {
+                            const temp = document.createElement('textarea');
+                            temp.value = data.trackingNumber;
+                            document.body.appendChild(temp);
+                            temp.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(temp);
+                            copyBtn.textContent = 'Copiado';
+                            setTimeout(() => (copyBtn.textContent = 'Copiar'), 1200);
+                        }
+                    }, { once: true });
+                }
+
+                if (!data.labelBase64) {
                     note.textContent = 'Tu guía aún no está lista. Intenta más tarde.';
                     return;
                 }
