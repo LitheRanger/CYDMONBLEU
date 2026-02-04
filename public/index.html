@@ -255,6 +255,18 @@
             cursor: pointer;
         }
 
+        .terms-link {
+            background: none;
+            border: none;
+            padding: 0;
+            color: var(--text-primary);
+            text-decoration: underline;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+        }
+
         /* --- BOTONES --- */
         .btn {
             background: var(--primary);
@@ -1235,6 +1247,38 @@
             font-size: 13px;
             color: var(--text-secondary);
         }
+
+        .refund-breakdown {
+            margin-top: 18px;
+            padding: 14px 16px;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            background: var(--bg-lighter);
+        }
+
+        .refund-breakdown h4 {
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        .breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            padding: 6px 0;
+            color: var(--text-primary);
+        }
+
+        .breakdown-row.total {
+            border-top: 1px dashed var(--border-light);
+            margin-top: 6px;
+            padding-top: 10px;
+            font-weight: 700;
+        }
     </style>
 </head>
 
@@ -1265,7 +1309,7 @@
 
             <div class="terms-check">
                 <input type="checkbox" id="terms-accept" aria-describedby="terms-help">
-                <label for="terms-accept">Acepto las condiciones del cambio</label>
+                <label for="terms-accept">Acepto las <button type="button" class="terms-link" id="terms-link">condiciones</button> del cambio</label>
             </div>
             <small id="terms-help" style="display:block;color:var(--text-secondary);font-size:12px;margin-top:4px;">Debes aceptar para continuar</small>
             
@@ -1312,6 +1356,22 @@
             <h4 style="margin:0; color:#666; text-transform:uppercase; font-size:12px; letter-spacing:1px;">Detalles de tu solicitud</h4>
             
             <div class="payment-items" id="payment-items-list"></div>
+
+            <div id="refund-breakdown" class="refund-breakdown" style="display:none;">
+                <h4>Desglose reembolso</h4>
+                <div class="breakdown-row">
+                    <span>Valor de prendas</span>
+                    <strong id="refund-items-total">$0.00</strong>
+                </div>
+                <div class="breakdown-row">
+                    <span>Menos guía</span>
+                    <strong id="refund-guide-cost">-$150.00</strong>
+                </div>
+                <div class="breakdown-row total">
+                    <span>Cupón a recibir</span>
+                    <strong id="refund-coupon-total">$0.00</strong>
+                </div>
+            </div>
 
             <div style="border-top: 1px solid var(--border-light); padding-top: 20px; margin-top: 20px;">
                 <h4 style="margin:0 0 15px 0; color:#666; text-transform:uppercase; font-size:12px; letter-spacing:1px;">Costo de Guía</h4>
@@ -1363,6 +1423,22 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="modal-terms" role="dialog" aria-labelledby="terms-title" aria-modal="true">
+    <div class="modal-content" style="max-width:520px;">
+        <button class="m-close" id="btn-close-terms" aria-label="Cerrar modal">×</button>
+        <div class="m-info">
+            <h3 id="terms-title" style="margin-top:0;">Condiciones del cambio</h3>
+            <div style="font-size:14px; color:var(--text-secondary); line-height:1.6;">
+                <p style="margin-bottom:12px;">• La prenda debe estar sin uso, con etiquetas y en su empaque original.</p>
+                <p style="margin-bottom:12px;">• El envío de devolución se descuenta del valor de la prenda.</p>
+                <p style="margin-bottom:12px;">• El cupón se emite una vez recibida y aprobada la devolución.</p>
+                <p style="margin-bottom:12px;">• El cupón es válido por 30 días y no es transferible.</p>
+                <p style="margin-bottom:0;">• No aplican cambios en prendas de liquidación o personalizadas.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // ===== CONFIGURACIÓN =====
     const API_BASE = (function() {
@@ -1378,6 +1454,15 @@
     let seleccion = {};
     let cambioConfig = { itemIndex: null, nuevaVariantId: null, nuevaTalla: '' };
     let tipoFinal = '';
+    const GUIDE_COST = 150;
+
+    function formatMoney(value) {
+        const amount = Number(value) || 0;
+        return new Intl.NumberFormat('es-MX', {
+            style: 'currency',
+            currency: 'MXN'
+        }).format(amount);
+    }
 
     // ===== TOAST SYSTEM =====
     function showToast(message, type = 'info', duration = 4000) {
@@ -1564,10 +1649,10 @@
             body.className = 'prod-body';
             body.id = `body-${idx}`;
             body.innerHTML = `
-                <label for="reason-${idx}">Razón (Requerido)</label>
+                <label for="reason-${idx}">Razón del cambio (Requerido)</label>
                 <select id="reason-${idx}">
                     <option value="">Selecciona...</option>
-                    <option value="Talla/Color incorrecto">Talla/Color incorrecto</option>
+                    <option value="Talla/Color incorrecto">Talla/Color</option>
                     <option value="No era lo que esperaba">No era lo que esperaba</option>
                     <option value="Defecto">Defecto</option>
                 </select>
@@ -1907,10 +1992,16 @@
         const itemsList = document.getElementById('payment-items-list');
         itemsList.innerHTML = '';
 
+        let totalItemsValue = 0;
+
         Object.keys(seleccion).forEach(idx => {
             const item = orderData.items[idx];
             const s = seleccion[idx];
             const typeLabel = (tipoFinal === 'Cambio') ? 'Cambio' : 'Devolución';
+
+            const qty = Number(item.quantity || 1);
+            const price = Number(item.price || 0);
+            totalItemsValue += qty * price;
             
             const html = `
                 <div class="payment-item">
@@ -1925,13 +2016,26 @@
             itemsList.innerHTML += html;
         });
 
+        const refundBreakdown = document.getElementById('refund-breakdown');
+        const refundItemsTotal = document.getElementById('refund-items-total');
+        const refundGuideCost = document.getElementById('refund-guide-cost');
+        const refundCouponTotal = document.getElementById('refund-coupon-total');
+
         if(tipo === 'Reembolso') {
             txt.innerHTML = "Al finalizar, se te enviará un <b>cupón de tienda</b> por el valor de tus productos.";
             note.style.display = 'none';
+
+            const couponValue = Math.max(totalItemsValue - GUIDE_COST, 0);
+            if (refundBreakdown) refundBreakdown.style.display = 'block';
+            if (refundItemsTotal) refundItemsTotal.textContent = formatMoney(totalItemsValue);
+            if (refundGuideCost) refundGuideCost.textContent = `-${formatMoney(GUIDE_COST)}`;
+            if (refundCouponTotal) refundCouponTotal.textContent = formatMoney(couponValue);
         } else {
             txt.innerHTML = "Estás pagando solo la guía de devolución.";
             note.style.display = 'inline-block';
             note.innerText = "✨ ¡El envío de tu NUEVA talla es GRATIS!";
+
+            if (refundBreakdown) refundBreakdown.style.display = 'none';
         }
         nav(4);
     }
@@ -2117,15 +2221,32 @@
         // Modal
         document.getElementById('btn-close-modal').addEventListener('click', cerrarModal);
         document.getElementById('btn-confirm-size').addEventListener('click', confirmarCambio);
-        
+        const termsLink = document.getElementById('terms-link');
+        const termsModal = document.getElementById('modal-terms');
+        const closeTerms = document.getElementById('btn-close-terms');
+
+        if (termsLink && termsModal && closeTerms) {
+            termsLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                termsModal.classList.add('active');
+            });
+
+            closeTerms.addEventListener('click', () => termsModal.classList.remove('active'));
+
+            termsModal.addEventListener('click', (e) => {
+                if (e.target === termsModal) termsModal.classList.remove('active');
+            });
+        }
 
 
         // ESC cierra modal
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 const modal = document.getElementById('modal-talla');
-                if (modal.style.display === 'flex') {
-                    cerrarModal();
+                if (modal.style.display === 'flex') cerrarModal();
+                if (termsModal && termsModal.classList.contains('active')) {
+                    termsModal.classList.remove('active');
                 }
             }
         });
