@@ -839,8 +839,9 @@
                 }).join('') || '<span class="muted">Sin items</span>';
                 const files = (r.files || []).map(f => {
                     const isImage = (f.mimetype || '').startsWith('image/');
-                    if (isImage) {
-                        return `<div style="margin:6px 0;"><img src="/${f.path}" alt="foto" style="max-width:100%;border-radius:6px;border:1px solid #e5e7eb;" /></div>`;
+                    const fileUrl = f.url || (f.filename ? `/uploads/${f.filename}` : (f.path ? `/${String(f.path).replace(/\\/g, '/')}` : ''));
+                    if (isImage && fileUrl) {
+                        return `<div style="margin:6px 0;"><img src="${fileUrl}" alt="foto" style="max-width:100%;border-radius:6px;border:1px solid #e5e7eb;" /></div>`;
                     }
                     return `<div class="muted">Archivo: ${f.originalname || f.filename || '—'}</div>`;
                 }).join('') || '<span class="muted">Sin archivos</span>';

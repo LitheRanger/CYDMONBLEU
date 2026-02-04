@@ -361,7 +361,8 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
             filename: f.filename,
             mimetype: f.mimetype,
             size: f.size,
-            path: f.path
+            path: String(f.path || '').replace(/\\/g, '/'),
+            url: `/uploads/${f.filename}`
         }));
 
         const insertSQL = isPostgreSQL 
