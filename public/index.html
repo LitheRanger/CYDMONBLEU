@@ -250,6 +250,13 @@
             font-size: 13px;
         }
 
+        .help-text {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
         /* --- BOTONES --- */
         .btn {
             background: var(--primary);
@@ -1284,17 +1291,17 @@
             <h3 style="text-align:center; margin-top:0;">Iniciar Solicitud</h3>
             <label for="orden">Número de pedido</label>
             <input type="text" id="orden" placeholder="#1001" maxlength="50" aria-label="Número de pedido" aria-required="true" aria-describedby="orden-help">
-            <small id="orden-help" style="display:block;color:var(--text-secondary);font-size:12px;margin-top:4px;">Puedes encontrarlo en tu correo de confirmación</small>
+            <small id="orden-help" class="help-text">Puedes encontrarlo en tu correo de confirmación</small>
             
             <label for="email" style="margin-top:16px;">Correo electrónico</label>
             <input type="email" id="email" placeholder="cliente@email.com" required aria-label="Correo electrónico asociado a la orden" aria-required="true" aria-describedby="email-help">
-            <small id="email-help" style="display:block;color:var(--text-secondary);font-size:12px;margin-top:4px;">El correo debe coincidir con tu pedido</small>
+            <small id="email-help" class="help-text">El correo debe coincidir con tu pedido</small>
 
             <div class="terms-check">
                 <input type="checkbox" id="terms-accept" aria-describedby="terms-help">
                 <label for="terms-accept">Acepto las <button type="button" class="terms-link" id="terms-link">condiciones</button> del cambio</label>
             </div>
-            <small id="terms-help" style="display:block;color:var(--text-secondary);font-size:12px;margin-top:4px;">Debes aceptar para continuar</small>
+            <small id="terms-help" class="help-text">Debes aceptar para continuar</small>
             
             <button class="btn" id="btn-search" aria-label="Buscar pedido con los datos ingresados">Buscar Pedido</button>
             <div id="login-msg" class="error-message" aria-live="polite" aria-atomic="true" role="alert"></div>
