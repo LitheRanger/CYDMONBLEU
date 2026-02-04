@@ -56,10 +56,20 @@
             max-width: 900px;
         }
 
+        /* --- HEADBAR --- */
+        .headbar {
+            background: var(--secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 18px;
+            padding: 18px 16px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 36px;
+        }
+
         /* --- HEADER/LOGO --- */
         .logo-header {
             text-align: center;
-            margin-bottom: 48px;
+            margin-bottom: 0;
             display: flex;
             justify-content: center;
             animation: slideDown 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1279,8 +1289,10 @@
 <body>
 <div class="toast-container" id="toastContainer"></div>
 <div class="main-container">
-    <div class="logo-header">
-        <img src="logo.png" alt="MON BLEU" class="logo-img">
+    <div class="headbar">
+        <div class="logo-header">
+            <img src="logo.png" alt="MON BLEU" class="logo-img">
+        </div>
     </div>
 
     <div class="progress-container">
