@@ -232,6 +232,29 @@
             background-color: #fef2f2;
         }
 
+        .terms-check {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 14px 0 4px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .terms-check input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .terms-check label {
+            margin: 0;
+            font-weight: 600;
+            text-transform: none;
+            cursor: pointer;
+        }
+
         /* --- BOTONES --- */
         .btn {
             background: var(--primary);
@@ -1239,6 +1262,12 @@
             <label for="email" style="margin-top:16px;">Correo electrónico</label>
             <input type="email" id="email" placeholder="cliente@email.com" required aria-label="Correo electrónico asociado a la orden" aria-required="true" aria-describedby="email-help">
             <small id="email-help" style="display:block;color:var(--text-secondary);font-size:12px;margin-top:4px;">El correo debe coincidir con tu pedido</small>
+
+            <div class="terms-check">
+                <input type="checkbox" id="terms-accept" aria-describedby="terms-help">
+                <label for="terms-accept">Acepto las condiciones del cambio</label>
+            </div>
+            <small id="terms-help" style="display:block;color:var(--text-secondary);font-size:12px;margin-top:4px;">Debes aceptar para continuar</small>
             
             <button class="btn" id="btn-search" aria-label="Buscar pedido con los datos ingresados">Buscar Pedido</button>
             <div id="login-msg" class="error-message" aria-live="polite" aria-atomic="true" role="alert"></div>
@@ -1246,7 +1275,7 @@
     </div>
 
     <div id="step-2" class="step-view">
-        <h3 style="text-align:center;">¿Qué te gustaría regresar?</h3>
+        <h3 style="text-align:center;">¿Qué te gustaría cambiar?</h3>
         <div class="card" id="product-list-container" role="region" aria-label="Lista de productos disponibles para devolución"></div>
         <div style="text-align:center;">
             <button class="btn" id="btn-next-prod" style="max-width:300px;" aria-label="Continuar con los productos seleccionados">Siguiente</button>
@@ -1256,15 +1285,15 @@
     <div id="step-3" class="step-view">
         <h3 style="text-align:center;">Selecciona una opción</h3>
         <div class="decision-grid" role="group" aria-label="Opciones de devolución o cambio">
-            <div class="decision-card" id="card-reembolso" tabindex="0" role="button" aria-label="Opción de reembolso - recibir dinero devuelto">
-                <span class="d-icon">🏷️</span>
-                <span class="d-title">Reembolso</span>
-                <span class="d-desc">Recibe un cupón por el valor total</span>
-            </div>
             <div class="decision-card" id="card-cambio" tabindex="0" role="button">
                 <span class="d-icon">🔄</span>
                 <span class="d-title">Cambio</span>
                 <span class="d-desc">Cambiar por otra talla o color</span>
+            </div>
+            <div class="decision-card" id="card-reembolso" tabindex="0" role="button" aria-label="Opción de reembolso - recibir dinero devuelto">
+                <span class="d-icon">🏷️</span>
+                <span class="d-title">Reembolso</span>
+                <span class="d-desc">Recibe un cupón por el valor total</span>
             </div>
         </div>
         <div class="change-items" id="change-items" role="region" aria-label="Selecciona talla o color por producto">
@@ -1441,6 +1470,7 @@
     async function buscarPedido() {
         const orden = document.getElementById('orden').value.trim();
         const email = document.getElementById('email').value.trim();
+        const termsAccepted = document.getElementById('terms-accept');
         const btn = document.getElementById('btn-search');
         const msgEl = document.getElementById('login-msg');
 
@@ -1453,6 +1483,10 @@
         }
         if (!email || !validateEmail(email)) {
             showErrorToast("❌ Por favor, ingresa un correo válido (ej: nombre@ejemplo.com)");
+            return;
+        }
+        if (!termsAccepted || !termsAccepted.checked) {
+            showErrorToast("❌ Debes aceptar las condiciones del cambio para continuar");
             return;
         }
 
@@ -1534,7 +1568,7 @@
                 <select id="reason-${idx}">
                     <option value="">Selecciona...</option>
                     <option value="Talla/Color incorrecto">Talla/Color incorrecto</option>
-                    <option value="No me gustó">No era lo que esperaba</option>
+                    <option value="No era lo que esperaba">No era lo que esperaba</option>
                     <option value="Defecto">Defecto</option>
                 </select>
                 <label for="file-${idx}" style="margin-top:10px;">Subir foto</label>
