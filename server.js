@@ -197,7 +197,19 @@ const storage = multer.diskStorage({
         cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB
+    },
+    fileFilter: (req, file, cb) => {
+        if ((file.mimetype || '').startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(null, false);
+        }
+    }
+});
 
 // Hacer pública la carpeta de uploads para poder ver las fotos
 app.use('/uploads', express.static('uploads'));
@@ -368,11 +380,11 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
         // Permitir órdenes duplicadas (validación desactivada temporalmente)
 
         // Guardar en DB
-        const filesMeta = (files || []).map(f => {
+        const filesMeta = await Promise.all((files || []).map(async (f) => {
             let dataUrl = null;
             try {
                 if (f.path && f.mimetype) {
-                    const fileBuffer = fs.readFileSync(f.path);
+                    const fileBuffer = await fs.promises.readFile(f.path);
                     const base64 = fileBuffer.toString('base64');
                     dataUrl = `data:${f.mimetype};base64,${base64}`;
                 }
@@ -390,7 +402,7 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
                 url: `/uploads/${f.filename}`,
                 dataUrl
             };
-        });
+        }));
 
         const insertSQL = isPostgreSQL 
             ? `INSERT INTO returns_requests (order_id, contact_email, return_type, items_json, files_json, amount)
