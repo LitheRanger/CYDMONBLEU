@@ -1294,7 +1294,9 @@
 <div class="main-container">
     <div class="headbar">
         <div class="logo-header">
-            <img src="logo.png" alt="MON BLEU" class="logo-img">
+            <a href="https://monbleu.mx/" aria-label="Ir a monbleu.mx">
+                <img src="logo.png" alt="MON BLEU" class="logo-img">
+            </a>
         </div>
     </div>
 
@@ -1343,7 +1345,7 @@
             <div class="decision-card" id="card-reembolso" tabindex="0" role="button" aria-label="Opción de reembolso - recibir dinero devuelto">
                 <span class="d-icon">🏷️</span>
                 <span class="d-title">Reembolso</span>
-                <span class="d-desc">Recibe un cupón por el valor total</span>
+                <span class="d-desc">Cupón por valor del pedido descontando costo de guía ($150).</span>
             </div>
         </div>
         <div class="change-items" id="change-items" role="region" aria-label="Selecciona talla o color por producto">
@@ -2038,9 +2040,9 @@
             if (refundGuideCost) refundGuideCost.textContent = `-${formatMoney(GUIDE_COST)}`;
             if (refundCouponTotal) refundCouponTotal.textContent = formatMoney(couponValue);
         } else {
-            txt.innerHTML = "Estás pagando solo la guía de devolución.";
+            txt.innerHTML = "Estás pagando la guía de tu domicilio a nuestro taller";
             note.style.display = 'inline-block';
-            note.innerText = "✨ ¡El envío de tu NUEVA talla es GRATIS!";
+            note.innerText = "✨ ¡La guia de tu cambio nosotros la cubrimos!";
 
             if (refundBreakdown) refundBreakdown.style.display = 'none';
         }
