@@ -445,10 +445,10 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
 
         const files = req.files || []; // Array con las fotos subidas
 
-        const isDefectOnly = items.length > 0 && items.every(i => String(i.reason || '').toLowerCase() === 'defecto');
+        const isDefectRequest = items.length > 0 && items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
 
-        // Lógica de Precio: TARIFA PLANA $150 (excepto defecto)
-        const amountToPay = isDefectOnly ? 0 : 150; 
+        // Lógica de Precio: TARIFA PLANA $150 (excepto cuando hay defecto)
+        const amountToPay = isDefectRequest ? 0 : 150; 
 
         // Validación básica
         if (!items || items.length === 0) {
@@ -531,7 +531,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
 
         const requestId = isPostgreSQL ? result[0]?.id : result.insertId;
 
-        if (isDefectOnly && requestId) {
+        if (isDefectRequest && requestId) {
             try {
                 await executeQuery(
                     `UPDATE returns_requests SET payment_status = 'no_payment_required' WHERE id = ?`,
@@ -568,7 +568,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                 currency: "MXN",
                 description: `Guía de devolución - Orden ${orderId}`
             },
-            skipPayment: isDefectOnly
+            skipPayment: isDefectRequest
         });
 
     } catch (error) {

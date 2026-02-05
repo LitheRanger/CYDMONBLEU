@@ -2038,7 +2038,7 @@
         const refundCouponLabel = document.getElementById('refund-coupon-label');
 
         const reasons = Object.values(seleccion).map(s => String(s.reason || '').toLowerCase());
-        const isDefectOnly = reasons.length > 0 && reasons.every(r => r === 'defecto');
+        const isDefectRequest = reasons.length > 0 && reasons.includes('defecto');
         const isNoEsperaba = reasons.length > 0 && reasons.includes('no era lo que esperaba');
 
         if(tipo === 'Reembolso') {
@@ -2059,7 +2059,7 @@
 
             if (refundBreakdown) refundBreakdown.style.display = 'block';
             if (refundItemsLabel) refundItemsLabel.textContent = isNoEsperaba ? 'Total pedido' : 'Valor de prendas';
-            if (refundGuideLabel) refundGuideLabel.textContent = isNoEsperaba ? 'Guía (se paga aparte)' : 'Menos guía';
+
             if (refundCouponLabel) refundCouponLabel.textContent = isNoEsperaba ? 'Cupón por total pedido' : 'Cupón a recibir';
             if (refundItemsTotal) refundItemsTotal.textContent = formatMoney(baseTotal);
             if (refundGuideCost) refundGuideCost.textContent = `-${formatMoney(GUIDE_COST)}`;
@@ -2071,7 +2071,7 @@
 
             if (refundBreakdown) refundBreakdown.style.display = 'none';
         }
-        if (isDefectOnly) {
+        if (isDefectRequest) {
             txt.innerHTML = "Defecto confirmado: no se requiere pago y te enviaremos la guía.";
             note.style.display = 'none';
         }
