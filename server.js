@@ -296,12 +296,21 @@ app.post('/api/validate-order', async (req, res) => {
         }));
 
         // E. Respuesta Exitosa
+        let orderTotal = Number(order.total_price || order.current_total_price || 0);
+        if (!orderTotal && Array.isArray(order.line_items)) {
+            orderTotal = order.line_items.reduce((sum, item) => {
+                const qty = Number(item.quantity || 0);
+                const price = Number(item.price || 0);
+                return sum + (qty * price);
+            }, 0);
+        }
+
         res.json({
             valid: true,
             orderId: order.id,
             orderNumber: order.name,
             customer: order.customer ? order.customer.first_name : 'Cliente',
-            orderTotal: Number(order.total_price || order.current_total_price || 0),
+            orderTotal,
             orderCurrency: order.currency || order.presentment_currency || 'MXN',
             items: itemsWithVariants // Enviamos los items enriquecidos
         });
@@ -667,7 +676,11 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
             try { return JSON.parse(row.items_json || '[]'); } catch { return []; }
         })();
         const parsedFiles = (() => {
-            try { return JSON.parse(row.files_json || '[]'); } catch { return []; }
+            const raw = row.files_json;
+            if (!raw) return [];
+            if (Array.isArray(raw)) return raw;
+            if (typeof raw === 'object') return raw;
+            try { return JSON.parse(raw); } catch { return []; }
         })();
 
         let itemsSelected = parsedItems;
