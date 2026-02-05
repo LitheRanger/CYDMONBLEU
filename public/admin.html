@@ -788,10 +788,15 @@
                 if (data.success) {
                     requests = data.data || [];
                     // Excluir completadas de cambios y reembolsos
-                    cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio' && String(r.admin_status || '').toLowerCase() !== 'completed');
-                    reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso' && String(r.admin_status || '').toLowerCase() !== 'completed');
                     defectos = requests.filter(r => hasDefect(r));
-                    completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed');
+                    cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio'
+                        && String(r.admin_status || '').toLowerCase() !== 'completed'
+                        && !hasDefect(r));
+                    reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso'
+                        && String(r.admin_status || '').toLowerCase() !== 'completed'
+                        && !hasDefect(r));
+                    completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed'
+                        && !hasDefect(r));
                     updateStats();
                     applyFilter();
                 } else {
