@@ -184,6 +184,7 @@
         .badge.paid { background: #dcfce7; color: var(--success); }
         .badge.pending { background: #fef3c7; color: var(--warning); }
         .badge.failed { background: #fee2e2; color: var(--danger); }
+        .badge.info { background: #e0f2fe; color: #0369a1; }
         .badge.no-label { background: #e5e7eb; color: #4b5563; }
 
         .muted { color: var(--text-secondary); font-size: 12px; }
@@ -434,6 +435,7 @@
         <div class="tabs">
             <button class="tab-btn active" data-tab="cambios">📦 Cambios</button>
             <button class="tab-btn" data-tab="reembolsos">💵 Reembolsos</button>
+            <button class="tab-btn" data-tab="defectos">🛠️ Defectos</button>
             <button class="tab-btn" data-tab="completadas">✅ Completadas</button>
         </div>
 
@@ -492,6 +494,34 @@
             </div>
         </div>
 
+        <!-- TAB: DEFECTOS -->
+        <div class="tab-content" id="tab-defectos">
+            <div id="loading-defectos" class="loading">Cargando defectos…</div>
+            <div id="summary-defectos" class="summary"></div>
+            <table class="table" id="table-defectos">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Orden</th>
+                        <th>Contacto</th>
+                        <th>Tipo</th>
+                        <th>Pago</th>
+                        <th>Monto</th>
+                        <th>Guía</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-defectos"></tbody>
+            </table>
+            <div id="empty-defectos" class="empty" style="display:none;">Sin defectos</div>
+            <div class="pagination" id="pagination-defectos" style="display:none;">
+                <button class="pager-btn" id="prev-defectos">◀ Anterior</button>
+                <div class="muted" id="page-info-defectos">Página 1</div>
+                <button class="pager-btn" id="next-defectos">Siguiente ▶</button>
+            </div>
+        </div>
+
         <!-- TAB: COMPLETADAS -->
         <div class="tab-content" id="tab-completadas">
             <div id="loading-completadas" class="loading">Cargando completadas…</div>
@@ -540,12 +570,15 @@
         let requests = [];
         let cambios = [];
         let reembolsos = [];
+        let defectos = [];
         let completadas = [];
         let filteredCambios = [];
         let filteredReembolsos = [];
+        let filteredDefectos = [];
         let filteredCompletadas = [];
         let currentTabCambios = 1;
         let currentTabReembolsos = 1;
+        let currentTabDefectos = 1;
         let currentTabCompletadas = 1;
         let activeTab = 'cambios';
         const pageSize = 50;
@@ -565,11 +598,26 @@
             return String(value || '').trim().toLowerCase();
         }
 
+        function hasDefect(r) {
+            const items = Array.isArray(r.items) ? r.items : [];
+            return items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
+        }
+
+        function isNoPayment(r) {
+            const amount = Number(r?.amount || 0);
+            return amount <= 0 || hasDefect(r);
+        }
+
         function badge(status) {
             const s = String(status || 'pending').toLowerCase();
             if (s === 'paid') return '<span class="badge paid">Pagado</span>';
             if (s === 'failed') return '<span class="badge failed">Fallido</span>';
             return '<span class="badge pending">Pendiente</span>';
+        }
+
+        function paymentBadge(r) {
+            if (isNoPayment(r)) return '<span class="badge info">Sin pago</span>';
+            return badge(r.payment_status);
         }
 
         function adminBadge(status) {
@@ -588,7 +636,7 @@
         function updateStats() {
             const total = requests.length;
             const paid = requests.filter(r => r.payment_status === 'paid').length;
-            const pending = requests.filter(r => r.payment_status === 'pending').length;
+            const pending = requests.filter(r => r.payment_status === 'pending' && !isNoPayment(r)).length;
             const labeled = requests.filter(r => r.tracking_number).length;
 
             document.getElementById('total').textContent = total;
@@ -603,6 +651,7 @@
             let total = 0;
             if (tabName === 'cambios') total = cambios.length;
             else if (tabName === 'reembolsos') total = reembolsos.length;
+            else if (tabName === 'defectos') total = defectos.length;
             else if (tabName === 'completadas') total = completadas.length;
             summary.textContent = `Mostrando ${data.length} de ${total} solicitudes`;
         }
@@ -610,12 +659,13 @@
         function updatePaginationTab(tabName, data) {
             const currentPage = tabName === 'cambios'
                 ? currentTabCambios
-                : (tabName === 'reembolsos' ? currentTabReembolsos : currentTabCompletadas);
+                : (tabName === 'reembolsos' ? currentTabReembolsos : (tabName === 'defectos' ? currentTabDefectos : currentTabCompletadas));
             const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
             const newPage = currentPage > totalPages ? totalPages : currentPage;
             
             if (tabName === 'cambios') currentTabCambios = newPage;
             else if (tabName === 'reembolsos') currentTabReembolsos = newPage;
+            else if (tabName === 'defectos') currentTabDefectos = newPage;
             else currentTabCompletadas = newPage;
 
             document.getElementById(`page-info-${tabName}`).textContent = `Página ${newPage} de ${totalPages}`;
@@ -645,7 +695,7 @@
 
             const currentPage = tabName === 'cambios'
                 ? currentTabCambios
-                : (tabName === 'reembolsos' ? currentTabReembolsos : currentTabCompletadas);
+                : (tabName === 'reembolsos' ? currentTabReembolsos : (tabName === 'defectos' ? currentTabDefectos : currentTabCompletadas));
             const start = (currentPage - 1) * pageSize;
             const pageData = data.slice(start, start + pageSize);
 
@@ -692,7 +742,7 @@
                 : '<span class="badge no-label">Sin guía</span>';
 
             const isCambio = tabName === 'cambios';
-            const isCompletadas = tabName === 'completadas';
+            const isCompletadas = tabName === 'completadas' || tabName === 'defectos';
             const actions = `
                 <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
                 <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
@@ -704,8 +754,8 @@
                 <td>${r.id}</td>
                 <td><strong>${r.order_id || '—'}</strong></td>
                 <td class="muted">${r.contact_email || '—'}</td>
-                ${tabName === 'completadas' ? `<td>${r.return_type || '—'}</td>` : ''}
-                <td>${badge(r.payment_status)}</td>
+                ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${r.return_type || '—'}</td>` : ''}
+                <td>${paymentBadge(r)}</td>
                 ${isCambio ? `<td>${refundBadge(r.refund_status)}</td>` : ''}
                 <td>${formatCurrency(r.amount)}</td>
                 <td>${labelBadge}</td>
@@ -726,6 +776,7 @@
                     // Excluir completadas de cambios y reembolsos
                     cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio' && String(r.admin_status || '').toLowerCase() !== 'completed');
                     reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso' && String(r.admin_status || '').toLowerCase() !== 'completed');
+                    defectos = requests.filter(r => hasDefect(r));
                     completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed');
                     updateStats();
                     applyFilter();
@@ -777,11 +828,24 @@
                 return true;
             });
 
+            // Filtrar DEFECTOS
+            filteredDefectos = defectos.filter(r => {
+                const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+                if (status && r.payment_status !== status) return false;
+                if (label === 'yes' && !r.tracking_number) return false;
+                if (label === 'no' && r.tracking_number) return false;
+                if (refund && r.refund_status !== refund) return false;
+                return true;
+            });
+
             currentTabCambios = 1;
             currentTabReembolsos = 1;
+            currentTabDefectos = 1;
             currentTabCompletadas = 1;
             renderTab('cambios', filteredCambios);
             renderTab('reembolsos', filteredReembolsos);
+            renderTab('defectos', filteredDefectos);
             renderTab('completadas', filteredCompletadas);
         }
 
@@ -1091,6 +1155,22 @@
             }
         });
 
+        // Event listeners para defectos
+        document.getElementById('prev-defectos').addEventListener('click', () => {
+            if (currentTabDefectos > 1) {
+                currentTabDefectos--;
+                renderTab('defectos', filteredDefectos.length ? filteredDefectos : defectos);
+            }
+        });
+        document.getElementById('next-defectos').addEventListener('click', () => {
+            const data = filteredDefectos.length ? filteredDefectos : defectos;
+            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+            if (currentTabDefectos < totalPages) {
+                currentTabDefectos++;
+                renderTab('defectos', data);
+            }
+        });
+
         // Event listeners para completadas
         document.getElementById('prev-completadas').addEventListener('click', () => {
             if (currentTabCompletadas > 1) {
@@ -1155,6 +1235,22 @@
                 const action = btn.getAttribute('data-action');
                 if (action === 'label') downloadLabel(id);
                 else if (action === 'retry') retryLabel(id);
+                return;
+            }
+            const row = e.target.closest('tr[data-request-id]');
+            if (!row) return;
+            const id = row.getAttribute('data-request-id');
+            if (id) viewDetail(id);
+        });
+
+        document.getElementById('tbody-defectos').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (btn) {
+                const id = btn.getAttribute('data-id');
+                const action = btn.getAttribute('data-action');
+                if (action === 'label') downloadLabel(id);
+                else if (action === 'retry') retryLabel(id);
+                else if (action === 'complete') completeRequest(id);
                 return;
             }
             const row = e.target.closest('tr[data-request-id]');
