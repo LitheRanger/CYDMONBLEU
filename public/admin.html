@@ -184,7 +184,7 @@
         .badge.paid { background: #dcfce7; color: var(--success); }
         .badge.pending { background: #fef3c7; color: var(--warning); }
         .badge.failed { background: #fee2e2; color: var(--danger); }
-        .badge.info { background: #e0f2fe; color: #0369a1; }
+        .badge.info { background: #e0f2fe; color: #0c4a6e; border: 1px solid #bae6fd; }
         .badge.no-label { background: #e5e7eb; color: #4b5563; }
 
         .muted { color: var(--text-secondary); font-size: 12px; }
@@ -399,6 +399,10 @@
                 <div class="stat-label">Pendientes</div>
             </div>
             <div class="stat-card">
+                <div class="stat-value" id="no-payment-count">0</div>
+                <div class="stat-label">Sin pago</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-value" id="labeled-count">0</div>
                 <div class="stat-label">Con Guía</div>
             </div>
@@ -413,6 +417,7 @@
                     <option value="">Todos los estados</option>
                     <option value="paid">Pagado</option>
                     <option value="pending">Pendiente</option>
+                    <option value="nopay">Sin pago</option>
                     <option value="failed">Fallido</option>
                 </select>
                 <select id="filter-label">
@@ -616,8 +621,15 @@
         }
 
         function paymentBadge(r) {
-            if (isNoPayment(r)) return '<span class="badge info">Sin pago</span>';
+            if (isNoPayment(r)) return '<span class="badge info">Sin cobro</span>';
             return badge(r.payment_status);
+        }
+
+        function matchesPaymentFilter(r, status) {
+            if (!status) return true;
+            if (status === 'nopay') return isNoPayment(r);
+            if (status === 'pending') return r.payment_status === 'pending' && !isNoPayment(r);
+            return r.payment_status === status;
         }
 
         function adminBadge(status) {
@@ -637,11 +649,13 @@
             const total = requests.length;
             const paid = requests.filter(r => r.payment_status === 'paid').length;
             const pending = requests.filter(r => r.payment_status === 'pending' && !isNoPayment(r)).length;
+            const noPayment = requests.filter(r => isNoPayment(r)).length;
             const labeled = requests.filter(r => r.tracking_number).length;
 
             document.getElementById('total').textContent = total;
             document.getElementById('paid-count').textContent = paid;
             document.getElementById('pending-count').textContent = pending;
+            document.getElementById('no-payment-count').textContent = noPayment;
             document.getElementById('labeled-count').textContent = labeled;
         }
 
@@ -800,7 +814,7 @@
             filteredCambios = cambios.filter(r => {
                 const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
-                if (status && r.payment_status !== status) return false;
+                if (!matchesPaymentFilter(r, status)) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
                 if (label === 'no' && r.tracking_number) return false;
                 if (refund && r.refund_status !== refund) return false;
@@ -811,7 +825,7 @@
             filteredReembolsos = reembolsos.filter(r => {
                 const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
-                if (status && r.payment_status !== status) return false;
+                if (!matchesPaymentFilter(r, status)) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
                 if (label === 'no' && r.tracking_number) return false;
                 return true;
@@ -821,7 +835,7 @@
             filteredCompletadas = completadas.filter(r => {
                 const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
-                if (status && r.payment_status !== status) return false;
+                if (!matchesPaymentFilter(r, status)) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
                 if (label === 'no' && r.tracking_number) return false;
                 if (refund && r.refund_status !== refund) return false;
@@ -832,7 +846,7 @@
             filteredDefectos = defectos.filter(r => {
                 const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
-                if (status && r.payment_status !== status) return false;
+                if (!matchesPaymentFilter(r, status)) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
                 if (label === 'no' && r.tracking_number) return false;
                 if (refund && r.refund_status !== refund) return false;
@@ -930,7 +944,7 @@
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Pago</div>
-                        <div>${badge(r.payment_status)}</div>
+                        <div>${paymentBadge(r)}</div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Estado</div>
