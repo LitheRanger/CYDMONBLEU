@@ -4,6 +4,10 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const pino = require('pino');
+const pinoHttp = require('pino-http');
+const rateLimit = require('express-rate-limit');
+const { z } = require('zod');
 
 // Detectar si es PostgreSQL o MySQL
 const isPostgreSQL = (process.env.DATABASE_URL || '').includes('postgresql://');
@@ -18,6 +22,27 @@ const myeshipClient = require('./myeshipClient.js');
 
 const app = express();
 app.use(cors());
+
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+app.use(pinoHttp({ logger }));
+
+const metrics = {
+    requests: 0,
+    errors: 0,
+    totalMs: 0
+};
+
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        metrics.requests += 1;
+        metrics.totalMs += Date.now() - start;
+        if (res.statusCode >= 500) {
+            metrics.errors += 1;
+        }
+    });
+    next();
+});
 
 // JSON parser para todas las rutas excepto Stripe webhook (requiere body raw)
 app.use((req, res, next) => {
@@ -225,8 +250,35 @@ app.get('/admin', requireAdmin, (req, res) => {
 });
 
 // --- 2. ENDPOINT: VALIDAR ORDEN Y TRAER TALLAS ---
-app.post('/api/validate-order', async (req, res) => {
-    const { orderNumber, email } = req.body;
+const validateOrderSchema = z.object({
+    orderNumber: z.string().trim().min(1).max(50),
+    email: z.string().trim().email().max(255)
+});
+
+const checkoutSchema = z.object({
+    requestId: z.union([z.string(), z.number()]),
+    amount: z.number().positive(),
+    currency: z.string().trim().min(3).max(8).optional(),
+    description: z.string().trim().max(255).optional(),
+    orderId: z.union([z.string(), z.number()]),
+    contactEmail: z.string().trim().email().max(255)
+});
+
+const limiterValidate = rateLimit({ windowMs: 15 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+const limiterSubmit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+const limiterCheckout = rateLimit({ windowMs: 15 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false });
+
+app.post('/api/validate-order', limiterValidate, async (req, res) => {
+    const parsed = validateOrderSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({
+            valid: false,
+            message: 'Datos inválidos',
+            errors: parsed.error.flatten()
+        });
+    }
+
+    const { orderNumber, email } = parsed.data;
 
     // Validar parámetros requeridos
     if (!orderNumber || !email) {
@@ -336,12 +388,26 @@ app.post('/api/validate-order', async (req, res) => {
 
 // --- 3. ENDPOINT: PROCESAR SELECCIÓN ---
 // upload.any() permite recibir múltiples archivos con cualquier nombre de campo
-app.post('/api/submit-return', upload.any(), async (req, res) => {
+app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => {
     try {
         console.log("📦 Recibiendo solicitud...");
 
         // Datos del formulario
-        const { orderId, contactEmail, returnType } = req.body;
+        const submitParsed = z.object({
+            orderId: z.string().trim().min(1).max(64),
+            contactEmail: z.string().trim().email().max(255),
+            returnType: z.string().trim().min(1).max(32)
+        }).safeParse(req.body);
+
+        if (!submitParsed.success) {
+            return res.status(400).json({
+                success: false,
+                message: 'Datos inválidos',
+                errors: submitParsed.error.flatten()
+            });
+        }
+
+        const { orderId, contactEmail, returnType } = submitParsed.data;
         
         // Los items vienen como string JSON, hay que parsearlos
         let items = [];
@@ -351,7 +417,18 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
             return res.status(400).json({ success: false, message: "Error en formato de items" });
         }
 
-        const files = req.files; // Array con las fotos subidas
+        const itemsParsed = z.array(z.object({
+            reason: z.string().trim().min(1).max(64),
+            variantId: z.any().optional(),
+            quantity: z.any().optional(),
+            price: z.any().optional()
+        })).safeParse(items);
+
+        if (!itemsParsed.success) {
+            return res.status(400).json({ success: false, message: 'Items inválidos', errors: itemsParsed.error.flatten() });
+        }
+
+        const files = req.files || []; // Array con las fotos subidas
 
         const isDefectOnly = items.length > 0 && items.every(i => String(i.reason || '').toLowerCase() === 'defecto');
 
@@ -488,22 +565,23 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
 });
 
 // --- 4. STRIPE CHECKOUT SESSION ---
-app.post('/api/create-checkout-session', async (req, res) => {
+app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
     try {
-        const { requestId, amount, currency, description, orderId, contactEmail } = req.body;
+        const parsed = checkoutSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                success: false,
+                message: 'Datos inválidos',
+                errors: parsed.error.flatten()
+            });
+        }
+
+        const { requestId, amount, currency, description, orderId, contactEmail } = parsed.data;
 
         if (!stripe) {
             return res.status(500).json({
                 success: false,
                 message: "Stripe no configurado. Agrega STRIPE_SECRET_KEY en .env"
-            });
-        }
-
-        // Validar parámetros requeridos
-        if (!requestId || !amount || !orderId || !contactEmail) {
-            return res.status(400).json({
-                success: false,
-                message: "Faltan parámetros requeridos: requestId, amount, orderId, contactEmail"
             });
         }
 
@@ -1076,6 +1154,48 @@ app.get('/api/label/:requestId', async (req, res) => {
         console.error('Error obteniendo guía:', err);
         res.status(500).json({ success: false, message: 'Error obteniendo guía' });
     }
+});
+
+app.get('/api/health', async (req, res) => {
+    let dbOk = false;
+    let dbError = null;
+
+    if (dbPool) {
+        try {
+            await executeQuery('SELECT 1', []);
+            dbOk = true;
+        } catch (e) {
+            dbError = e?.message || 'DB error';
+        }
+    }
+
+    res.json({
+        status: 'ok',
+        uptime: process.uptime(),
+        db: dbPool ? (dbOk ? 'ok' : 'error') : 'disabled',
+        dbError,
+        requests: metrics.requests,
+        avgMs: metrics.requests ? Math.round(metrics.totalMs / metrics.requests) : 0,
+        errors: metrics.errors
+    });
+});
+
+app.get('/api/metrics', requireAdmin, async (req, res) => {
+    res.json({
+        requests: metrics.requests,
+        avgMs: metrics.requests ? Math.round(metrics.totalMs / metrics.requests) : 0,
+        errors: metrics.errors
+    });
+});
+
+app.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ success: false, message: 'La foto no debe superar 5MB' });
+        }
+        return res.status(400).json({ success: false, message: err.message });
+    }
+    return next(err);
 });
 
 // --- 4. INICIAR SERVIDOR ---

@@ -59,23 +59,57 @@ class ShopifyTokenManager {
   }
 
   async makeRequest(endpoint, options = {}) {
-    const token = await this.getToken();
-    
-    const response = await fetch(`https://${this.shop}.myshopify.com${endpoint}`, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'X-Shopify-Access-Token': token,
-        'Content-Type': 'application/json'
+    const timeoutMs = Number(process.env.SHOPIFY_TIMEOUT_MS || 10000);
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const fetchWithTimeout = async (url, opts) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...opts, signal: controller.signal });
+        return res;
+      } finally {
+        clearTimeout(id);
       }
-    });
+    };
 
-    if (!response.ok) {
-        // Log para depuración si falla
-        console.error(`Error en petición a ${endpoint}:`, response.status);
+    const attempt = async () => {
+      const token = await this.getToken();
+      const response = await fetchWithTimeout(`https://${this.shop}.myshopify.com${endpoint}`, {
+        ...options,
+        headers: {
+          ...options.headers,
+          'X-Shopify-Access-Token': token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const status = response.status;
+        console.error(`Error en petición a ${endpoint}:`, status);
+        const err = new Error(`Shopify request failed: ${status}`);
+        err.status = status;
+        throw err;
+      }
+
+      return await response.json();
+    };
+
+    const maxRetries = 2;
+    let lastErr;
+    for (let i = 0; i <= maxRetries; i++) {
+      try {
+        return await attempt();
+      } catch (err) {
+        lastErr = err;
+        const status = err.status || 0;
+        const retryable = status === 429 || status >= 500 || err.name === 'AbortError';
+        if (!retryable || i === maxRetries) break;
+        await sleep(500 * (i + 1));
+      }
     }
-
-    return await response.json();
+    throw lastErr;
   }
 
   // --- MÉTODOS ESPECÍFICOS PARA TU PROYECTO ---

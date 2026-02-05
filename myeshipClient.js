@@ -7,6 +7,27 @@ const MYESHIP_BASE_URL = MYESHIP_ENV === 'production'
   : 'https://apiqa.myeship.co/rest';
 
 const MYESHIP_API_KEY = process.env.MYESHIP_API_KEY;
+const MYESHIP_TIMEOUT_MS = Number(process.env.MYESHIP_TIMEOUT_MS || 10000);
+
+const http = axios.create({ timeout: MYESHIP_TIMEOUT_MS });
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function requestWithRetry(fn, retries = 2) {
+  let lastError;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const status = error?.response?.status || 0;
+      const retryable = status === 429 || status >= 500;
+      if (!retryable || i === retries) break;
+      await sleep(500 * (i + 1));
+    }
+  }
+  throw lastError;
+}
 
 // Return shipment address from environment
 const RETURN_COMPANY_NAME = process.env.RETURN_COMPANY_NAME;
@@ -63,7 +84,7 @@ async function apiCall(method, endpoint, data = null) {
       config.data = data;
     }
 
-    const response = await axios(config);
+    const response = await requestWithRetry(() => http(config));
     return response.data;
   } catch (error) {
     console.error(`MyeShip API Error (${method} ${endpoint}):`, error.response?.data || error.message);
@@ -224,7 +245,7 @@ async function createShipment(rateId, labelFormat = 'PDF') {
  */
 async function downloadLabelBase64(labelUrl) {
   try {
-    const response = await axios.get(labelUrl, {
+    const response = await http.get(labelUrl, {
       responseType: 'arraybuffer'
     });
     
