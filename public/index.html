@@ -1368,15 +1368,15 @@
             <div id="refund-breakdown" class="refund-breakdown" style="display:none;">
                 <h4>Desglose reembolso</h4>
                 <div class="breakdown-row">
-                    <span>Valor de prendas</span>
+                    <span id="refund-items-label">Valor de prendas</span>
                     <strong id="refund-items-total">$0.00</strong>
                 </div>
                 <div class="breakdown-row">
-                    <span>Menos guía</span>
+                    <span id="refund-guide-label">Menos guía</span>
                     <strong id="refund-guide-cost">-$150.00</strong>
                 </div>
                 <div class="breakdown-row total">
-                    <span>Cupón a recibir</span>
+                    <span id="refund-coupon-label">Cupón a recibir</span>
                     <strong id="refund-coupon-total">$0.00</strong>
                 </div>
             </div>
@@ -1776,6 +1776,10 @@
                 showErrorToast("❌ Selecciona la razón de devolución para todos los productos");
                 return;
             }
+            if (String(seleccion[k].reason).toLowerCase() === 'defecto' && !seleccion[k].file) {
+                showErrorToast("❌ En defecto es obligatorio subir una foto del producto");
+                return;
+            }
         }
         nav(3);
     }
@@ -2095,6 +2099,25 @@
             removeToast(loadingToast);
 
             if(data.success && data.requestId) {
+                if (data.skipPayment) {
+                    localStorage.setItem('mon_request_id', data.requestId);
+                    localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
+                    localStorage.setItem('mon_order_data', JSON.stringify({
+                        orderId: orderData.orderId,
+                        items: Object.keys(seleccion).map(idx => ({
+                            name: orderData.items[idx].name,
+                            reason: seleccion[idx].reason,
+                            replacementTitle: seleccion[idx].replacementTitle
+                        })),
+                        tipo: tipoFinal
+                    }));
+
+                    showSuccessToast("✓ Solicitud guardada. Generando guía...");
+                    setTimeout(() => {
+                        window.location.href = `${API_BASE}/success.html?request_id=${encodeURIComponent(data.requestId)}`;
+                    }, 800);
+                    return;
+                }
                 // Paso 2: Crear sesión de Stripe Checkout
                 loadingToast = showLoadingToast("Redirigiendo a pago seguro...");
                 

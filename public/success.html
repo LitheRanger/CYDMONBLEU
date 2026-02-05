@@ -211,6 +211,7 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session_id');
+        const requestIdParam = urlParams.get('request_id');
 
         const API_BASE = (function() {
             const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -220,6 +221,11 @@
         async function verifyPayment() {
             const container = document.getElementById('content');
             
+            if (!sessionId && requestIdParam) {
+                renderSuccess(requestIdParam, true);
+                return;
+            }
+
             if (!sessionId) {
                 container.innerHTML = `
                     <div class="success-icon">❌</div>
@@ -330,6 +336,58 @@
                     <a href="/" class="btn">Volver al inicio</a>
                 `;
             }
+        }
+
+        async function renderSuccess(requestId, noPayment) {
+            const container = document.getElementById('content');
+            const orderData = JSON.parse(localStorage.getItem('mon_order_data') || '{}');
+            const trackingNumber = '—';
+
+            let summaryHtml = '';
+            if (orderData.items && Array.isArray(orderData.items)) {
+                summaryHtml = `
+                    <div class="summary">
+                        <h3>Resumen</h3>
+                        ${orderData.items.map(item => `
+                            <div class="summary-item">
+                                <div style="font-weight:600;">${item.name}</div>
+                                <div style="font-size:12px;color:var(--text-secondary);">
+                                    Razón: ${item.reason}
+                                    ${item.replacementTitle ? `<br>Nueva talla: ${item.replacementTitle}` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="success-icon">✅</div>
+                <h1>¡Solicitud Recibida!</h1>
+                <p>${noPayment ? 'Tu solicitud fue aprobada por defecto y no requiere pago.' : 'Tu solicitud ha sido procesada.'}</p>
+                
+                <div class="tracking">
+                    <div class="tracking-label">Tu número de seguimiento:</div>
+                    <div class="tracking-number" id="tracking-number">${trackingNumber}</div>
+                    <div class="tracking-actions">
+                        <button class="tracking-btn" id="btn-copy-tracking" type="button">Copiar</button>
+                        <a class="tracking-btn" id="btn-track-link" href="#" target="_blank" rel="noopener">Rastrear</a>
+                    </div>
+                </div>
+
+                ${summaryHtml}
+
+                <p>Recibirás un correo con los detalles y las instrucciones para enviar tu producto.</p>
+
+                <div class="label-section">
+                    <a id="btn-download-label" class="btn disabled" href="#">Descargar guía</a>
+                    <div id="label-note" class="label-note">Preparando tu guía...</div>
+                </div>
+                
+                <a href="/" class="btn">Volver al inicio</a>
+            `;
+
+            await initLabelDownload(requestId);
         }
 
         function base64ToBlob(base64, mime) {

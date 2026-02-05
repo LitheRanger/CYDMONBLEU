@@ -301,6 +301,8 @@ app.post('/api/validate-order', async (req, res) => {
             orderId: order.id,
             orderNumber: order.name,
             customer: order.customer ? order.customer.first_name : 'Cliente',
+            orderTotal: Number(order.total_price || order.current_total_price || 0),
+            orderCurrency: order.currency || order.presentment_currency || 'MXN',
             items: itemsWithVariants // Enviamos los items enriquecidos
         });
 
@@ -330,8 +332,10 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
 
         const files = req.files; // Array con las fotos subidas
 
-        // Lógica de Precio: TARIFA PLANA $150
-        const amountToPay = 150; 
+        const isDefectOnly = items.length > 0 && items.every(i => String(i.reason || '').toLowerCase() === 'defecto');
+
+        // Lógica de Precio: TARIFA PLANA $150 (excepto defecto)
+        const amountToPay = isDefectOnly ? 0 : 150; 
 
         // Validación básica
         if (!items || items.length === 0) {
@@ -382,6 +386,32 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
 
         const requestId = isPostgreSQL ? result[0]?.id : result.insertId;
 
+        if (isDefectOnly && requestId) {
+            try {
+                await executeQuery(
+                    `UPDATE returns_requests SET payment_status = 'no_payment_required' WHERE id = ?`,
+                    [requestId]
+                );
+
+                if (myeshipClient.isConfigured()) {
+                    const order = await shopifyClient.getOrderById(orderId);
+                    if (order && order.shipping_address) {
+                        const label = await myeshipClient.createReturnLabel({ order, requestId });
+                        if (label && label.trackingNumber) {
+                            const now = new Date().toISOString();
+                            await executeQuery(
+                                `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
+                                [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
+                            );
+                            console.log(`📦 Guía MyeShip generada (defecto): ${label.trackingNumber}`);
+                        }
+                    }
+                }
+            } catch (defectErr) {
+                console.error('❌ Error procesando defecto sin pago:', defectErr.message || defectErr);
+            }
+        }
+
         // Respuesta al Frontend
         res.json({
             success: true,
@@ -392,7 +422,8 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
                 amount: amountToPay,
                 currency: "MXN",
                 description: `Guía de devolución - Orden ${orderId}`
-            }
+            },
+            skipPayment: isDefectOnly
         });
 
     } catch (error) {
