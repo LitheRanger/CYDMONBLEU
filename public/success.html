@@ -305,9 +305,6 @@
                     <a href="/" class="btn">Volver al inicio</a>
                 `;
 
-                const requestId = localStorage.getItem('mon_request_id');
-                await initLabelDownload(requestId);
-
                 const copyBtn = document.getElementById('btn-copy-tracking');
                 const trackLink = document.getElementById('btn-track-link');
                 if (copyBtn) {
@@ -320,6 +317,9 @@
                     trackLink.style.opacity = '0.6';
                     trackLink.style.pointerEvents = 'none';
                 }
+
+                const requestId = localStorage.getItem('mon_request_id');
+                await initLabelDownload(requestId);
 
                 // Limpiar localStorage
                 localStorage.removeItem('mon_tracking');
@@ -437,7 +437,7 @@
                 }
 
                 if (data.trackingNumber && trackLink) {
-                    trackLink.href = `https://track.myeship.co/track?no=${encodeURIComponent(data.trackingNumber)}`;
+                    trackLink.href = 'https://track.myeship.co/en/track/eship-es';
                     trackLink.setAttribute('aria-disabled', 'false');
                     trackLink.style.opacity = '1';
                     trackLink.style.pointerEvents = 'auto';
