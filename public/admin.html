@@ -843,7 +843,7 @@
                     const normalizedPath = rawPath
                         ? (rawPath.startsWith('uploads/') ? `/${rawPath}` : (rawPath.startsWith('/') ? rawPath : `/uploads/${rawPath}`))
                         : '';
-                    const fileUrl = f.url || (f.filename ? `/uploads/${f.filename}` : normalizedPath);
+                    const fileUrl = f.dataUrl || f.url || (f.filename ? `/uploads/${f.filename}` : normalizedPath);
                     if (isImage && fileUrl) {
                         return `<div style="margin:6px 0;"><img src="${fileUrl}" alt="foto" style="max-width:100%;border-radius:6px;border:1px solid #e5e7eb;" /></div>`;
                     }

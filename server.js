@@ -368,15 +368,29 @@ app.post('/api/submit-return', upload.any(), async (req, res) => {
         // Permitir órdenes duplicadas (validación desactivada temporalmente)
 
         // Guardar en DB
-        const filesMeta = (files || []).map(f => ({
-            fieldname: f.fieldname,
-            originalname: f.originalname,
-            filename: f.filename,
-            mimetype: f.mimetype,
-            size: f.size,
-            path: String(f.path || '').replace(/\\/g, '/'),
-            url: `/uploads/${f.filename}`
-        }));
+        const filesMeta = (files || []).map(f => {
+            let dataUrl = null;
+            try {
+                if (f.path && f.mimetype) {
+                    const fileBuffer = fs.readFileSync(f.path);
+                    const base64 = fileBuffer.toString('base64');
+                    dataUrl = `data:${f.mimetype};base64,${base64}`;
+                }
+            } catch (e) {
+                console.warn('⚠️ No se pudo leer archivo para base64:', e?.message || e);
+            }
+
+            return {
+                fieldname: f.fieldname,
+                originalname: f.originalname,
+                filename: f.filename,
+                mimetype: f.mimetype,
+                size: f.size,
+                path: String(f.path || '').replace(/\\/g, '/'),
+                url: `/uploads/${f.filename}`,
+                dataUrl
+            };
+        });
 
         const insertSQL = isPostgreSQL 
             ? `INSERT INTO returns_requests (order_id, contact_email, return_type, items_json, files_json, amount)
