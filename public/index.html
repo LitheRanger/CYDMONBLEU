@@ -2095,7 +2095,12 @@
             const s = seleccion[idx];
             const original = orderData.items[idx];
             
-            if(s.file) formData.append(`evidence_${original.id}`, s.file);
+            const fileInput = document.getElementById(`file-${idx}`);
+            const selectedFile = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0] : s.file;
+
+            if (selectedFile) {
+                formData.append(`evidence_${original.id}`, selectedFile);
+            }
 
             itemsPayload.push({
                 variantId: original.id,
