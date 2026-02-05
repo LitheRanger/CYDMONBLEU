@@ -1435,7 +1435,6 @@
         <div class="m-info">
             <h3 id="m-name" style="margin-top:0;">Nombre Producto</h3>
             <div id="m-price" style="font-weight:bold; margin-bottom:15px;">$0.00</div>
-            <div style="margin-bottom: 20px; font-weight: 500; color: #666;">Selecciona talla o color de la prenda nueva:</div>
             <div class="size-grid" id="m-sizes"></div>
             <button class="btn" style="margin-top:25px;" id="btn-confirm-size">Confirmar Cambio</button>
         </div>
@@ -1906,95 +1905,91 @@
                 };
             });
 
-            const byColor = {};
-            variants.forEach(v => {
-                if (!byColor[v.color]) byColor[v.color] = [];
-                byColor[v.color].push(v);
-            });
+            const uniqueColors = [...new Set(variants.map(v => v.color))];
+            const hasMultipleColors = uniqueColors.length > 1;
+            let selectedColor = cambioConfig.nuevaColor || (hasMultipleColors ? uniqueColors[0] : variants[0]?.color);
 
-            Object.entries(byColor).forEach(([color, sizes]) => {
-                if (Object.keys(byColor).length > 1) {
-                    const colorSection = document.createElement('div');
-                    colorSection.className = 'variant-section';
+            const renderSizes = (color) => {
+                const sizeLabel = document.createElement('div');
+                sizeLabel.className = 'variant-label';
+                sizeLabel.innerText = sizeIndex >= 0 ? 'Selecciona talla:' : 'Selecciona variante:';
 
-                    const label = document.createElement('div');
-                    label.className = 'variant-label';
-                    label.innerText = `Color: ${color}`;
-                    colorSection.appendChild(label);
+                const sizeContainer = document.createElement('div');
+                sizeContainer.className = 'size-grid';
 
-                    const sizeContainer = document.createElement('div');
-                    sizeContainer.className = 'size-grid';
+                const filtered = color ? variants.filter(v => v.color === color) : variants;
+                filtered.forEach(v => {
+                    const btn = document.createElement('button');
+                    btn.className = 'size-btn';
+                    btn.innerText = v.size;
+                    btn.type = 'button';
+                    btn.dataset.title = v.title;
+                    btn.dataset.variantId = v.id;
 
-                    sizes.forEach(v => {
-                        const btn = document.createElement('button');
-                        btn.className = 'size-btn';
-                        btn.innerText = v.size;
-                        btn.type = 'button';
-                        btn.dataset.title = v.title;
-                        btn.dataset.variantId = v.id;
-
-                        if (v.inventory <= 0) {
-                            btn.classList.add('disabled');
-                            btn.disabled = true;
-                            btn.title = 'Sin stock';
-                        } else {
-                            if (cambioConfig.nuevaVariantId && String(cambioConfig.nuevaVariantId) === String(v.id)) {
-                                btn.classList.add('selected');
-                            }
-                            btn.addEventListener('click', () => {
-                                document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
-                                btn.classList.add('selected');
-                                cambioConfig.nuevaVariantId = v.id;
-                                cambioConfig.nuevaTalla = v.title;
-                                cambioConfig.nuevaColor = v.color || '';
-                                cambioConfig.nuevaSize = v.size || '';
-                            });
+                    if (v.inventory <= 0) {
+                        btn.classList.add('disabled');
+                        btn.disabled = true;
+                        btn.title = 'Sin stock';
+                    } else {
+                        if (cambioConfig.nuevaVariantId && String(cambioConfig.nuevaVariantId) === String(v.id)) {
+                            btn.classList.add('selected');
                         }
-                        sizeContainer.appendChild(btn);
+                        btn.addEventListener('click', () => {
+                            sizeContainer.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+                            btn.classList.add('selected');
+                            cambioConfig.nuevaVariantId = v.id;
+                            cambioConfig.nuevaTalla = v.title;
+                            cambioConfig.nuevaColor = v.color || '';
+                            cambioConfig.nuevaSize = v.size || '';
+                        });
+                    }
+                    sizeContainer.appendChild(btn);
+                });
+
+                grid.appendChild(sizeLabel);
+                grid.appendChild(sizeContainer);
+            };
+
+            if (hasMultipleColors) {
+                const colorLabel = document.createElement('div');
+                colorLabel.className = 'variant-label';
+                colorLabel.innerText = 'Selecciona color:';
+                grid.appendChild(colorLabel);
+
+                const colorContainer = document.createElement('div');
+                colorContainer.className = 'size-grid';
+
+                uniqueColors.forEach(color => {
+                    const btn = document.createElement('button');
+                    btn.className = 'size-btn';
+                    btn.type = 'button';
+                    btn.innerText = color;
+
+                    if (String(selectedColor) === String(color)) {
+                        btn.classList.add('selected');
+                    }
+
+                    btn.addEventListener('click', () => {
+                        colorContainer.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+                        btn.classList.add('selected');
+                        selectedColor = color;
+                        cambioConfig.nuevaColor = color;
+                        cambioConfig.nuevaSize = '';
+                        cambioConfig.nuevaVariantId = null;
+                        grid.querySelectorAll('.variant-label, .size-grid').forEach(el => {
+                            if (el !== colorLabel && el !== colorContainer) el.remove();
+                        });
+                        renderSizes(selectedColor);
                     });
 
-                    colorSection.appendChild(sizeContainer);
-                    grid.appendChild(colorSection);
-                } else {
-                    const label = document.createElement('div');
-                    label.className = 'variant-label';
-                    label.innerText = 'Selecciona talla o color de la prenda nueva:';
-                    grid.appendChild(label);
+                    colorContainer.appendChild(btn);
+                });
 
-                    const sizeContainer = document.createElement('div');
-                    sizeContainer.className = 'size-grid';
-
-                    sizes.forEach(v => {
-                        const btn = document.createElement('button');
-                        btn.className = 'size-btn';
-                        btn.innerText = v.size;
-                        btn.type = 'button';
-                        btn.dataset.title = v.title;
-                        btn.dataset.variantId = v.id;
-
-                        if (v.inventory <= 0) {
-                            btn.classList.add('disabled');
-                            btn.disabled = true;
-                            btn.title = 'Sin stock';
-                        } else {
-                            if (cambioConfig.nuevaVariantId && String(cambioConfig.nuevaVariantId) === String(v.id)) {
-                                btn.classList.add('selected');
-                            }
-                            btn.addEventListener('click', () => {
-                                document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
-                                btn.classList.add('selected');
-                                cambioConfig.nuevaVariantId = v.id;
-                                cambioConfig.nuevaTalla = v.title;
-                                cambioConfig.nuevaColor = v.color || '';
-                                cambioConfig.nuevaSize = v.size || '';
-                            });
-                        }
-                        sizeContainer.appendChild(btn);
-                    });
-
-                    grid.appendChild(sizeContainer);
-                }
-            });
+                grid.appendChild(colorContainer);
+                renderSizes(selectedColor);
+            } else {
+                renderSizes(selectedColor);
+            }
         } else {
             grid.innerHTML = '<p style="color: #666;">No hay variantes disponibles</p>';
         }
