@@ -2033,14 +2033,35 @@
         const refundItemsTotal = document.getElementById('refund-items-total');
         const refundGuideCost = document.getElementById('refund-guide-cost');
         const refundCouponTotal = document.getElementById('refund-coupon-total');
+        const refundItemsLabel = document.getElementById('refund-items-label');
+        const refundGuideLabel = document.getElementById('refund-guide-label');
+        const refundCouponLabel = document.getElementById('refund-coupon-label');
+
+        const reasons = Object.values(seleccion).map(s => String(s.reason || '').toLowerCase());
+        const isDefectOnly = reasons.length > 0 && reasons.every(r => r === 'defecto');
+        const isNoEsperaba = reasons.length > 0 && reasons.includes('no era lo que esperaba');
 
         if(tipo === 'Reembolso') {
             txt.innerHTML = "Al finalizar, se te enviará un <b>cupón de tienda</b> por el valor de tus productos.";
             note.style.display = 'none';
 
-            const couponValue = Math.max(totalItemsValue - GUIDE_COST, 0);
+            const orderTotal = Number(orderData?.orderTotal || 0);
+            const fallbackOrderTotal = Array.isArray(orderData?.items)
+                ? orderData.items.reduce((sum, item) => {
+                    const qty = Number(item.quantity || 0);
+                    const price = Number(item.price || 0);
+                    return sum + (qty * price);
+                }, 0)
+                : 0;
+            const fullOrderTotal = orderTotal > 0 ? orderTotal : fallbackOrderTotal;
+            const baseTotal = isNoEsperaba && fullOrderTotal > 0 ? fullOrderTotal : totalItemsValue;
+            const couponValue = isNoEsperaba ? baseTotal : Math.max(baseTotal - GUIDE_COST, 0);
+
             if (refundBreakdown) refundBreakdown.style.display = 'block';
-            if (refundItemsTotal) refundItemsTotal.textContent = formatMoney(totalItemsValue);
+            if (refundItemsLabel) refundItemsLabel.textContent = isNoEsperaba ? 'Total pedido' : 'Valor de prendas';
+            if (refundGuideLabel) refundGuideLabel.textContent = isNoEsperaba ? 'Guía (se paga aparte)' : 'Menos guía';
+            if (refundCouponLabel) refundCouponLabel.textContent = isNoEsperaba ? 'Cupón por total pedido' : 'Cupón a recibir';
+            if (refundItemsTotal) refundItemsTotal.textContent = formatMoney(baseTotal);
             if (refundGuideCost) refundGuideCost.textContent = `-${formatMoney(GUIDE_COST)}`;
             if (refundCouponTotal) refundCouponTotal.textContent = formatMoney(couponValue);
         } else {
@@ -2049,6 +2070,10 @@
             note.innerText = "✨ ¡La guia de tu cambio nosotros la cubrimos!";
 
             if (refundBreakdown) refundBreakdown.style.display = 'none';
+        }
+        if (isDefectOnly) {
+            txt.innerHTML = "Defecto confirmado: no se requiere pago y te enviaremos la guía.";
+            note.style.display = 'none';
         }
         nav(4);
     }
