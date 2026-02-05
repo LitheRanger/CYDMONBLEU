@@ -151,6 +151,10 @@
         }
         .btn:hover { opacity: 0.95; transform: translateY(-1px); box-shadow: var(--shadow-md); }
         .btn:active { transform: translateY(0); }
+        .btn.secondary { background: #e5e7eb; color: #111827; }
+        .btn.secondary:hover { background: #d1d5db; }
+        .btn.danger { background: #b91c1c; }
+        .btn.danger:hover { background: #991b1b; }
 
         .table {
             width: 100%;
@@ -434,6 +438,8 @@
             <div class="toolbar-group">
                 <button class="btn" id="btn-refresh">Actualizar</button>
                 <button class="btn" id="btn-export">Exportar CSV</button>
+                <button class="btn secondary" id="btn-clear-view">Limpiar vista</button>
+                <button class="btn danger" id="btn-delete-all">Eliminar pedidos</button>
             </div>
         </div>
 
@@ -1081,6 +1087,8 @@
                 source = filteredCambios.length ? filteredCambios : cambios;
             } else if (activeTab === 'reembolsos') {
                 source = filteredReembolsos.length ? filteredReembolsos : reembolsos;
+            } else if (activeTab === 'defectos') {
+                source = filteredDefectos.length ? filteredDefectos : defectos;
             } else {
                 source = filteredCompletadas.length ? filteredCompletadas : completadas;
             }
@@ -1108,6 +1116,64 @@
             a.download = `devoluciones-${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        function clearView() {
+            const search = document.getElementById('search');
+            const status = document.getElementById('filter-status');
+            const label = document.getElementById('filter-label');
+            const refund = document.getElementById('filter-refund');
+            if (search) search.value = '';
+            if (status) status.value = '';
+            if (label) label.value = '';
+            if (refund) refund.value = '';
+
+            requests = [];
+            cambios = [];
+            reembolsos = [];
+            defectos = [];
+            completadas = [];
+            filteredCambios = [];
+            filteredReembolsos = [];
+            filteredDefectos = [];
+            filteredCompletadas = [];
+            currentTabCambios = 1;
+            currentTabReembolsos = 1;
+            currentTabDefectos = 1;
+            currentTabCompletadas = 1;
+            updateStats();
+            renderTab('cambios', []);
+            renderTab('reembolsos', []);
+            renderTab('defectos', []);
+            renderTab('completadas', []);
+        }
+
+        async function deleteAllRequests() {
+            const proceed = confirm('¿Seguro que quieres eliminar TODOS los pedidos? Esta acción no se puede deshacer.');
+            if (!proceed) return;
+            const typed = prompt('Escribe BORRAR para confirmar la eliminación total:');
+            if (typed !== 'BORRAR') {
+                alert('Confirmación incorrecta. No se eliminó nada.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-delete-all');
+            if (btn) btn.disabled = true;
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests/delete-all`, { method: 'POST' });
+                const data = await res.json();
+                if (!data.success) {
+                    alert(data.message || 'Error eliminando pedidos');
+                    return;
+                }
+                clearView();
+                alert('Pedidos eliminados correctamente.');
+            } catch (e) {
+                console.error('Error eliminando pedidos:', e);
+                alert('Error eliminando pedidos');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
         }
 
         // Manejo de tabs
@@ -1208,6 +1274,8 @@
 
         document.getElementById('btn-refresh').addEventListener('click', loadRequests);
         document.getElementById('btn-export').addEventListener('click', exportCSV);
+        document.getElementById('btn-clear-view').addEventListener('click', clearView);
+        document.getElementById('btn-delete-all').addEventListener('click', deleteAllRequests);
         document.getElementById('search').addEventListener('input', applyFilter);
         document.getElementById('filter-status').addEventListener('change', applyFilter);
         document.getElementById('filter-label').addEventListener('change', applyFilter);

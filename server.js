@@ -1035,6 +1035,20 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
     }
 });
 
+app.post('/api/admin/requests/delete-all', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        await executeQuery('DELETE FROM returns_requests', []);
+        res.json({ success: true, message: 'Todos los pedidos eliminados' });
+    } catch (err) {
+        console.error('Error eliminando pedidos:', err);
+        res.status(500).json({ success: false, message: 'Error eliminando pedidos' });
+    }
+});
+
 // --- ADMIN MIGRATION: Enriquecer todos los items existentes desde Shopify ---
 app.post('/api/admin/migrate-enrich-items', requireAdmin, async (req, res) => {
     try {
