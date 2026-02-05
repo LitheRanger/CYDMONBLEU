@@ -4,6 +4,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const cloudinary = require('cloudinary').v2;
 const pino = require('pino');
 const pinoHttp = require('pino-http');
 const rateLimit = require('express-rate-limit');
@@ -22,6 +23,20 @@ const myeshipClient = require('./myeshipClient.js');
 
 const app = express();
 app.use(cors());
+
+const cloudinaryConfigured = !!(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+);
+
+if (cloudinaryConfigured) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+}
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 app.use(pinoHttp({ logger }));
@@ -459,14 +474,31 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         // Guardar en DB
         const filesMeta = await Promise.all((files || []).map(async (f) => {
             let dataUrl = null;
+            let cloudinaryUrl = null;
             try {
                 if (f.path && f.mimetype) {
-                    const fileBuffer = await fs.promises.readFile(f.path);
-                    const base64 = fileBuffer.toString('base64');
-                    dataUrl = `data:${f.mimetype};base64,${base64}`;
+                    if (cloudinaryConfigured) {
+                        const uploadResult = await cloudinary.uploader.upload(f.path, {
+                            folder: 'monbleu-returns',
+                            resource_type: 'image'
+                        });
+                        cloudinaryUrl = uploadResult?.secure_url || uploadResult?.url || null;
+                    } else {
+                        const fileBuffer = await fs.promises.readFile(f.path);
+                        const base64 = fileBuffer.toString('base64');
+                        dataUrl = `data:${f.mimetype};base64,${base64}`;
+                    }
                 }
             } catch (e) {
                 console.warn('⚠️ No se pudo leer archivo para base64:', e?.message || e);
+            }
+
+            if (cloudinaryConfigured && f.path) {
+                try {
+                    await fs.promises.unlink(f.path);
+                } catch (e) {
+                    console.warn('⚠️ No se pudo borrar archivo temporal:', e?.message || e);
+                }
             }
 
             return {
@@ -477,6 +509,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                 size: f.size,
                 path: String(f.path || '').replace(/\\/g, '/'),
                 url: `/uploads/${f.filename}`,
+                cloudinaryUrl,
                 dataUrl
             };
         }));
