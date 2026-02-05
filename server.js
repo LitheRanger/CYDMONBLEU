@@ -539,7 +539,12 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                 );
 
                 if (myeshipClient.isConfigured()) {
-                    const order = await shopifyClient.getOrderById(orderId);
+                    let order = await shopifyClient.getOrderById(orderId);
+                    if (!order) {
+                        const rawOrderId = String(orderId || '').trim();
+                        const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
+                        order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
+                    }
                     if (order && order.shipping_address) {
                         const label = await myeshipClient.createReturnLabel({ order, requestId });
                         if (label && label.trackingNumber) {
@@ -782,7 +787,11 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
         const data = (rows || []).map(r => ({
             ...r,
             items: (() => {
-                try { return JSON.parse(r.items_json || '[]'); } catch { return []; }
+                const raw = r.items_json;
+                if (!raw) return [];
+                if (Array.isArray(raw)) return raw;
+                if (typeof raw === 'object') return raw;
+                try { return JSON.parse(raw); } catch { return []; }
             })()
         }));
 
