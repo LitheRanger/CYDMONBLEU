@@ -2040,6 +2040,7 @@
         const reasons = Object.values(seleccion).map(s => String(s.reason || '').toLowerCase());
         const isDefectRequest = reasons.length > 0 && reasons.includes('defecto');
         const isNoEsperaba = reasons.length > 0 && reasons.includes('no era lo que esperaba');
+        const payBtn = document.getElementById('btn-pay');
 
         if(tipo === 'Reembolso') {
             txt.innerHTML = "Al finalizar, se te enviará un <b>cupón de tienda</b> por el valor de tus productos.";
@@ -2074,6 +2075,9 @@
         if (isDefectRequest) {
             txt.innerHTML = "Defecto confirmado: no se requiere pago y te enviaremos la guía.";
             note.style.display = 'none';
+            if (payBtn) payBtn.innerText = 'Generar guía';
+        } else if (payBtn) {
+            payBtn.innerText = 'Procesar Pago';
         }
         nav(4);
     }
