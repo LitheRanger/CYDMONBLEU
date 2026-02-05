@@ -636,6 +636,17 @@
             background-clip: text;
         }
 
+        .pay-amount.defect-note {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0;
+            color: #111827;
+            background: none;
+            -webkit-text-fill-color: currentColor;
+            text-align: center;
+            margin: 12px 0 24px;
+        }
+
         .pay-note {
             background: #f0f0f0;
             color: var(--primary);
@@ -1382,8 +1393,8 @@
             </div>
 
             <div style="border-top: 1px solid var(--border-light); padding-top: 20px; margin-top: 20px;">
-                <h4 style="margin:0 0 15px 0; color:#666; text-transform:uppercase; font-size:12px; letter-spacing:1px;">Costo de Guía</h4>
-                <div class="pay-amount">$150.00</div>
+                <h4 id="pay-title" style="margin:0 0 15px 0; color:#666; text-transform:uppercase; font-size:12px; letter-spacing:1px;">Costo de Guía</h4>
+                <div id="pay-amount" class="pay-amount">$150.00</div>
                 
                 <div id="pay-dynamic-text" class="pay-desc"></div>
                 
@@ -2041,6 +2052,8 @@
         const isDefectRequest = reasons.length > 0 && reasons.includes('defecto');
         const isNoEsperaba = reasons.length > 0 && reasons.includes('no era lo que esperaba');
         const payBtn = document.getElementById('btn-pay');
+        const payAmount = document.getElementById('pay-amount');
+        const payTitle = document.getElementById('pay-title');
 
         if(tipo === 'Reembolso') {
             txt.innerHTML = "Al finalizar, se te enviará un <b>cupón de tienda</b> por el valor de tus productos.";
@@ -2073,11 +2086,21 @@
             if (refundBreakdown) refundBreakdown.style.display = 'none';
         }
         if (isDefectRequest) {
-            txt.innerHTML = "Defecto confirmado: no se requiere pago y te enviaremos la guía.";
+            if (payTitle) payTitle.style.display = 'none';
+            if (payAmount) {
+                payAmount.textContent = 'Defecto confirmado: no se requiere pago y te enviaremos la guía.';
+                payAmount.classList.add('defect-note');
+            }
+            txt.innerHTML = '';
             note.style.display = 'none';
             if (payBtn) payBtn.innerText = 'Generar guía';
-        } else if (payBtn) {
-            payBtn.innerText = 'Procesar Pago';
+        } else {
+            if (payTitle) payTitle.style.display = '';
+            if (payAmount) {
+                payAmount.textContent = '$150.00';
+                payAmount.classList.remove('defect-note');
+            }
+            if (payBtn) payBtn.innerText = 'Procesar Pago';
         }
         nav(4);
     }

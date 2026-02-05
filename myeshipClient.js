@@ -125,10 +125,10 @@ function parseAddress(address) {
  * Construye el payload para crear una cotización (paso 1)
  */
 function buildQuotationPayload({ order, requestId }) {
-  const shipping = order && order.shipping_address ? order.shipping_address : null;
+  const shipping = order?.shipping_address || order?.customer?.default_address || null;
 
   if (!shipping) {
-    throw new Error('Order does not have shipping address');
+    throw new Error('Order does not have a usable address');
   }
 
   const shipperName = `${shipping.first_name || ''} ${shipping.last_name || ''}`.trim() || 'Customer';

@@ -534,7 +534,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         if (isDefectRequest && requestId) {
             try {
                 await executeQuery(
-                    `UPDATE returns_requests SET payment_status = 'no_payment_required' WHERE id = ?`,
+                    `UPDATE returns_requests SET payment_status = 'pending' WHERE id = ?`,
                     [requestId]
                 );
 
