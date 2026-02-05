@@ -1359,8 +1359,8 @@
                 <span class="d-desc">Cupón por valor del pedido descontando costo de guía ($150).</span>
             </div>
         </div>
-        <div class="change-items" id="change-items" role="region" aria-label="Selecciona talla o color por producto">
-            <h4>Selecciona talla por producto</h4>
+        <div class="change-items" id="change-items" role="region" aria-label="Selecciona talla o color de la prenda nueva">
+            <h4>Selecciona talla o color de la prenda nueva</h4>
             <div id="change-items-list"></div>
             <div style="text-align:right; margin-top:16px;">
                 <button class="btn" id="btn-change-continue" aria-label="Continuar con los cambios seleccionados">Continuar con cambio</button>
@@ -1435,7 +1435,7 @@
         <div class="m-info">
             <h3 id="m-name" style="margin-top:0;">Nombre Producto</h3>
             <div id="m-price" style="font-weight:bold; margin-bottom:15px;">$0.00</div>
-            <div style="margin-bottom: 20px; font-weight: 500; color: #666;">Selecciona nueva talla:</div>
+            <div style="margin-bottom: 20px; font-weight: 500; color: #666;">Selecciona talla o color de la prenda nueva:</div>
             <div class="size-grid" id="m-sizes"></div>
             <button class="btn" style="margin-top:25px;" id="btn-confirm-size">Confirmar Cambio</button>
         </div>
@@ -1832,7 +1832,7 @@
                 </div>
                 <div class="change-actions">
                     <span class="change-status ${hasChange ? 'done' : 'pending'}">${hasChange ? 'Listo' : 'Pendiente'}</span>
-                    <button class="btn" type="button" data-change-idx="${idx}" aria-label="Cambiar talla de ${item.name}">Elegir talla</button>
+                    <button class="btn" type="button" data-change-idx="${idx}" aria-label="Seleccionar talla o color de la prenda nueva para ${item.name}">Elegir talla/color</button>
                 </div>
             `;
             list.appendChild(row);
@@ -1867,40 +1867,48 @@
         const grid = document.getElementById('m-sizes');
         grid.innerHTML = '';
 
-        if(item.available_variants && item.available_variants.length > 0) {
-            // Parsear variantes para extraer color y talla
+        if (item.available_variants && item.available_variants.length > 0) {
+            const optionNames = Array.isArray(item.option_names) ? item.option_names : [];
+            const normalizedNames = optionNames.map(n => String(n || '').toLowerCase());
+            const colorIndex = normalizedNames.findIndex(n => n.includes('color') || n.includes('colour'));
+            const sizeIndex = normalizedNames.findIndex(n => n.includes('talla') || n.includes('size'));
+
+            const getOptionValue = (variant, index) => {
+                if (index === 0) return variant.option1 || '';
+                if (index === 1) return variant.option2 || '';
+                if (index === 2) return variant.option3 || '';
+                return '';
+            };
+
             const variants = item.available_variants.map(v => {
-                const parts = v.title.split('/').map(p => p.trim());
+                const color = colorIndex >= 0 ? getOptionValue(v, colorIndex) : '';
+                const size = sizeIndex >= 0 ? getOptionValue(v, sizeIndex) : '';
                 return {
                     ...v,
-                    color: parts.length > 1 ? parts[0] : 'Único',
-                    size: parts.length > 1 ? parts[1] : parts[0]
+                    color: color || 'Único',
+                    size: size || (v.title || 'Único')
                 };
             });
 
-            // Agrupar por color
             const byColor = {};
             variants.forEach(v => {
                 if (!byColor[v.color]) byColor[v.color] = [];
                 byColor[v.color].push(v);
             });
 
-            // Renderizar colores y tallas
             Object.entries(byColor).forEach(([color, sizes]) => {
-                // Sección de color
                 if (Object.keys(byColor).length > 1) {
                     const colorSection = document.createElement('div');
                     colorSection.className = 'variant-section';
-                    
+
                     const label = document.createElement('div');
                     label.className = 'variant-label';
                     label.innerText = `Color: ${color}`;
                     colorSection.appendChild(label);
-                    
-                    // Botones de talla para este color
+
                     const sizeContainer = document.createElement('div');
                     sizeContainer.className = 'size-grid';
-                    
+
                     sizes.forEach(v => {
                         const btn = document.createElement('button');
                         btn.className = 'size-btn';
@@ -1908,8 +1916,8 @@
                         btn.type = 'button';
                         btn.dataset.title = v.title;
                         btn.dataset.variantId = v.id;
-                        
-                        if(v.inventory <= 0) {
+
+                        if (v.inventory <= 0) {
                             btn.classList.add('disabled');
                             btn.disabled = true;
                             btn.title = 'Sin stock';
@@ -1926,19 +1934,18 @@
                         }
                         sizeContainer.appendChild(btn);
                     });
-                    
+
                     colorSection.appendChild(sizeContainer);
                     grid.appendChild(colorSection);
                 } else {
-                    // Sin colores múltiples, mostrar solo tallas
                     const label = document.createElement('div');
                     label.className = 'variant-label';
-                    label.innerText = 'Selecciona una talla:';
+                    label.innerText = 'Selecciona talla o color de la prenda nueva:';
                     grid.appendChild(label);
-                    
+
                     const sizeContainer = document.createElement('div');
                     sizeContainer.className = 'size-grid';
-                    
+
                     sizes.forEach(v => {
                         const btn = document.createElement('button');
                         btn.className = 'size-btn';
@@ -1946,8 +1953,8 @@
                         btn.type = 'button';
                         btn.dataset.title = v.title;
                         btn.dataset.variantId = v.id;
-                        
-                        if(v.inventory <= 0) {
+
+                        if (v.inventory <= 0) {
                             btn.classList.add('disabled');
                             btn.disabled = true;
                             btn.title = 'Sin stock';
@@ -1964,7 +1971,7 @@
                         }
                         sizeContainer.appendChild(btn);
                     });
-                    
+
                     grid.appendChild(sizeContainer);
                 }
             });

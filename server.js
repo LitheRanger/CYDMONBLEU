@@ -342,6 +342,7 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
         const itemsWithVariants = await Promise.all(order.line_items.map(async (item) => {
             let availableVariants = [];
             let productImage = null;
+            let optionNames = [];
 
             if (item.product_id) {
                 // Usamos el nuevo método de tu cliente para traer detalles
@@ -352,8 +353,15 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
                     availableVariants = product.variants.map(v => ({
                         id: v.id,
                         title: v.title, // Ej: "S", "M / Negro"
-                        inventory: v.inventory_quantity
+                        inventory: v.inventory_quantity,
+                        option1: v.option1 || null,
+                        option2: v.option2 || null,
+                        option3: v.option3 || null
                     }));
+
+                    optionNames = Array.isArray(product.options)
+                        ? product.options.map(o => o.name).filter(Boolean)
+                        : [];
                     
                     // Intentamos obtener la imagen principal
                     if(product.image && product.image.src) {
@@ -370,7 +378,8 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
                 price: item.price,
                 current_variant_title: item.variant_title,
                 image: productImage,        // URL de la imagen para el modal
-                available_variants: availableVariants // LISTA DE TALLAS PARA EL MODAL
+                available_variants: availableVariants, // LISTA DE TALLAS/COLORES PARA EL MODAL
+                option_names: optionNames
             };
         }));
 
