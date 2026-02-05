@@ -1172,8 +1172,19 @@ app.get('/api/label/:requestId', async (req, res) => {
         }
 
         const row = rows[0];
-        if (!row.tracking_number || !row.label_base64) {
+        if (!row.tracking_number) {
             return res.status(404).json({ success: false, message: 'Guía aún no disponible' });
+        }
+
+        if (!row.label_base64) {
+            return res.json({
+                success: true,
+                carrier: row.carrier,
+                trackingNumber: row.tracking_number,
+                labelBase64: null,
+                labelMime: row.label_mime || 'application/pdf',
+                message: 'Guía aún no disponible'
+            });
         }
 
         res.json({
