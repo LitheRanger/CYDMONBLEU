@@ -1041,6 +1041,11 @@ app.post('/api/admin/requests/delete-all', requireAdmin, async (req, res) => {
             return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
         }
 
+        const confirmPass = req.body?.confirmPass;
+        if (!confirmPass || confirmPass !== ADMIN_PASS) {
+            return res.status(401).json({ success: false, message: 'Confirmacion de admin invalida' });
+        }
+
         await executeQuery('DELETE FROM returns_requests', []);
         res.json({ success: true, message: 'Todos los pedidos eliminados' });
     } catch (err) {

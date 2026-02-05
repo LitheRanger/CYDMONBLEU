@@ -1156,11 +1156,20 @@
                 alert('Confirmación incorrecta. No se eliminó nada.');
                 return;
             }
+            const confirmPass = prompt('Ingresa tu contraseña de admin para confirmar:');
+            if (!confirmPass) {
+                alert('Confirmación cancelada.');
+                return;
+            }
 
             const btn = document.getElementById('btn-delete-all');
             if (btn) btn.disabled = true;
             try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/delete-all`, { method: 'POST' });
+                const res = await fetch(`${API_BASE}/api/admin/requests/delete-all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirmPass })
+                });
                 const data = await res.json();
                 if (!data.success) {
                     alert(data.message || 'Error eliminando pedidos');
