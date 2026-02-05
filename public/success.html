@@ -270,7 +270,7 @@
                                     <div style="font-weight:600;">${item.name}</div>
                                     <div style="font-size:12px;color:var(--text-secondary);">
                                         Razón: ${item.reason}
-                                        ${item.replacementTitle ? `<br>Nueva talla: ${item.replacementTitle}` : ''}
+                                        ${item.replacementColor || item.replacementSize ? `<br>Nueva prenda: ${[item.replacementColor ? `Color: ${item.replacementColor}` : '', item.replacementSize ? `Talla: ${item.replacementSize}` : ''].filter(Boolean).join(' • ')}` : (item.replacementTitle ? `<br>Nueva prenda: ${item.replacementTitle}` : '')}
                                     </div>
                                 </div>
                             `).join('')}
@@ -353,7 +353,7 @@
                                 <div style="font-weight:600;">${item.name}</div>
                                 <div style="font-size:12px;color:var(--text-secondary);">
                                     Razón: ${item.reason}
-                                    ${item.replacementTitle ? `<br>Nueva talla: ${item.replacementTitle}` : ''}
+                                    ${item.replacementColor || item.replacementSize ? `<br>Nueva prenda: ${[item.replacementColor ? `Color: ${item.replacementColor}` : '', item.replacementSize ? `Talla: ${item.replacementSize}` : ''].filter(Boolean).join(' • ')}` : (item.replacementTitle ? `<br>Nueva prenda: ${item.replacementTitle}` : '')}
                                 </div>
                             </div>
                         `).join('')}

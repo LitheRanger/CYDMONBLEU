@@ -1472,7 +1472,7 @@
     // ===== ESTADO =====
     let orderData = null;
     let seleccion = {};
-    let cambioConfig = { itemIndex: null, nuevaVariantId: null, nuevaTalla: '' };
+    let cambioConfig = { itemIndex: null, nuevaVariantId: null, nuevaTalla: '', nuevaColor: '', nuevaSize: '' };
     let tipoFinal = '';
     const GUIDE_COST = 150;
 
@@ -1482,6 +1482,19 @@
             style: 'currency',
             currency: 'MXN'
         }).format(amount);
+    }
+
+    function formatReplacement(s) {
+        if (!s) return 'Sin seleccionar';
+        const color = s.replacementColor || '';
+        const size = s.replacementSize || '';
+        if (color || size) {
+            const parts = [];
+            if (color) parts.push(`Color: ${color}`);
+            if (size) parts.push(`Talla: ${size}`);
+            return parts.join(' • ');
+        }
+        return s.replacementTitle || 'Sin seleccionar';
     }
 
     // ===== TOAST SYSTEM =====
@@ -1709,7 +1722,7 @@
             chk.setAttribute('aria-checked', 'true');
             body.classList.add('open');
             row.classList.add('active');
-            seleccion[idx] = { reason: '', replacementVariantId: null, replacementTitle: '' };
+            seleccion[idx] = { reason: '', replacementVariantId: null, replacementTitle: '', replacementColor: '', replacementSize: '' };
         }
 
         const changeBox = document.getElementById('change-items');
@@ -1821,6 +1834,7 @@
             const item = orderData.items[idx];
             const s = seleccion[idx];
             const hasChange = !!s.replacementVariantId;
+            const replacementLabel = formatReplacement(s);
 
             const row = document.createElement('div');
             row.className = 'change-item';
@@ -1828,7 +1842,7 @@
                 <div style="flex:1;">
                     <div style="font-weight:600;">${item.name}</div>
                     <div class="change-item-meta">Actual: ${item.current_variant_title || 'Unitalla'}</div>
-                    <div class="change-item-meta">Nuevo: ${s.replacementTitle || 'Sin seleccionar'}</div>
+                    <div class="change-item-meta">Nuevo: ${replacementLabel}</div>
                 </div>
                 <div class="change-actions">
                     <span class="change-status ${hasChange ? 'done' : 'pending'}">${hasChange ? 'Listo' : 'Pendiente'}</span>
@@ -1857,6 +1871,8 @@
         cambioConfig.itemIndex = targetIdx;
         cambioConfig.nuevaVariantId = seleccion[targetIdx]?.replacementVariantId || null;
         cambioConfig.nuevaTalla = seleccion[targetIdx]?.replacementTitle || '';
+        cambioConfig.nuevaColor = seleccion[targetIdx]?.replacementColor || '';
+        cambioConfig.nuevaSize = seleccion[targetIdx]?.replacementSize || '';
 
         document.getElementById('modal-talla').style.display = 'flex';
         document.getElementById('m-img').src = item.image || '';
@@ -1930,6 +1946,8 @@
                                 btn.classList.add('selected');
                                 cambioConfig.nuevaVariantId = v.id;
                                 cambioConfig.nuevaTalla = v.title;
+                                cambioConfig.nuevaColor = v.color || '';
+                                cambioConfig.nuevaSize = v.size || '';
                             });
                         }
                         sizeContainer.appendChild(btn);
@@ -1967,6 +1985,8 @@
                                 btn.classList.add('selected');
                                 cambioConfig.nuevaVariantId = v.id;
                                 cambioConfig.nuevaTalla = v.title;
+                                cambioConfig.nuevaColor = v.color || '';
+                                cambioConfig.nuevaSize = v.size || '';
                             });
                         }
                         sizeContainer.appendChild(btn);
@@ -1992,12 +2012,14 @@
 
     function confirmarCambio() {
         if(!cambioConfig.nuevaVariantId) {
-            showErrorToast("❌ Selecciona una talla para continuar");
+            showErrorToast("❌ Selecciona talla o color para continuar");
             return;
         }
         if (seleccion[cambioConfig.itemIndex]) {
             seleccion[cambioConfig.itemIndex].replacementVariantId = cambioConfig.nuevaVariantId;
             seleccion[cambioConfig.itemIndex].replacementTitle = cambioConfig.nuevaTalla;
+            seleccion[cambioConfig.itemIndex].replacementColor = cambioConfig.nuevaColor;
+            seleccion[cambioConfig.itemIndex].replacementSize = cambioConfig.nuevaSize;
         }
         cerrarModal();
         renderChangeItems();
@@ -2014,7 +2036,7 @@
             const keys = Object.keys(seleccion);
             const missing = keys.filter(k => !seleccion[k].replacementVariantId);
             if (missing.length > 0) {
-                showErrorToast("❌ Selecciona la nueva talla para todos los productos antes de continuar");
+                showErrorToast("❌ Selecciona talla o color para todos los productos antes de continuar");
                 return;
             }
         }
@@ -2039,7 +2061,7 @@
                     <div style="flex: 1;">
                         <div class="payment-item-name">${item.name}</div>
                         <span class="payment-item-reason">${s.reason}</span>
-                        ${tipoFinal === 'Cambio' ? `<div class="payment-item-reason" style="margin-top:6px;">Nueva talla: ${s.replacementTitle || 'N/A'}</div>` : ''}
+                        ${tipoFinal === 'Cambio' ? `<div class="payment-item-reason" style="margin-top:6px;">Nueva prenda: ${formatReplacement(s)}</div>` : ''}
                     </div>
                     <div class="payment-item-type">${typeLabel}</div>
                 </div>
@@ -2175,7 +2197,9 @@
                         items: Object.keys(seleccion).map(idx => ({
                             name: orderData.items[idx].name,
                             reason: seleccion[idx].reason,
-                            replacementTitle: seleccion[idx].replacementTitle
+                            replacementTitle: seleccion[idx].replacementTitle,
+                            replacementColor: seleccion[idx].replacementColor,
+                            replacementSize: seleccion[idx].replacementSize
                         })),
                         tipo: tipoFinal
                     }));
@@ -2215,7 +2239,9 @@
                         items: Object.keys(seleccion).map(idx => ({
                             name: orderData.items[idx].name,
                             reason: seleccion[idx].reason,
-                            replacementTitle: seleccion[idx].replacementTitle
+                            replacementTitle: seleccion[idx].replacementTitle,
+                            replacementColor: seleccion[idx].replacementColor,
+                            replacementSize: seleccion[idx].replacementSize
                         })),
                         tipo: tipoFinal
                     }));
