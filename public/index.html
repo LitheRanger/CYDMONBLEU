@@ -1393,25 +1393,17 @@
     </div>
 
     <div id="step-3" class="step-view">
-        <h3 style="text-align:center;">Selecciona una opción</h3>
-        <div class="decision-grid" role="group" aria-label="Opciones de devolución o cambio">
-            <div class="decision-card" id="card-cambio" tabindex="0" role="button">
-                <span class="d-icon">🔄</span>
-                <span class="d-title">Cambio</span>
-                <span class="d-desc">Cambiar por otra talla o color</span>
-            </div>
-            <div class="decision-card" id="card-reembolso" tabindex="0" role="button" aria-label="Opción de reembolso - recibir dinero devuelto">
-                <span class="d-icon">🏷️</span>
-                <span class="d-title">Reembolso</span>
-                <span class="d-desc">Cupón por valor del pedido descontando costo de guía ($150).</span>
-            </div>
-        </div>
+        <h3 style="text-align:center;">Revisa tu solicitud</h3>
+        <p style="text-align:center; color: var(--text-secondary); margin-top:6px;">Selecciona talla o color solo para los productos marcados como Cambio.</p>
         <div class="change-items" id="change-items" role="region" aria-label="Selecciona talla o color de la prenda nueva">
             <h4>Selecciona talla o color de la prenda nueva</h4>
             <div id="change-items-list"></div>
             <div style="text-align:right; margin-top:16px;">
-                <button class="btn" id="btn-change-continue" aria-label="Continuar con los cambios seleccionados">Continuar con cambio</button>
+                <button class="btn" id="btn-change-continue" aria-label="Continuar con los cambios seleccionados">Continuar</button>
             </div>
+        </div>
+        <div style="text-align:center; margin-top:16px;">
+            <button class="btn" id="btn-continue-summary" aria-label="Continuar a resumen">Continuar</button>
         </div>
         <div class="link-back" id="link-back-3">Volver</div>
     </div>
@@ -1739,6 +1731,13 @@
                     <option value="No era lo que esperaba">No era lo que esperaba</option>
                     <option value="Defecto">Defecto</option>
                 </select>
+                <label for="request-type-${idx}" style="margin-top:10px;">Tipo de solicitud</label>
+                <select id="request-type-${idx}">
+                    <option value="">Selecciona...</option>
+                    <option value="Cambio">Cambio</option>
+                    <option value="Reembolso">Devolución</option>
+                </select>
+                <div class="muted" id="type-hint-${idx}" style="margin-top:6px;"></div>
                 <label for="file-${idx}" style="margin-top:10px;">Subir foto</label>
                 <input type="file" id="file-${idx}" accept="image/*">
                 <div id="file-error-${idx}" class="error-message"></div>
@@ -1747,6 +1746,8 @@
 
             const reasonSelect = body.querySelector(`#reason-${idx}`);
             reasonSelect.addEventListener('change', () => updateData(idx));
+            const typeSelect = body.querySelector(`#request-type-${idx}`);
+            typeSelect.addEventListener('change', () => updateData(idx));
             const fileInput = body.querySelector(`#file-${idx}`);
             fileInput.addEventListener('change', () => updateData(idx));
 
@@ -1772,7 +1773,7 @@
             chk.setAttribute('aria-checked', 'true');
             body.classList.add('open');
             row.classList.add('active');
-            seleccion[idx] = { reason: '', replacementVariantId: null, replacementTitle: '', replacementColor: '', replacementSize: '' };
+            seleccion[idx] = { reason: '', requestType: '', replacementVariantId: null, replacementTitle: '', replacementColor: '', replacementSize: '' };
         }
 
         const changeBox = document.getElementById('change-items');
@@ -1783,7 +1784,51 @@
 
     function updateData(idx) {
         if(seleccion[idx]) {
-            seleccion[idx].reason = document.getElementById(`reason-${idx}`).value;
+            const reasonValue = document.getElementById(`reason-${idx}`).value;
+            const typeSelect = document.getElementById(`request-type-${idx}`);
+            const typeHint = document.getElementById(`type-hint-${idx}`);
+            const reasonLower = String(reasonValue || '').toLowerCase();
+
+            seleccion[idx].reason = reasonValue;
+
+            if (typeSelect) {
+                let allowedTypes = ['Cambio', 'Reembolso'];
+                if (reasonLower === 'talla/color incorrecto') {
+                    allowedTypes = ['Cambio'];
+                } else if (reasonLower === 'no era lo que esperaba') {
+                    allowedTypes = ['Reembolso'];
+                }
+
+                Array.from(typeSelect.options).forEach(opt => {
+                    if (!opt.value) return;
+                    opt.disabled = !allowedTypes.includes(opt.value);
+                });
+
+                if (!allowedTypes.includes(typeSelect.value)) {
+                    typeSelect.value = allowedTypes.length === 1 ? allowedTypes[0] : '';
+                }
+
+                if (typeHint) {
+                    if (reasonLower === 'talla/color incorrecto') {
+                        typeHint.textContent = 'Solo disponible como Cambio.';
+                    } else if (reasonLower === 'no era lo que esperaba') {
+                        typeHint.textContent = 'Solo disponible como Devolución.';
+                    } else if (reasonLower === 'defecto') {
+                        typeHint.textContent = 'Disponible como Cambio o Devolución.';
+                    } else {
+                        typeHint.textContent = '';
+                    }
+                }
+
+                seleccion[idx].requestType = typeSelect.value;
+
+                if (seleccion[idx].requestType !== 'Cambio') {
+                    seleccion[idx].replacementVariantId = null;
+                    seleccion[idx].replacementTitle = '';
+                    seleccion[idx].replacementColor = '';
+                    seleccion[idx].replacementSize = '';
+                }
+            }
             const fileInput = document.getElementById(`file-${idx}`);
             if(fileInput.files[0]) {
                 const file = fileInput.files[0];
@@ -1824,6 +1869,10 @@
                 reader.readAsDataURL(file);
             }
         }
+        const changeBox = document.getElementById('change-items');
+        if (changeBox && changeBox.style.display !== 'none') {
+            renderChangeItems();
+        }
     }
 
     function removePhoto(idx) {
@@ -1850,22 +1899,17 @@
                 showErrorToast("❌ Selecciona la razón de devolución para todos los productos");
                 return;
             }
+            if(!seleccion[k].requestType) {
+                showErrorToast("❌ Selecciona el tipo de solicitud para todos los productos");
+                return;
+            }
             if (String(seleccion[k].reason).toLowerCase() === 'defecto' && !seleccion[k].file) {
                 showErrorToast("❌ En defecto es obligatorio subir una foto del producto");
                 return;
             }
         }
         nav(3);
-    }
-
-    function iniciarCambio() {
-        tipoFinal = 'Cambio';
         renderChangeItems();
-        const changeBox = document.getElementById('change-items');
-        if (changeBox) {
-            changeBox.style.display = 'block';
-            changeBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
     }
 
     function renderChangeItems() {
@@ -1874,13 +1918,15 @@
         if (!list || !changeBox) return;
 
         const keys = Object.keys(seleccion);
-        if (keys.length === 0) {
+        const changeKeys = keys.filter(idx => seleccion[idx]?.requestType === 'Cambio');
+        if (changeKeys.length === 0) {
             changeBox.style.display = 'none';
             return;
         }
 
+        changeBox.style.display = 'block';
         list.innerHTML = '';
-        keys.forEach(idx => {
+        changeKeys.forEach(idx => {
             const item = orderData.items[idx];
             const s = seleccion[idx];
             const hasChange = !!s.replacementVariantId;
@@ -2076,8 +2122,8 @@
 
     function cerrarModal() { 
         document.getElementById('modal-talla').style.display = 'none';
-        // Return focus a decision card
-        document.getElementById('card-cambio').focus();
+        const fallback = document.getElementById('btn-continue-summary');
+        if (fallback) fallback.focus();
     }
 
     function confirmarCambio() {
@@ -2097,16 +2143,25 @@
     }
 
     // ===== PASO 4: PAGO =====
+    function resolveTipoFinal() {
+        const keys = Object.keys(seleccion);
+        const types = keys.map(k => seleccion[k]?.requestType).filter(Boolean);
+        const unique = [...new Set(types)];
+        if (unique.length === 1) return unique[0];
+        return 'Mixto';
+    }
+
     function irAPago(tipo) {
-        tipoFinal = tipo;
+        tipoFinal = tipo || resolveTipoFinal();
         const txt = document.getElementById('pay-dynamic-text');
         const note = document.getElementById('pay-promo-note');
 
-        if (tipoFinal === 'Cambio') {
-            const keys = Object.keys(seleccion);
-            const missing = keys.filter(k => !seleccion[k].replacementVariantId);
+        const keys = Object.keys(seleccion);
+        const changeKeys = keys.filter(k => seleccion[k]?.requestType === 'Cambio');
+        if (changeKeys.length > 0) {
+            const missing = changeKeys.filter(k => !seleccion[k].replacementVariantId);
             if (missing.length > 0) {
-                showErrorToast("❌ Selecciona talla o color para todos los productos antes de continuar");
+                showErrorToast("❌ Selecciona talla o color para todos los productos de Cambio antes de continuar");
                 return;
             }
         }
@@ -2117,21 +2172,25 @@
 
         let totalItemsValue = 0;
 
+        let refundItemsValue = 0;
         Object.keys(seleccion).forEach(idx => {
             const item = orderData.items[idx];
             const s = seleccion[idx];
-            const typeLabel = (tipoFinal === 'Cambio') ? 'Cambio' : 'Devolución';
+            const typeLabel = s.requestType === 'Cambio' ? 'Cambio' : 'Devolución';
 
             const qty = Number(item.quantity || 1);
             const price = Number(item.price || 0);
             totalItemsValue += qty * price;
+            if (s.requestType === 'Reembolso') {
+                refundItemsValue += qty * price;
+            }
             
             const html = `
                 <div class="payment-item">
                     <div style="flex: 1;">
                         <div class="payment-item-name">${item.name}</div>
                         <span class="payment-item-reason">${s.reason}</span>
-                        ${tipoFinal === 'Cambio' ? `<div class="payment-item-reason" style="margin-top:6px;">Nueva prenda: ${formatReplacement(s)}</div>` : ''}
+                        ${s.requestType === 'Cambio' ? `<div class="payment-item-reason" style="margin-top:6px;">Nueva prenda: ${formatReplacement(s)}</div>` : ''}
                     </div>
                     <div class="payment-item-type">${typeLabel}</div>
                 </div>
@@ -2150,12 +2209,15 @@
 
         const reasons = Object.values(seleccion).map(s => String(s.reason || '').toLowerCase());
         const isDefectRequest = reasons.length > 0 && reasons.includes('defecto');
-        const isNoEsperaba = reasons.length > 0 && reasons.includes('no era lo que esperaba');
+        const refundReasons = Object.values(seleccion)
+            .filter(s => s.requestType === 'Reembolso')
+            .map(s => String(s.reason || '').toLowerCase());
+        const isNoEsperaba = refundReasons.length > 0 && refundReasons.includes('no era lo que esperaba');
         const payBtn = document.getElementById('btn-pay');
         const payAmount = document.getElementById('pay-amount');
         const payTitle = document.getElementById('pay-title');
 
-        if(tipo === 'Reembolso') {
+        if (refundItemsValue > 0) {
             txt.innerHTML = "Al finalizar, se te enviará un <b>cupón de tienda</b> por el valor de tus productos.";
             note.style.display = 'none';
 
@@ -2168,7 +2230,7 @@
                 }, 0)
                 : 0;
             const fullOrderTotal = orderTotal > 0 ? orderTotal : fallbackOrderTotal;
-            const baseTotal = isNoEsperaba && fullOrderTotal > 0 ? fullOrderTotal : totalItemsValue;
+            const baseTotal = isNoEsperaba && fullOrderTotal > 0 ? fullOrderTotal : refundItemsValue;
             const couponValue = isDefectRequest
                 ? baseTotal
                 : (isNoEsperaba ? baseTotal : Math.max(baseTotal - GUIDE_COST, 0));
@@ -2232,6 +2294,7 @@
                 formData.append(`evidence_${original.id}`, selectedFile);
             }
 
+            const isCambioItem = s.requestType === 'Cambio';
             itemsPayload.push({
                 variantId: original.id,
                 name: original.name || 'Producto',
@@ -2239,8 +2302,11 @@
                 quantity: original.quantity || 1,
                 price: original.price,
                 reason: s.reason,
-                replacementVariantId: (tipoFinal === 'Cambio') ? s.replacementVariantId : null,
-                replacementTitle: (tipoFinal === 'Cambio') ? (s.replacementTitle || '') : ''
+                requestType: s.requestType,
+                replacementVariantId: isCambioItem ? s.replacementVariantId : null,
+                replacementTitle: isCambioItem ? (s.replacementTitle || '') : '',
+                replacementColor: isCambioItem ? (s.replacementColor || '') : '',
+                replacementSize: isCambioItem ? (s.replacementSize || '') : ''
             });
         });
         formData.append('items', JSON.stringify(itemsPayload));
@@ -2267,6 +2333,7 @@
                         items: Object.keys(seleccion).map(idx => ({
                             name: orderData.items[idx].name,
                             reason: seleccion[idx].reason,
+                            requestType: seleccion[idx].requestType,
                             replacementTitle: seleccion[idx].replacementTitle,
                             replacementColor: seleccion[idx].replacementColor,
                             replacementSize: seleccion[idx].replacementSize
@@ -2309,6 +2376,7 @@
                         items: Object.keys(seleccion).map(idx => ({
                             name: orderData.items[idx].name,
                             reason: seleccion[idx].reason,
+                            requestType: seleccion[idx].requestType,
                             replacementTitle: seleccion[idx].replacementTitle,
                             replacementColor: seleccion[idx].replacementColor,
                             replacementSize: seleccion[idx].replacementSize
@@ -2354,15 +2422,15 @@
         Object.keys(seleccion).forEach(idx => {
             const item = orderData.items[idx];
             const s = seleccion[idx];
-            const type = (tipoFinal === 'Cambio') ? 'Cambio' : 'Devolución';
-            
+            const type = s.requestType === 'Cambio' ? 'Cambio' : 'Devolución';
+
             html += `
                 <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
                     <div style="font-weight: 600; margin-bottom: 4px;">${item.name}</div>
                     <div style="font-size: 12px; color: var(--text-secondary);">
                         Razón: ${s.reason}<br>
                         Tipo: ${type}
-                        ${tipoFinal === 'Cambio' ? `<br>Nueva talla: ${s.replacementTitle || 'N/A'}` : ''}
+                        ${s.requestType === 'Cambio' ? `<br>Nueva prenda: ${formatReplacement(s)}` : ''}
                     </div>
                 </div>
             `;
@@ -2383,29 +2451,13 @@
         document.getElementById('btn-next-prod').addEventListener('click', validarSeleccion);
 
         // Paso 3
-        document.getElementById('card-reembolso').addEventListener('click', () => {
-            const changeBox = document.getElementById('change-items');
-            if (changeBox) changeBox.style.display = 'none';
-            irAPago('Reembolso');
-        });
-        document.getElementById('card-reembolso').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                const changeBox = document.getElementById('change-items');
-                if (changeBox) changeBox.style.display = 'none';
-                irAPago('Reembolso');
-            }
-        });
+        const continueToPayment = () => {
+            renderChangeItems();
+            irAPago();
+        };
 
-        document.getElementById('card-cambio').addEventListener('click', iniciarCambio);
-        document.getElementById('card-cambio').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                iniciarCambio();
-            }
-        });
-
-        document.getElementById('btn-change-continue').addEventListener('click', () => irAPago('Cambio'));
+        document.getElementById('btn-change-continue').addEventListener('click', continueToPayment);
+        document.getElementById('btn-continue-summary').addEventListener('click', continueToPayment);
 
         document.getElementById('link-back-3').addEventListener('click', () => nav(2));
 
