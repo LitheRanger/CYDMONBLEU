@@ -692,6 +692,15 @@
             display: flex;
         }
 
+        body.terms-locked {
+            overflow: hidden;
+        }
+
+        body.terms-locked .main-container {
+            pointer-events: none;
+            filter: blur(1px);
+        }
+
         .modal-content {
             background: var(--secondary);
             width: 100%;
@@ -769,6 +778,10 @@
         .m-close:hover {
             background: var(--primary);
             color: var(--secondary);
+        }
+
+        #modal-terms .m-close {
+            display: none;
         }
 
         .m-img {
@@ -1488,6 +1501,9 @@
                 <p style="margin-bottom:12px;">• El cupón se emite una vez recibida y aprobada la devolución.</p>
                 <p style="margin-bottom:12px;">• El cupón es válido por 30 días y no es transferible.</p>
                 <p style="margin-bottom:0;">• No aplican cambios en prendas de liquidación o personalizadas.</p>
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn" id="btn-accept-terms" type="button">Aceptar y continuar</button>
             </div>
         </div>
     </div>
@@ -2264,10 +2280,10 @@
                     }, 800);
                     return;
                 }
-                // Paso 2: Crear sesión de Stripe Checkout
+                // Paso 2: Crear preferencia de MercadoPago
                 loadingToast = showLoadingToast("Redirigiendo a pago seguro...");
-                
-                const checkoutRes = await fetch(`${API_BASE}/api/create-checkout-session`, {
+
+                const checkoutRes = await fetch(`${API_BASE}/api/create-mp-preference`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     mode: 'cors',
@@ -2284,7 +2300,7 @@
                 const checkoutData = await checkoutRes.json();
                 removeToast(loadingToast);
                 
-                if(checkoutData.success && checkoutData.url) {
+                if(checkoutData.success && checkoutData.checkoutUrl) {
                     // Guardar requestId localmente antes de redirigir
                     localStorage.setItem('mon_request_id', data.requestId);
                     localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
@@ -2301,10 +2317,10 @@
                     }));
                     
                     showSuccessToast("✓ Redirigiendo a pago...");
-                    
-                    // Redirigir a Stripe Checkout
+
+                    // Redirigir a MercadoPago
                     setTimeout(() => {
-                        window.location.href = checkoutData.url;
+                        window.location.href = checkoutData.checkoutUrl;
                     }, 800);
                 } else {
                     showErrorToast(`❌ ${checkoutData.message || "Error al iniciar pago"}`);
@@ -2402,21 +2418,36 @@
         document.getElementById('btn-confirm-size').addEventListener('click', confirmarCambio);
         const termsLink = document.getElementById('terms-link');
         const termsModal = document.getElementById('modal-terms');
-        const closeTerms = document.getElementById('btn-close-terms');
+        const acceptTermsBtn = document.getElementById('btn-accept-terms');
+        const termsCheckbox = document.getElementById('terms-accept');
+        let termsAccepted = false;
 
-        if (termsLink && termsModal && closeTerms) {
+        const openTerms = () => {
+            if (!termsModal) return;
+            termsModal.classList.add('active');
+            document.body.classList.add('terms-locked');
+        };
+
+        const acceptTerms = () => {
+            termsAccepted = true;
+            if (termsCheckbox) termsCheckbox.checked = true;
+            if (termsModal) termsModal.classList.remove('active');
+            document.body.classList.remove('terms-locked');
+        };
+
+        if (termsLink && termsModal) {
             termsLink.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                termsModal.classList.add('active');
-            });
-
-            closeTerms.addEventListener('click', () => termsModal.classList.remove('active'));
-
-            termsModal.addEventListener('click', (e) => {
-                if (e.target === termsModal) termsModal.classList.remove('active');
+                openTerms();
             });
         }
+
+        if (acceptTermsBtn) {
+            acceptTermsBtn.addEventListener('click', acceptTerms);
+        }
+
+        openTerms();
 
 
         // ESC cierra modal
@@ -2424,8 +2455,9 @@
             if (e.key === 'Escape') {
                 const modal = document.getElementById('modal-talla');
                 if (modal.style.display === 'flex') cerrarModal();
-                if (termsModal && termsModal.classList.contains('active')) {
+                if (termsModal && termsModal.classList.contains('active') && termsAccepted) {
                     termsModal.classList.remove('active');
+                    document.body.classList.remove('terms-locked');
                 }
             }
         });

@@ -14,8 +14,13 @@ const { z } = require('zod');
 const isPostgreSQL = (process.env.DATABASE_URL || '').includes('postgresql://');
 const db = isPostgreSQL ? require('pg').Pool : require('mysql2/promise');
 
-// Stripe (opcional - solo se inicializa si está configurado)
-const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+// MercadoPago (se inicializa si está configurado)
+const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+const mpAccessToken = process.env.MP_ACCESS_TOKEN || '';
+const mpEnv = String(process.env.MP_ENV || 'sandbox').toLowerCase();
+const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessToken }) : null;
+const mpPreference = mpClient ? new Preference(mpClient) : null;
+const mpPayment = mpClient ? new Payment(mpClient) : null;
 
 // Importamos tu cliente robusto de Shopify
 const shopifyClient = require('./Shopifyclient.js');
@@ -59,13 +64,8 @@ app.use((req, res, next) => {
     next();
 });
 
-// JSON parser para todas las rutas excepto Stripe webhook (requiere body raw)
-app.use((req, res, next) => {
-    if (req.originalUrl === '/api/stripe-webhook') {
-        return next();
-    }
-    return express.json()(req, res, next);
-});
+// JSON parser para todas las rutas
+app.use(express.json());
 
 // --- ADMIN BASIC AUTH ---
 const ADMIN_USER = process.env.ADMIN_USER;
@@ -142,6 +142,13 @@ async function initDb() {
                 await dbPool.query(
                     `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS refund_status VARCHAR(32) DEFAULT 'pending_receipt'`
                 );
+                // Agregar columnas de pago si no existen
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS payment_provider VARCHAR(32) DEFAULT 'mercadopago'`
+                );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255) NULL`
+                );
                 console.log('✅ DB lista: tabla returns_requests verificada (PostgreSQL)');
             } else {
                 console.warn('⚠️ Tabla returns_requests no existe en PostgreSQL - ejecuta migración en Neon');
@@ -159,6 +166,8 @@ async function initDb() {
                     amount DECIMAL(10,2) NOT NULL,
                     payment_status VARCHAR(32) DEFAULT 'pending',
                     stripe_session_id VARCHAR(255) NULL,
+                    payment_provider VARCHAR(32) DEFAULT 'mercadopago',
+                    payment_reference VARCHAR(255) NULL,
                     carrier VARCHAR(32) NULL,
                     tracking_number VARCHAR(64) NULL,
                     label_base64 MEDIUMTEXT NULL,
@@ -186,6 +195,25 @@ async function initDb() {
             if (refundCols && refundCols[0] && refundCols[0].cnt === 0) {
                 await dbPool.execute(
                     `ALTER TABLE returns_requests ADD COLUMN refund_status VARCHAR(32) DEFAULT 'pending_receipt'`
+                );
+            }
+            // Agregar columnas payment_provider y payment_reference si no existen
+            const [payProviderCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'payment_provider']
+            );
+            if (payProviderCols && payProviderCols[0] && payProviderCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN payment_provider VARCHAR(32) DEFAULT 'mercadopago'`
+                );
+            }
+            const [payRefCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'payment_reference']
+            );
+            if (payRefCols && payRefCols[0] && payRefCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN payment_reference VARCHAR(255) NULL`
                 );
             }
             console.log('✅ DB lista: tabla returns_requests verificada (MySQL)');
@@ -611,8 +639,72 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
     }
 });
 
-// --- 4. STRIPE CHECKOUT SESSION ---
-app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
+async function resolveOrderForLabel(orderId) {
+    if (!orderId) return null;
+    let order = await shopifyClient.getOrderById(orderId);
+    if (!order) {
+        const rawOrderId = String(orderId || '').trim();
+        const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
+        order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
+    }
+    return order || null;
+}
+
+async function handleApprovedPayment({ requestId, orderId, paymentId }) {
+    if (!dbPool || !requestId) return;
+
+    const [rows] = await executeQuery(
+        `SELECT order_id, tracking_number FROM returns_requests WHERE id = ? LIMIT 1`,
+        [requestId]
+    );
+    const storedOrderId = rows && rows[0] ? rows[0].order_id : null;
+    const finalOrderId = orderId || storedOrderId;
+
+    await executeQuery(
+        `UPDATE returns_requests SET payment_status = 'paid', payment_provider = 'mercadopago', payment_reference = ? WHERE id = ?`,
+        [String(paymentId || ''), requestId]
+    );
+
+    if (rows && rows[0] && rows[0].tracking_number) {
+        return;
+    }
+
+    if (myeshipClient.isConfigured()) {
+        try {
+            const order = await resolveOrderForLabel(finalOrderId);
+            if (!order) {
+                console.warn('⚠️ No se pudo obtener la orden para generar guía');
+                return;
+            }
+            const label = await myeshipClient.createReturnLabel({ order, requestId });
+            if (label && label.trackingNumber) {
+                const now = new Date().toISOString();
+                await executeQuery(
+                    `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
+                    [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
+                );
+                console.log(`📦 Guía MyeShip generada: ${label.trackingNumber} (${label.provider} - ${label.serviceName})`);
+            } else {
+                console.warn('⚠️ MyeShip respondió sin tracking');
+            }
+        } catch (labelErr) {
+            console.error('❌ Error generando guía MyeShip:', labelErr.message || labelErr);
+        }
+    } else {
+        console.warn('ℹ️ MyeShip no configurado: no se generó guía');
+    }
+}
+
+async function handleFailedPayment({ requestId, paymentId }) {
+    if (!dbPool || !requestId) return;
+    await executeQuery(
+        `UPDATE returns_requests SET payment_status = 'failed', payment_provider = 'mercadopago', payment_reference = ? WHERE id = ?`,
+        [String(paymentId || ''), requestId]
+    );
+}
+
+// --- 4. MERCADOPAGO PREFERENCE ---
+app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
     try {
         const parsed = checkoutSchema.safeParse(req.body);
         if (!parsed.success) {
@@ -625,155 +717,141 @@ app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
 
         const { requestId, amount, currency, description, orderId, contactEmail } = parsed.data;
 
-        if (!stripe) {
+        if (!mpPreference) {
             return res.status(500).json({
                 success: false,
-                message: "Stripe no configurado. Agrega STRIPE_SECRET_KEY en .env"
+                message: 'MercadoPago no configurado. Agrega MP_ACCESS_TOKEN en .env'
             });
         }
 
         if (amount <= 0) {
             return res.status(400).json({
                 success: false,
-                message: "El monto debe ser mayor a 0"
+                message: 'El monto debe ser mayor a 0'
             });
         }
 
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            line_items: [{
-                price_data: {
-                    currency: currency || 'mxn',
-                    product_data: {
-                        name: 'Guía de Devolución MON|BLEU',
-                        description: description || `Guía para orden ${orderId}`,
-                    },
-                    unit_amount: Math.round(amount * 100), // Stripe usa centavos
-                },
-                quantity: 1,
-            }],
-            mode: 'payment',
-            success_url: `${req.headers.origin || 'http://localhost:3000'}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${req.headers.origin || 'http://localhost:3000'}/cancel.html`,
+        const baseUrl = process.env.PUBLIC_BASE_URL || req.headers.origin || 'http://localhost:3000';
+
+        const preferenceBody = {
+            items: [
+                {
+                    title: 'Guía de Devolución MON|BLEU',
+                    description: description || `Guía para orden ${orderId}`,
+                    quantity: 1,
+                    unit_price: Number(amount),
+                    currency_id: (currency || 'MXN').toUpperCase()
+                }
+            ],
+            payer: {
+                email: contactEmail
+            },
+            back_urls: {
+                success: `${baseUrl}/success.html`,
+                failure: `${baseUrl}/cancel.html`,
+                pending: `${baseUrl}/success.html`
+            },
+            auto_return: 'approved',
+            external_reference: String(requestId),
             metadata: {
                 requestId: String(requestId),
                 orderId: String(orderId),
                 contactEmail: String(contactEmail)
             },
-            customer_email: contactEmail
-        });
+            notification_url: `${baseUrl}/api/mp-webhook`
+        };
+
+        const preference = await mpPreference.create({ body: preferenceBody });
+        const prefId = preference?.id || preference?.body?.id;
+        const initPoint = preference?.init_point || preference?.body?.init_point;
+        const sandboxInit = preference?.sandbox_init_point || preference?.body?.sandbox_init_point;
+
+        if (dbPool && requestId) {
+            await executeQuery(
+                `UPDATE returns_requests SET payment_provider = 'mercadopago', payment_reference = ? WHERE id = ?`,
+                [String(prefId || ''), requestId]
+            );
+        }
 
         res.json({
             success: true,
-            sessionId: session.id,
-            url: session.url
+            preferenceId: prefId,
+            checkoutUrl: mpEnv === 'sandbox' ? sandboxInit : initPoint,
+            checkoutUrlSandbox: sandboxInit,
+            checkoutUrlLive: initPoint
         });
-
     } catch (error) {
-        console.error('Error creando sesión de Stripe:', error);
+        console.error('Error creando preferencia MP:', error);
         res.status(500).json({
             success: false,
-            message: error.message || "Error al crear sesión de pago"
+            message: error.message || 'Error al crear preferencia de pago'
         });
     }
 });
 
-// --- 5. STRIPE WEBHOOK (Para confirmar pagos) ---
-app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-    const sig = req.headers['stripe-signature'];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (!stripe) {
-        console.warn('⚠️ Stripe no configurado');
-        return res.status(400).send('Stripe no configurado');
-    }
-
-    if (!webhookSecret) {
-        console.warn('⚠️ STRIPE_WEBHOOK_SECRET no configurado');
-        return res.status(400).send('Webhook secret no configurado');
-    }
-
-    let event;
-
+// --- 5. MERCADOPAGO WEBHOOK ---
+app.post('/api/mp-webhook', async (req, res) => {
     try {
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        const paymentId = req.body?.data?.id || req.query?.data?.id || req.body?.id || req.query?.id;
+        if (!paymentId) {
+            return res.json({ received: true });
+        }
+
+        if (!mpPayment) {
+            console.warn('⚠️ MercadoPago no configurado');
+            return res.json({ received: true });
+        }
+
+        const payment = await mpPayment.get({ id: paymentId });
+        const status = payment?.status || payment?.body?.status;
+        const externalRef = payment?.external_reference || payment?.body?.external_reference;
+        const metadata = payment?.metadata || payment?.body?.metadata || {};
+        const requestId = externalRef || metadata.requestId;
+        const orderId = metadata.orderId;
+
+        if (status === 'approved') {
+            await handleApprovedPayment({ requestId, orderId, paymentId });
+        } else if (['rejected', 'cancelled'].includes(status)) {
+            await handleFailedPayment({ requestId, paymentId });
+        }
+
+        return res.json({ received: true });
     } catch (err) {
-        console.error('❌ Error verificando webhook:', err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
+        console.error('Error en webhook MP:', err.message || err);
+        return res.json({ received: true });
     }
-
-    // Manejar evento de pago exitoso
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-        const { requestId, orderId, contactEmail } = session.metadata;
-
-        console.log(`✅ Pago confirmado: Request ${requestId}, Orden ${orderId}`);
-
-        // Actualizar DB con estado de pago
-        if (dbPool && requestId) {
-            try {
-                await executeQuery(
-                    `UPDATE returns_requests SET payment_status = 'paid', stripe_session_id = ? WHERE id = ?`,
-                    [session.id, requestId]
-                );
-                console.log(`💾 DB actualizada: Request ${requestId} marcado como pagado`);
-            } catch (dbErr) {
-                console.error('❌ Error actualizando DB:', dbErr);
-            }
-        }
-
-        // Generar guía de MyeShip (si está configurado)
-        if (dbPool && requestId && myeshipClient.isConfigured()) {
-            try {
-                const order = await shopifyClient.getOrderById(orderId);
-                if (!order || !order.shipping_address) {
-                    console.warn('⚠️ No se pudo obtener dirección de envío de la orden');
-                } else {
-                    const label = await myeshipClient.createReturnLabel({ order, requestId });
-                    if (label && label.trackingNumber) {
-                        const now = new Date().toISOString();
-                        await executeQuery(
-                            `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
-                            [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
-                        );
-                        console.log(`📦 Guía MyeShip generada: ${label.trackingNumber} (${label.provider} - ${label.serviceName})`);
-                    } else {
-                        console.warn('⚠️ MyeShip respondió sin tracking');
-                    }
-                }
-            } catch (labelErr) {
-                console.error('❌ Error generando guía MyeShip:', labelErr.message || labelErr);
-            }
-        } else if (!myeshipClient.isConfigured()) {
-            console.warn('ℹ️ MyeShip no configurado: no se generó guía');
-        }
-
-        // Aquí puedes agregar lógica para enviar email de confirmación
-    }
-
-    res.json({ received: true });
 });
 
-// --- 6. VERIFICAR SESIÓN DE STRIPE ---
-app.get('/api/verify-payment/:sessionId', async (req, res) => {
+// --- 6. VERIFICAR PAGO MERCADOPAGO ---
+app.get('/api/verify-mp-payment/:paymentId', async (req, res) => {
     try {
-        const { sessionId } = req.params;
-
-        if (!stripe) {
-            return res.status(500).json({ success: false, message: "Stripe no configurado" });
+        const { paymentId } = req.params;
+        if (!mpPayment) {
+            return res.status(500).json({ success: false, message: 'MercadoPago no configurado' });
         }
 
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const payment = await mpPayment.get({ id: paymentId });
+        const status = payment?.status || payment?.body?.status;
+        const externalRef = payment?.external_reference || payment?.body?.external_reference;
+        const metadata = payment?.metadata || payment?.body?.metadata || {};
+        const requestId = externalRef || metadata.requestId;
+        const orderId = metadata.orderId;
+
+        if (status === 'approved') {
+            await handleApprovedPayment({ requestId, orderId, paymentId });
+        } else if (['rejected', 'cancelled'].includes(status)) {
+            await handleFailedPayment({ requestId, paymentId });
+        }
 
         res.json({
             success: true,
-            paymentStatus: session.payment_status,
-            metadata: session.metadata
+            paymentStatus: status,
+            requestId,
+            orderId
         });
-
     } catch (error) {
-        console.error('Error verificando pago:', error);
-        res.status(500).json({ success: false, message: "Error al verificar pago" });
+        console.error('Error verificando pago MP:', error);
+        res.status(500).json({ success: false, message: 'Error al verificar pago' });
     }
 });
 
