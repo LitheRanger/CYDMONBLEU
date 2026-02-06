@@ -2225,18 +2225,20 @@
             note.style.display = 'none';
 
             const baseTotal = refundItemsValue;
-            const couponValue = isDefectRequest
+            const couponValue = (isDefectRequest || isNoEsperaba)
                 ? baseTotal
-                : (isNoEsperaba ? baseTotal : Math.max(baseTotal - GUIDE_COST, 0));
+                : Math.max(baseTotal - GUIDE_COST, 0);
 
             if (refundBreakdown) refundBreakdown.style.display = 'block';
             if (refundItemsLabel) refundItemsLabel.textContent = 'Valor de prendas seleccionadas';
 
             if (refundCouponLabel) refundCouponLabel.textContent = 'Cupón por prendas seleccionadas';
             if (refundItemsTotal) refundItemsTotal.textContent = formatMoney(baseTotal);
-            if (refundGuideCost) refundGuideCost.textContent = isDefectRequest ? '' : `-${formatMoney(GUIDE_COST)}`;
+            if (refundGuideCost) refundGuideCost.textContent = (isDefectRequest || isNoEsperaba)
+                ? ''
+                : `-${formatMoney(GUIDE_COST)}`;
             if (refundCouponTotal) refundCouponTotal.textContent = formatMoney(couponValue);
-            if (refundGuideRow) refundGuideRow.style.display = isDefectRequest ? 'none' : 'flex';
+            if (refundGuideRow) refundGuideRow.style.display = (isDefectRequest || isNoEsperaba) ? 'none' : 'flex';
         } else {
             txt.innerHTML = "Estás pagando la guía de tu domicilio a nuestro taller";
             note.style.display = 'inline-block';
