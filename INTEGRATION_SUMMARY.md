@@ -123,9 +123,10 @@ SHOPIFY_CLIENT_ID=...
 SHOPIFY_CLIENT_SECRET=...
 SHOP_DOMAIN=...
 
-# Stripe (para pagos)
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# MercadoPago (para pagos)
+MP_ACCESS_TOKEN=APP_USR_...
+MP_ENV=sandbox
+PUBLIC_BASE_URL=http://localhost:3000
 
 # Admin
 ADMIN_USER=admin
@@ -143,7 +144,7 @@ ADMIN_PASS=admin123456
          └─ Se guarda en BD
 
 2. PAGO
-   └─ Cliente paga con Stripe
+   └─ Cliente paga con MercadoPago
       └─ Webhook actualiza payment_status='paid'
          └─ Sistema genera guía FedEx automáticamente
 
@@ -178,7 +179,7 @@ Todos requieren **Basic Auth**: `Authorization: Basic <base64(admin:password)>`
 ### returns_requests
 ```
 id, order_id, contact_email, return_type, items_json, files_json,
-amount, payment_status, stripe_session_id,
+amount, payment_status, payment_reference,
 carrier, tracking_number, label_base64, label_mime, label_created_at,
 created_at
 ```
@@ -244,7 +245,7 @@ mysql -u root -p -e "DROP DATABASE cydmonbleu;"
 | MySQL | ✅ Listo | Tabla creada y migrada |
 | Admin Panel | ✅ Listo | Conectada y funcional |
 | Shopify API | ✅ Listo | Cliente configurado |
-| Stripe | ⚠️ Pendiente | Necesita keys reales |
+| MercadoPago | ⚠️ Pendiente | Necesita credenciales reales |
 | FedEx | ⚠️ Pendiente | Necesita credenciales |
 | SSL/HTTPS | ⚠️ Pendiente | Para producción |
 

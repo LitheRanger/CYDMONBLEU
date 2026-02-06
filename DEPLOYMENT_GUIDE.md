@@ -6,7 +6,7 @@
 - ✅ **Gratis para empezar** (sin tarjeta de crédito)
 - ✅ **Node.js nativo** con detección automática
 - ✅ **Base de datos MySQL** incluida ($7/mes) o PostgreSQL gratis
-- ✅ **SSL automático** (necesario para Stripe)
+- ✅ **SSL automático** (necesario para webhooks de pago)
 - ✅ **Variables de entorno** fáciles de configurar
 - ✅ **Deploy desde GitHub** con auto-deploy
 - ✅ **Logs en tiempo real**
@@ -135,26 +135,23 @@ DB_PASSWORD=tu_password_generado
 DB_NAME=monbleu_returns
 DB_PORT=3306
 
-STRIPE_SECRET_KEY=sk_live_tu_clave_de_produccion
-STRIPE_WEBHOOK_SECRET=whsec_tu_webhook_secret
+MP_ACCESS_TOKEN=APP_USR_tu_access_token
+MP_ENV=production
+PUBLIC_BASE_URL=https://tu-app.onrender.com
 
 NODE_ENV=production
 PORT=3000
 ```
 
-⚠️ **IMPORTANTE:** Usa las credenciales **LIVE** de Stripe para producción
+⚠️ **IMPORTANTE:** Usa credenciales de **producción** de MercadoPago
 
 ---
 
-### **Paso 7: Configurar Webhook de Stripe**
+### **Paso 7: Configurar Webhook de MercadoPago**
 
-1. Ve a Stripe Dashboard → **"Developers"** → **"Webhooks"**
-2. Clic en **"Add endpoint"**
-3. URL del endpoint: `https://tu-app.onrender.com/api/stripe-webhook`
-4. Eventos a escuchar:
-   - `checkout.session.completed`
-   - `checkout.session.expired`
-5. Copia el **Signing secret** y agrégalo como `STRIPE_WEBHOOK_SECRET`
+1. Ve a MercadoPago Developers → **"Webhooks"**
+2. Crea el webhook con la URL: `https://tu-app.onrender.com/api/mp-webhook`
+3. Asegura `PUBLIC_BASE_URL` en Render
 
 ---
 
@@ -317,7 +314,7 @@ Para MON|BLEU, te recomiendo **Render** porque:
 1. ✅ **Fácil para empezar** - Deploy en 10 minutos
 2. ✅ **Todo incluido** - Web + DB + SSL
 3. ✅ **Precio justo** - $14/mes para producción real
-4. ✅ **Stripe ready** - SSL automático
+4. ✅ **Pagos listos** - SSL automático
 5. ✅ **Auto-deploy** - Push y olvídate
 6. ✅ **Soporte MySQL** - Tu código ya está listo
 7. ✅ **Escalable** - Cuando crezcas, sube el plan
@@ -336,7 +333,7 @@ Antes de hacer deploy, verifica:
 - [ ] `.gitignore` creado (no subir `.env` ni `node_modules`)
 - [ ] `package.json` tiene script `"start": "node server.js"`
 - [ ] Variables de entorno documentadas en `.env.example`
-- [ ] Stripe keys de **PRODUCCIÓN** (sk_live_...)
+- [ ] Credenciales de MercadoPago en **producción**
 - [ ] Cloudinary o S3 configurado para archivos
 - [ ] Webhook URL apunta a dominio de producción
 - [ ] Base de datos creada y accesible

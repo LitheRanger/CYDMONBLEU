@@ -50,8 +50,8 @@ Cliente                 Admin Panel             Server.js              MySQL DB
   │                         │                      │── INSERT ────────────►│
   │                         │                      │◄─ returns_requests ───│
   │                         │
-  ├─ Paga Stripe ──────────►│── POST /stripe/checkout ──►│
-  │                         │                      │   [Stripe API]
+   ├─ Paga MercadoPago ─────►│── POST /api/create-mp-preference ──►│
+   │                         │                      │   [MercadoPago API]
   │                         │
   │                         │◄─ Webhook ────────────────────┐
   │                         │                      │   (pago_recibido)
@@ -105,11 +105,11 @@ Contraseña:     admin123456
 ✅ Autenticación Basic Auth configurada
 ✅ Endpoints /api/admin/* listos
 ✅ FedEx API preparada para generar guías
-✅ Stripe integrado para pagos
+✅ MercadoPago integrado para pagos
 
 ⚠️  Pendiente:
    • Editar .env con credenciales MySQL reales
-   • Configurar Stripe keys (para pagos reales)
+   • Configurar MercadoPago (para pagos reales)
    • Configurar FedEx credenciales (para guías reales)
 
 
@@ -125,7 +125,7 @@ Tabla: returns_requests
 ├─ files_json (JSON) ..................... Imágenes subidas
 ├─ amount (DECIMAL) ...................... Monto a pagar
 ├─ payment_status (VARCHAR) .............. 'pending', 'paid', 'failed'
-├─ stripe_session_id (VARCHAR) ........... ID sesión Stripe
+├─ payment_reference (VARCHAR) ........... Referencia MercadoPago
 ├─ carrier (VARCHAR) ..................... 'FEDEX'
 ├─ tracking_number (VARCHAR) ............. Número de seguimiento
 ├─ label_base64 (MEDIUMTEXT) ............. PDF etiqueta en base64
@@ -183,9 +183,10 @@ Shopify (ya configurado):
   SHOPIFY_CLIENT_SECRET=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
   SHOP_DOMAIN=monbleu1221.myshopify.com
 
-Stripe (para pagos):
-  STRIPE_SECRET_KEY=sk_test_...              ← EDITAR
-  STRIPE_WEBHOOK_SECRET=whsec_...            ← EDITAR
+MercadoPago (para pagos):
+   MP_ACCESS_TOKEN=APP_USR_...               ← EDITAR
+   MP_ENV=sandbox                            ← EDITAR
+   PUBLIC_BASE_URL=http://localhost:3000     ← EDITAR
 
 FedEx (para guías):
   FEDEX_ENV=sandbox                          ← EDITAR
@@ -209,12 +210,12 @@ Admin:
 
 2. CLIENTE REALIZA PAGO
    ├─ Clic en "Pagar"
-   ├─ Redirige a Stripe Checkout
+   ├─ Redirige a MercadoPago Checkout
    ├─ Realiza pago
-   └─ Stripe envía webhook
+   └─ MercadoPago envía webhook
 
 3. SISTEMA PROCESA PAGO
-   ├─ Webhook valida firma
+   ├─ Webhook verifica pago
    ├─ Actualiza BD: payment_status='paid'
    ├─ Obtiene orden de Shopify
    ├─ Genera etiqueta FedEx
@@ -291,7 +292,7 @@ Admin:
 5. Accede al panel
    http://localhost:3000/admin.html
 
-6. Configura Stripe (para pagos reales)
+6. Configura MercadoPago (para pagos reales)
 
 7. Configura FedEx (para guías reales)
 

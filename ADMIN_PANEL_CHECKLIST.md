@@ -51,10 +51,10 @@ SHOPIFY_CLIENT_ID=b4381e2ca835d8205ea3e3f3da25a7b5
 SHOPIFY_CLIENT_SECRET=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
 SHOP_DOMAIN=monbleu1221.myshopify.com
 
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# MercadoPago
+MP_ACCESS_TOKEN=APP_USR_...
+MP_ENV=sandbox
+PUBLIC_BASE_URL=http://localhost:3000
 
 # Admin
 ADMIN_USER=admin
@@ -155,7 +155,7 @@ mysql -u root -p -e "SELECT COUNT(*) FROM cydmonbleu.returns_requests;"
 | server.js | ✅ | Endpoints integrados |
 | admin.html | ✅ | Interface conectada |
 | Shopify API | ✅ | Cliente configurado |
-| Stripe | ⚠️ | Necesita API keys (test o prod) |
+| MercadoPago | ⚠️ | Necesita credenciales (sandbox o prod) |
 | FedEx | ⚠️ | Necesita credenciales |
 
 ---
@@ -190,7 +190,7 @@ mysql -u root -p -e "SELECT id, order_id, payment_status, created_at FROM cydmon
 ✅ **BD MySQL**: Configurada con `returns_requests`
 ✅ **Server.js**: Endpoints `/api/admin/*` listos
 ✅ **Admin.html**: Interface conectada
-⚠️ **Stripe**: Pendiente configurar keys (test)
+⚠️ **MercadoPago**: Pendiente configurar credenciales (sandbox)
 ⚠️ **FedEx**: Pendiente configurar credenciales
 
 ---
@@ -202,7 +202,7 @@ mysql -u root -p -e "SELECT id, order_id, payment_status, created_at FROM cydmon
 3. ⬜ Instalar `npm install`
 4. ⬜ Iniciar `npm start`
 5. ⬜ Probar admin panel
-6. ⬜ Configurar Stripe para pagos reales
+6. ⬜ Configurar MercadoPago para pagos reales
 7. ⬜ Configurar FedEx para etiquetas reales
 
 ---

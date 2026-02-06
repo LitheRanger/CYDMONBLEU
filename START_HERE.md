@@ -88,16 +88,15 @@ NODE_ENV=production
 # Base de Datos NEON
 DATABASE_URL=postgresql://user:pass@ep-xyz.aws.neon.tech/cydmonbleu?sslmode=require
 DISABLE_DB=false
-
 # Shopify
 SHOPIFY_CLIENT_ID=b4381e2ca835d8205ea3e3f3da25a7b5
 SHOPIFY_CLIENT_SECRET=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
 SHOP_DOMAIN=monbleu1221.myshopify.com
 
-# Stripe (obtén keys en stripe.com)
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# MercadoPago (usa sandbox para pruebas)
+MP_ACCESS_TOKEN=APP_USR-...
+MP_ENV=sandbox
+PUBLIC_BASE_URL=http://localhost:3000
 
 # MyeShip (opcional - para etiquetas)
 MYESHIP_API_KEY=
@@ -118,27 +117,26 @@ DB_PASSWORD=tu_contraseña_mysql
 DB_NAME=cydmonbleu
 DB_PORT=3306
 DISABLE_DB=false
+
+# MercadoPago (usa sandbox para pruebas)
+MP_ACCESS_TOKEN=APP_USR-...
+MP_ENV=sandbox
+PUBLIC_BASE_URL=http://localhost:3000
 ```
 
 ---
 
-### **PASO 5: Configurar Stripe** (5 min)
+### **PASO 5: Configurar MercadoPago** (5 min)
 
-1. Ve a: **https://stripe.com**
-2. Sign up / Login
-3. Activa **Test mode**
-4. Ve a **Developers** → **API keys**
-5. Copia:
-   - `Publishable key` (pk_test_...)
-   - `Secret key` (sk_test_...)
-6. Ve a **Developers** → **Webhooks**
-7. Add endpoint: `https://cydmonbleu.onrender.com/api/stripe-webhook`
-   - Para desarrollo local: `http://localhost:3000/api/stripe-webhook`
-8. Selecciona eventos:
-   - `checkout.session.completed`
-   - `payment_intent.succeeded`
-9. Copia el **Signing secret** (whsec_...)
-10. Pega las 3 keys en `.env`
+1. Ve a: **https://www.mercadopago.com.mx/developers/es**
+2. Crea una app y copia el **Access Token**
+3. Configura el webhook con tu URL pública:
+   - `https://tu-dominio.com/api/mp-webhook`
+   - Para desarrollo local, usa un túnel (ngrok) y actualiza `PUBLIC_BASE_URL`
+4. En `.env`, agrega:
+   - `MP_ACCESS_TOKEN=...`
+   - `MP_ENV=sandbox`
+   - `PUBLIC_BASE_URL=https://tu-dominio.com`
 
 ---
 
@@ -175,23 +173,20 @@ http://localhost:3000/admin.html
 - Usuario: `admin`
 - Contraseña: `admin123456`
 
-Deberías ver el dashboard (vacío por ahora).
-
 ### 3. Test End-to-End
 
 1. En `http://localhost:3000`:
    - Ingresa orden: `TEST123`
    - Email: `test@example.com`
    - Completa formulario
-   - En pago, usa: `4242 4242 4242 4242` (tarjeta test Stripe)
-   - CVV: `123`, Fecha: `12/34`
-   - Click "Pay"
+   - En pago, usa un usuario y método de prueba de MercadoPago (sandbox)
+   - Completa el checkout
 
 2. Verifica:
    - ✅ Pago exitoso
    - ✅ Aparece en admin panel
    - ✅ Se guardó en BD
-   - ✅ Aparece en Stripe Dashboard
+   - ✅ Aparece en MercadoPago
 
 ---
 
@@ -219,9 +214,8 @@ CYDMONBLEU/
 ├── myeshipClient.js           ← API MyeShip
 │
 └── docs/                       ← Documentación
-    ├── NEON_SETUP_GUIDE.md
-    ├── STRIPE_COMPLETE_GUIDE.md
-    └── ...
+   ├── NEON_SETUP_GUIDE.md
+   └── ...
 ```
 
 ---
@@ -260,7 +254,7 @@ mysql -u root -p -e "DROP DATABASE cydmonbleu;"
    ↓
 3. Cliente sube fotos de evidencia
    ↓
-4. Cliente paga $150 con Stripe
+4. Cliente paga $150 con MercadoPago
    ↓
 5. Webhook confirma pago
    ↓
@@ -303,14 +297,14 @@ npm install
 - Verifica que BD esté corriendo (Neon siempre está up)
 - Verifica `DISABLE_DB=false`
 
-### ❌ "Invalid Stripe key"
-- Verifica keys en `.env`
+### ❌ "MercadoPago no configurado"
+- Verifica `MP_ACCESS_TOKEN` en `.env`
 - No deben tener espacios
 - Reinicia servidor después de cambiar
 
-### ❌ "Webhook signature failed"
-- Verifica `STRIPE_WEBHOOK_SECRET`
-- Debe coincidir con Stripe Dashboard
+### ❌ "Webhook no válido"
+- Verifica `PUBLIC_BASE_URL`
+- Revisa que el webhook apunte a `/api/mp-webhook`
 
 ### ❌ Panel admin no carga datos
 - Verifica que BD esté conectada
@@ -324,7 +318,6 @@ npm install
 Para más detalles, consulta:
 
 - **[NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md)** - Setup BD en la nube
-- **[STRIPE_COMPLETE_GUIDE.md](STRIPE_COMPLETE_GUIDE.md)** - Configurar pagos
 - **[database/README.md](database/README.md)** - Documentación BD
 - **[INTEGRATION_GUIDE.md](database/INTEGRATION_GUIDE.md)** - Guía técnica
 - **[ARCHITECTURE_DIAGRAM.md](ARCHITECTURE_DIAGRAM.md)** - Diagramas
@@ -363,7 +356,7 @@ Ver [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) para más detalles.
 - ✅ Selección de productos
 - ✅ Razón de devolución
 - ✅ Cambio de talla (si aplica)
-- ✅ Pago con Stripe ($150)
+- ✅ Pago con MercadoPago ($150)
 - ✅ Generación automática guía MyeShip
 
 ### Panel Admin:
@@ -378,7 +371,7 @@ Ver [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) para más detalles.
 
 ### Integraciones:
 - ✅ Shopify API - Validar órdenes
-- ✅ Stripe API - Procesar pagos
+- ✅ MercadoPago API - Procesar pagos
 - ✅ MyeShip API - Generar etiquetas
 - ✅ PostgreSQL/MySQL - Base de datos
 
@@ -386,12 +379,11 @@ Ver [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) para más detalles.
 
 ## 💡 TIPS
 
-1. **Usa test mode** en Stripe hasta que esté todo probado
-2. **Tarjeta test**: `4242 4242 4242 4242`
-3. **Verifica logs** del servidor para debugging
-4. **Usa Neon** si no quieres instalar MySQL local
-5. **Backup BD** antes de cambios importantes
-6. **Documenta** tus propias configuraciones
+1. **Usa sandbox** en MercadoPago hasta que esté todo probado
+2. **Verifica logs** del servidor para debugging
+3. **Usa Neon** si no quieres instalar MySQL local
+4. **Backup BD** antes de cambios importantes
+5. **Documenta** tus propias configuraciones
 
 ---
 
@@ -426,7 +418,7 @@ Si tienes problemas:
 1. Revisa [TROUBLESHOOTING](ADMIN_PANEL_CHECKLIST.md)
 2. Verifica logs del servidor
 3. Revisa documentación específica
-4. Busca en Stripe/Neon docs
+4. Busca en MercadoPago/Neon docs
 
 ---
 
@@ -437,7 +429,7 @@ Antes de considerar completado:
 - [ ] npm install exitoso
 - [ ] .env configurado
 - [ ] BD creada (Neon o MySQL)
-- [ ] Stripe keys configuradas
+- [ ] MercadoPago configurado
 - [ ] Servidor inicia sin errores
 - [ ] http://localhost:3000 carga
 - [ ] admin.html carga con login

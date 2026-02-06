@@ -81,10 +81,10 @@ DB_PASSWORD=tu_contraseña_mysql
 DB_NAME=cydmonbleu
 DB_PORT=3306
 
-# Stripe (si tienes)
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# MercadoPago
+MP_ACCESS_TOKEN=APP_USR_...
+MP_ENV=sandbox
+PUBLIC_BASE_URL=http://localhost:3000
 
 # Admin (cambiar antes de producción)
 ADMIN_USER=admin

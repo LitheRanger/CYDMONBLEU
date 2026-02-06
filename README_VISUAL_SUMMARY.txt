@@ -14,13 +14,13 @@
 ✅ Portal de cliente (Node.js)
    └─ Validación de órdenes Shopify
    └─ Upload de evidencia con preview
-   └─ Pago con Stripe ($150 flat)
+   └─ Pago con MercadoPago ($150 flat)
    └─ Generación automática de guías FedEx
    └─ Dashboard admin con filtros y exportar CSV
 
 ✅ Panel administrativo interno (Flask/Python) - RECIÉN MEJORADO
    └─ Kanban board: Pendiente → Aprobado → Rechazado
-   └─ Modelo ReturnRequest con integración Stripe + FedEx
+   └─ Modelo ReturnRequest con integración MercadoPago + FedEx
    └─ Historial detallado de todas las acciones
    └─ Webhook receptor para sincronización
    └─ API REST para consultas programáticas
@@ -70,10 +70,9 @@ Tablas de BD:           3 (usuarios, return_requests, historial)
 │  │                                 │                                   │  │
 │  │  /api/validate-order            │  /                                │  │
 │  │  /api/submit-return      ──────→  /webhook/return-requests          │  │
-│  │  /api/create-checkout           │  /return-request/<id>/approve     │  │
-│  │  /api/stripe-webhook            │  /return-request/<id>/reject      │  │
-│  │  /api/verify-payment            │  /api/return-requests             │  │
-│  │  /api/label/<requestId>         │  /api/return-requests/<id>/hist   │  │
+│  │  /api/create-mp-preference      │  /return-request/<id>/approve     │  │
+│  │  /api/mp-webhook                │  /return-request/<id>/reject      │  │
+│  │  /api/verify-mp-payment         │  /api/return-requests             │  │
 │  │  /api/admin/requests            │                                   │  │
 │  │  /api/admin/requests/<id>       │                                   │  │
 │  │  /admin                         │                                   │  │
@@ -88,7 +87,7 @@ Tablas de BD:           3 (usuarios, return_requests, historial)
 │  🛍️  Shopify Admin API 2024-01    │      │  CYDMONBLEU:                 │
 │      (Validar órdenes)            │      │  • MySQL - returns_requests  │
 │                                   │      │                              │
-│  💳 Stripe Checkout API           │      │  GESTORCYDMONBLEU:           │
+│  💳 MercadoPago Checkout API      │      │  GESTORCYDMONBLEU:           │
 │      (Procesar pagos)             │      │  • PostgreSQL/Neon           │
 │                                   │      │    - return_requests         │
 │  📦 FedEx Web Services API        │      │    - return_request_historial│
@@ -120,8 +119,7 @@ DOCUMENTACIÓN:
   ├─ PROJECT_STATUS_COMPLETE.md                 [~370 líneas] ← Este
   ├─ GESTORCYDMONBLEU_UPGRADE_GUIDE.md          [~250 líneas] ← Instalación
   ├─ DEPLOYMENT_GUIDE.md                        [Existente] ← Despliegue
-  ├─ ERRORES_ENCONTRADOS.md                     [Histórico] ← Problemas
-  └─ STRIPE_SETUP.md                            [Existente] ← Stripe
+   └─ (otros docs)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -143,20 +141,20 @@ DOCUMENTACIÓN:
          └─ Calcula monto ($150 flat)
 
 4. CLIENTE PAGA
-   └─ success.html → Stripe Checkout Session
-      └─ /api/create-checkout-session → Stripe API
-         └─ Redirige a Stripe hosted page
-            └─ Cliente completa pago (test mode)
+   └─ success.html → MercadoPago Checkout
+      └─ /api/create-mp-preference → MercadoPago API
+         └─ Redirige a MercadoPago hosted page
+            └─ Cliente completa pago (sandbox)
 
-5. WEBHOOK STRIPE CONFIRMA PAGO
-   └─ /api/stripe-webhook → Verifica firma
+5. WEBHOOK MERCADOPAGO CONFIRMA PAGO
+   └─ /api/mp-webhook → Verifica pago
       └─ payment_status = "paid"
          └─ Llama fedexClient.getAccessToken()
             └─ Genera FedEx label (OAuth 2.0)
                └─ Guarda en DB: tracking_number, label_base64
 
 6. CLIENTE VE CONFIRMACIÓN
-   └─ success.html → /api/verify-payment/{sessionId}
+   └─ success.html → /api/verify-mp-payment/{paymentId}
       └─ Muestra: Orden, items, tracking, botón descargar guía
          └─ /api/label/{requestId} → Descarga PDF FedEx
 
@@ -204,7 +202,7 @@ DOCUMENTACIÓN:
    ├─ File upload validation (tipos, tamaño)
    ├─ Email validation
    ├─ Amount validation
-   ├─ Stripe signature verification
+   ├─ MercadoPago webhook verification
    └─ Webhook signature verification
 
 ✅ Datos Sensibles
@@ -243,10 +241,10 @@ INMEDIATO (Esta semana):
   2. ☐ Configurar variables de entorno en Render
   3. ☐ Ejecutar migración SQL en PostgreSQL/Neon
   4. ☐ Probar webhook entre CYDMONBLEU ↔ GESTORCYDMONBLEU
-  5. ☐ Prueba end-to-end con Stripe test mode
+   5. ☐ Prueba end-to-end con MercadoPago sandbox
 
 CORTO PLAZO (Próximas 2 semanas):
-  6. ☐ Activar Stripe production keys
+   6. ☐ Activar credenciales de MercadoPago en producción
   7. ☐ Activar FedEx production environment
   8. ☐ Implementar email notifications
   9. ☐ Migrar uploads a Cloudinary/S3
@@ -268,7 +266,7 @@ Node.js/npm         ✅              ❌
 Python/Flask        ❌              ✅
 MySQL               ✅              ⚠️
 PostgreSQL          ❌              ✅
-Stripe              ✅              (Datos)
+MercadoPago         ✅              (Datos)
 FedEx               ✅              (Datos)
 Shopify             ✅              ❌
 Admin Panel         ✅              ✅
@@ -283,7 +281,7 @@ Historial           ⚠️ Básico        ✅ Completo
 
 1. EXPRESS MIDDLEWARE ORDER MATTERS
    └─ express.json() debe ir ANTES de webhook route
-      (Si no, body se parsea y pierde firma Stripe)
+      (Si no, body se parsea y pierde validación del webhook)
 
 2. MULTER LOCAL STORAGE EN RENDER
    └─ Render tiene filesystem efímero (12 horas)
@@ -301,16 +299,16 @@ Historial           ⚠️ Básico        ✅ Completo
    └─ API tiene rate limit (2 req/sec)
       └─ Implementar retry con backoff
 
-6. STRIPE WEBHOOK SIGNATURE VERIFICATION
-   └─ Crítico: valida que webhook es real de Stripe
-      └─ Usar stripe.webhooks.constructEvent()
+6. MERCADOPAGO WEBHOOK VERIFICATION
+   └─ Crítico: valida que el webhook es real
+      └─ Verificar en panel de MercadoPago
 
 ═══════════════════════════════════════════════════════════════════════════════
 
 💡 NOTAS ADICIONALES:
 
 - Proyecto es TOTALMENTE FUNCIONAL pero necesita configuración externa
-  (DB, Stripe keys, FedEx credentials, Shopify access)
+   (DB, credenciales MercadoPago, FedEx credentials, Shopify access)
 
 - Código está modularizado y bien documentado para futuro mantenimiento
 
@@ -329,7 +327,7 @@ Historial           ⚠️ Básico        ✅ Completo
   Tienes dos aplicaciones fully-integrated que manejan:
   • Validación de órdenes
   • Upload de evidencia
-  • Pagos con Stripe
+   • Pagos con MercadoPago
   • Generación automática de etiquetas FedEx
   • Dashboard admin con filtros
   • Panel interno Kanban con historial

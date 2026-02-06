@@ -22,7 +22,7 @@ El panel admin HTML (`public/admin.html`) está **completamente integrado** con 
 │    server.js        │  (Express.js + Node)
 │  - /api/admin/*     │
 │  - MySQL queries    │
-│  - FedEx + Stripe   │
+│  - FedEx + MercadoPago   │
 └──────────┬──────────┘
            │ SQL
            │
@@ -56,7 +56,7 @@ Authorization: Basic <base64(admin:password)>
       "items_json": "[...]",
       "amount": 50.00,
       "payment_status": "paid",
-      "stripe_session_id": "cs_test_...",
+      "payment_reference": "mp_...",
       "carrier": "FEDEX",
       "tracking_number": "794614473450",
       "label_base64": "JVBERi0xLjQK...",
@@ -104,7 +104,7 @@ returns_requests:
   ├── files_json (JSON)            ← Uploads
   ├── amount (DECIMAL)             ← Monto a pagar
   ├── payment_status (VARCHAR)     ← 'pending', 'paid', 'failed'
-  ├── stripe_session_id (VARCHAR)  ← ID de sesión Stripe
+  ├── payment_reference (VARCHAR)  ← Referencia MercadoPago
   ├── carrier (VARCHAR)            ← 'FEDEX'
   ├── tracking_number (VARCHAR)    ← Número de seguimiento
   ├── label_base64 (MEDIUMTEXT)    ← PDF en base64
@@ -158,14 +158,14 @@ Client → POST /api/submit-return
          └─ Devuelve request_id
 ```
 
-### 2. Cliente paga con Stripe
+### 2. Cliente paga con MercadoPago
 ```
-Client → POST /api/create-checkout-session
-         ├─ Crea sesión Stripe
+Client → POST /api/create-mp-preference
+         ├─ Crea preferencia MercadoPago
          ├─ Devuelve URL checkout
          └─ Cliente paga
          
-Stripe → POST /api/stripe-webhook
+MercadoPago → POST /api/mp-webhook
          ├─ Webhook recibe confirmación
          ├─ Actualiza payment_status='paid'
          └─ Genera guía FedEx
@@ -262,10 +262,10 @@ SHOPIFY_CLIENT_ID=...
 SHOPIFY_CLIENT_SECRET=...
 SHOP_DOMAIN=monbleu1221.myshopify.com
 
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# MercadoPago
+MP_ACCESS_TOKEN=APP_USR_...
+MP_ENV=sandbox
+PUBLIC_BASE_URL=http://localhost:3000
 
 # FedEx
 FEDEX_ACCOUNT_NUMBER=...
@@ -339,5 +339,5 @@ socket.on('request:new', (req) => {
 - [Express.js](https://expressjs.com/)
 - [MySQL2 Node.js](https://github.com/sidorares/node-mysql2)
 - [Shopify API](https://shopify.dev/api)
-- [Stripe API](https://stripe.com/docs/api)
+- [MercadoPago Docs](https://www.mercadopago.com.mx/developers/es/docs)
 - [FedEx API](https://developer.fedex.com/)

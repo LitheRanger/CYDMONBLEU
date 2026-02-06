@@ -33,8 +33,8 @@
 │  │ CLIENT ROUTES:                                              │ │
 │  │ ├─ POST /api/validate-order (Shopify)                      │ │
 │  │ ├─ POST /api/submit-return (Upload files)                 │ │
-│  │ ├─ POST /api/create-checkout-session (Stripe)             │ │
-│  │ └─ GET /api/verify-payment/:sessionId                     │ │
+│  │ ├─ POST /api/create-mp-preference (MercadoPago)           │ │
+│  │ └─ GET /api/verify-mp-payment/:paymentId                  │ │
 │  │                                                             │ │
 │  │ ADMIN ROUTES (requireAdmin):                               │ │
 │  │ ├─ GET /api/admin/requests (Listar)                       │ │
@@ -43,7 +43,7 @@
 │  │ └─ GET /api/label/:requestId (Descargar PDF)             │ │
 │  │                                                             │ │
 │  │ WEBHOOK ROUTES:                                             │ │
-│  │ └─ POST /api/stripe-webhook (Confirmación pago)           │ │
+│  │ └─ POST /api/mp-webhook (Confirmación pago)               │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                   │
 │  ┌─────────────────────────────────────────────────────────────┐ │
@@ -51,9 +51,9 @@
 │  │ ├─ Shopify Client (shopifyClient.js)                       │ │
 │  │ │  └─ Obtiene órdenes, datos cliente                       │ │
 │  │ │                                                            │ │
-│  │ ├─ Stripe (npm package)                                    │ │
-│  │ │  ├─ Crea sesiones de checkout                            │ │
-│  │ │  └─ Verifica webhooks de pago                            │ │
+│  │ ├─ MercadoPago (SDK)                                       │ │
+│  │ │  ├─ Crea preferencias de pago                            │ │
+│  │ │  └─ Verifica pagos y webhooks                            │ │
 │  │ │                                                            │ │
 │  │ └─ FedEx Client (fedexClient.js)                           │ │
 │  │    ├─ Genera etiquetas de retorno                          │ │
@@ -73,7 +73,7 @@
 │  │ TABLES:                                                  │   │
 │  │ ├─ returns_requests                                      │   │
 │  │ │  └─ order_id, contact_email, return_type, ...         │   │
-│  │ │     amount, payment_status, stripe_session_id         │   │
+│  │ │     amount, payment_status, payment_reference         │   │
 │  │ │     carrier, tracking_number, label_base64            │   │
 │  │ │     created_at                                         │   │
 │  │ │                                                        │   │
@@ -134,23 +134,23 @@
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  Cliente en /success.html hace clic en "Pagar"                 │
-│  ├─ POST /api/create-checkout-session                         │
+│  ├─ POST /api/create-mp-preference                            │
 │  │  ├─ SELECT from returns_requests WHERE id=1                │
-│  │  ├─ Stripe.checkout.sessions.create({                     │
+│  │  ├─ MercadoPago preference.create({                       │
 │  │  │    amount, customer_email, metadata...                 │
 │  │  │  })                                                     │
 │  │  ├─ UPDATE returns_requests SET                           │
-│  │  │    stripe_session_id = 'cs_test_...'                  │
+│  │  │    payment_reference = 'mp_...'                       │
 │  │  │  WHERE id=1                                            │
 │  │  └─ Response: checkout_url                                │
 │  │                                                              │
-│  └─ Redirige a Stripe Checkout (cliente paga aquí)           │
+│  └─ Redirige a MercadoPago Checkout (cliente paga aquí)      │
 │                                                                  │
-│  Stripe → Webhook → POST /api/stripe-webhook                  │
-│  ├─ Stripe: Verifica firma webhook                            │
+│  MercadoPago → Webhook → POST /api/mp-webhook                 │
+│  ├─ MercadoPago: Verifica pago                                │
 │  ├─ UPDATE returns_requests SET                               │
 │  │    payment_status = 'paid'                                │
-│  │  WHERE stripe_session_id = 'cs_test_...'                 │
+│  │  WHERE payment_reference = 'mp_...'                       │
 │  ├─ INSERT into returns_request_historial                     │
 │  │    accion = 'pago_recibido'                               │
 │  │    metadata = {...}                                        │
@@ -249,7 +249,6 @@ CYDMONBLEU/
 │
 ├── README.md
 ├── DEPLOYMENT_GUIDE.md
-├── ERRORES_ENCONTRADOS.md
 └── ... (otros archivos)
 ```
 
@@ -264,7 +263,7 @@ CYDMONBLEU/
 │                                                         │
 │ 1. .env (LOCAL - no commitar)                          │
 │    ├─ DB_PASSWORD                                      │
-│    ├─ STRIPE_SECRET_KEY                                │
+│    ├─ MP_ACCESS_TOKEN                                 │
 │    ├─ FEDEX_API_KEY                                    │
 │    ├─ ADMIN_PASS                                       │
 │    └─ SHOPIFY_CLIENT_SECRET                            │
@@ -342,6 +341,6 @@ WHERE payment_status = 'paid';
 5. ⬜ Instalar `npm install`
 6. ⬜ Iniciar `npm start`
 7. ⬜ Probar admin panel
-8. ⬜ Configurar Stripe API keys
+8. ⬜ Configurar MercadoPago
 9. ⬜ Configurar FedEx credenciales
 10. ⬜ Deploy a producción (Render)

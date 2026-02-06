@@ -67,7 +67,7 @@ if (Test-Path ".env") {
     $criticalVars = @(
         @{Name="PORT"; Pattern="PORT=\d+"},
         @{Name="DISABLE_DB"; Pattern="DISABLE_DB="},
-        @{Name="STRIPE_SECRET_KEY"; Pattern="STRIPE_SECRET_KEY="},
+        @{Name="MP_ACCESS_TOKEN"; Pattern="MP_ACCESS_TOKEN="},
         @{Name="ADMIN_USER"; Pattern="ADMIN_USER="},
         @{Name="ADMIN_PASS"; Pattern="ADMIN_PASS="}
     )
@@ -162,18 +162,18 @@ foreach ($endpoint in $endpoints) {
     }
 }
 
-# ===== 9. STRIPE =====
-Write-Host "💳 9. Verificando Stripe..." -ForegroundColor Yellow
+# ===== 9. MERCADOPAGO =====
+Write-Host "💳 9. Verificando MercadoPago..." -ForegroundColor Yellow
 if (Test-Path ".env") {
     $envContent = Get-Content ".env" -Raw
-    if ($envContent -match "STRIPE_SECRET_KEY=sk_") {
-        Write-Host "   ✅ Stripe configurado (key detectada)" -ForegroundColor Green
-    } elseif ($envContent -match "STRIPE_SECRET_KEY=\s*$") {
-        Write-Host "   ⚠️  Stripe key vacía" -ForegroundColor Yellow
-        $warnings += "Stripe no configurado - pagos no funcionarán"
+    if ($envContent -match "MP_ACCESS_TOKEN=") {
+        Write-Host "   ✅ MercadoPago configurado (token detectado)" -ForegroundColor Green
+    } elseif ($envContent -match "MP_ACCESS_TOKEN=\s*$") {
+        Write-Host "   ⚠️  Token MercadoPago vacío" -ForegroundColor Yellow
+        $warnings += "MercadoPago no configurado - pagos no funcionarán"
     } else {
-        Write-Host "   ⚠️  Stripe no detectado en .env" -ForegroundColor Yellow
-        $warnings += "Stripe no configurado"
+        Write-Host "   ⚠️  MercadoPago no detectado en .env" -ForegroundColor Yellow
+        $warnings += "MercadoPago no configurado"
     }
 }
 

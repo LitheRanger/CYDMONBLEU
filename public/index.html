@@ -2221,27 +2221,18 @@
         const payTitle = document.getElementById('pay-title');
 
         if (refundItemsValue > 0) {
-            txt.innerHTML = "Al finalizar, se te enviará un <b>cupón de tienda</b> por el valor de tus productos.";
+            txt.innerHTML = "Al finalizar, se te enviará un <b>cupón de tienda</b> por el valor de las prendas seleccionadas.";
             note.style.display = 'none';
 
-            const orderTotal = Number(orderData?.orderTotal || 0);
-            const fallbackOrderTotal = Array.isArray(orderData?.items)
-                ? orderData.items.reduce((sum, item) => {
-                    const qty = Number(item.quantity || 0);
-                    const price = Number(item.price || 0);
-                    return sum + (qty * price);
-                }, 0)
-                : 0;
-            const fullOrderTotal = orderTotal > 0 ? orderTotal : fallbackOrderTotal;
-            const baseTotal = isNoEsperaba && fullOrderTotal > 0 ? fullOrderTotal : refundItemsValue;
+            const baseTotal = refundItemsValue;
             const couponValue = isDefectRequest
                 ? baseTotal
                 : (isNoEsperaba ? baseTotal : Math.max(baseTotal - GUIDE_COST, 0));
 
             if (refundBreakdown) refundBreakdown.style.display = 'block';
-            if (refundItemsLabel) refundItemsLabel.textContent = isNoEsperaba ? 'Total pedido' : 'Valor de prendas';
+            if (refundItemsLabel) refundItemsLabel.textContent = 'Valor de prendas seleccionadas';
 
-            if (refundCouponLabel) refundCouponLabel.textContent = isNoEsperaba ? 'Cupón por total pedido' : 'Cupón a recibir';
+            if (refundCouponLabel) refundCouponLabel.textContent = 'Cupón por prendas seleccionadas';
             if (refundItemsTotal) refundItemsTotal.textContent = formatMoney(baseTotal);
             if (refundGuideCost) refundGuideCost.textContent = isDefectRequest ? '' : `-${formatMoney(GUIDE_COST)}`;
             if (refundCouponTotal) refundCouponTotal.textContent = formatMoney(couponValue);

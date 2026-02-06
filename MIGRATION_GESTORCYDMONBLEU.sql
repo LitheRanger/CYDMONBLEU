@@ -1,7 +1,7 @@
 -- ========================================
 -- MIGRACIÓN: GESTORCYDMONBLEU MEJORADO
 -- De: Solicitud (simple) 
--- A: ReturnRequest (con Stripe + FedEx)
+-- A: ReturnRequest (con MercadoPago + FedEx)
 -- ========================================
 
 -- 1. CREAR TABLA NUEVA (O RENOMBRAR SI EXISTE)
@@ -28,10 +28,11 @@ CREATE TABLE IF NOT EXISTS return_requests (
     files_json JSONB,  -- [{ filename, url, uploaded_at }]
     razon TEXT,
     
-    -- Pago (Stripe)
+    -- Pago (MercadoPago)
     amount NUMERIC(10, 2) DEFAULT 0,
     payment_status VARCHAR(20) DEFAULT 'pending',  -- pending, paid, failed
-    stripe_session_id VARCHAR(150),
+    payment_provider VARCHAR(32) DEFAULT 'mercadopago',
+    payment_reference VARCHAR(150),
     
     -- Envío (FedEx)
     carrier VARCHAR(50),  -- FEDEX, UPS, etc.

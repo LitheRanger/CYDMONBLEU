@@ -4,7 +4,7 @@ Gestor de cambios y devoluciones con integración de pagos y shipping
 
 Cambios principales:
 - Modelo Solicitud → ReturnRequest (estructura mejorada)
-- Integración Stripe payments
+- Integración MercadoPago payments
 - Integración FedEx shipping
 - Historial detallado de acciones
 """
@@ -93,10 +93,11 @@ class ReturnRequest(db.Model):
     files_json = db.Column(db.JSON)  # [{ filename, url, uploaded_at }]
     razon = db.Column(db.Text)  # Razón de devolución
     
-    # Pago (Stripe)
+    # Pago (MercadoPago)
     amount = db.Column(db.Numeric(10, 2), default=0)
     payment_status = db.Column(db.String(20), default='pending')  # pending, paid, failed
-    stripe_session_id = db.Column(db.String(150))
+    payment_provider = db.Column(db.String(32), default='mercadopago')
+    payment_reference = db.Column(db.String(150))
     
     # Envío (FedEx)
     carrier = db.Column(db.String(50))  # FEDEX, UPS, etc.
@@ -126,7 +127,8 @@ class ReturnRequest(db.Model):
             'razon': self.razon,
             'amount': float(self.amount) if self.amount else 0,
             'payment_status': self.payment_status,
-            'stripe_session_id': self.stripe_session_id,
+            'payment_provider': self.payment_provider,
+            'payment_reference': self.payment_reference,
             'carrier': self.carrier,
             'tracking_number': self.tracking_number,
             'label_created_at': self.label_created_at.isoformat() if self.label_created_at else None,
@@ -268,7 +270,8 @@ def webhook_return_requests():
         "razon": "No me gusta el color",
         "amount": 150.00,
         "payment_status": "pending" | "paid",
-        "stripe_session_id": "cs_live_xxxxx",
+        "payment_provider": "mercadopago",
+        "payment_reference": "mp_12345",
         "carrier": "FEDEX",
         "tracking_number": "7684294823",
         "label_base64": "JVBERi0xLjQK...",
@@ -302,7 +305,8 @@ def webhook_return_requests():
         r.razon = data.get('razon')
         r.amount = data.get('amount', 0)
         r.payment_status = data.get('payment_status', 'pending')
-        r.stripe_session_id = data.get('stripe_session_id')
+        r.payment_provider = data.get('payment_provider', 'mercadopago')
+        r.payment_reference = data.get('payment_reference')
         r.carrier = data.get('carrier')
         r.tracking_number = data.get('tracking_number')
         r.label_base64 = data.get('label_base64')

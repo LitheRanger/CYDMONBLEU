@@ -2,7 +2,7 @@
 
 ## 📊 Descripción General
 
-**MON|BLEU Returns Portal** - Sistema integral de devoluciones y cambios con integraciones Shopify, Stripe y MyeShip.
+**MON|BLEU Returns Portal** - Sistema integral de devoluciones y cambios con integraciones Shopify, MercadoPago y MyeShip.
 
 ### Dos Aplicaciones Integradas:
 
@@ -11,7 +11,7 @@
 - ✅ Customer-facing portal (cliente)
 - ✅ Validación de órdenes Shopify
 - ✅ Upload de fotos de evidencia
-- ✅ Pago con Stripe ($150 flat)
+- ✅ Pago con MercadoPago ($150 flat)
 - ✅ Generación de etiquetas MyeShip
 - ✅ Admin dashboard con filtros y exportar CSV
 
@@ -21,7 +21,7 @@
 - ✅ Kanban board (Pendiente → Aprobado → Rechazado)
 - ✅ Historial detallado de acciones
 - ✅ Webhook receptor de CYDMONBLEU
-- ✅ Integración Stripe + MyeShip
+- ✅ Integración MercadoPago + MyeShip
 - ✅ API REST para consultas
 
 ---
@@ -35,7 +35,7 @@
 │  1. Ingresa orden (#1001)                                        │
 │  2. Sube fotos de evidencia                                      │
 │  3. Selecciona items a devolver                                  │
-│  4. Paga con Stripe ($150)                                       │
+│  4. Paga con MercadoPago ($150)                                  │
 │  5. Se genera guía MyeShip automáticamente                       │
 └───────────────────────┬─────────────────────────────────────────┘
                         │
@@ -48,8 +48,8 @@
 │                                                                   │
 │  ✅ /api/validate-order        → Shopify                        │
 │  ✅ /api/submit-return         → Upload fotos                   │
-│  ✅ /api/create-checkout-session → Stripe                       │
-│  ✅ /api/stripe-webhook        → Trigger MyeShip label          │
+│  ✅ /api/create-mp-preference → MercadoPago                     │
+│  ✅ /api/mp-webhook           → Trigger MyeShip label           │
 │  ✅ /admin                     → Dashboard admin                │
 └───────────────────────┬─────────────────────────────────────────┘
                         │
@@ -117,11 +117,11 @@ Cliente → index.html
   └─ Confirma monto ($150)
 ```
 
-### **Paso 2: Pago Stripe**
+### **Paso 2: Pago MercadoPago**
 ```
-Cliente → Stripe Checkout (test mode)
+Cliente → MercadoPago Checkout (sandbox)
   ├─ Payment Info
-  ├─ Webhook → /api/stripe-webhook (server.js)
+  ├─ Webhook → /api/mp-webhook (server.js)
   ├─ Genera MyeShip label → myeshipClient.js
   └─ Guarda en DB: tracking_number, label_base64
 ```
@@ -184,7 +184,7 @@ return_requests {
   -- Pago
   amount               NUMERIC(10,2)          ← $150 (NUEVO)
   payment_status       VARCHAR(20)            ← pending/paid/failed (NUEVO)
-  stripe_session_id    VARCHAR(150)           ← Session ID Stripe (NUEVO)
+  payment_reference    VARCHAR(150)           ← Referencia MercadoPago (NUEVO)
   
   -- Envío
   carrier              VARCHAR(50)            ← MYESHIP (NUEVO)
@@ -223,7 +223,7 @@ return_request_historial {
 - ✅ Basic HTTP Auth en `/admin` (CYDMONBLEU)
 - ✅ Admin middleware `requireAdmin`
 - ✅ X-API-KEY validation en webhook
-- ✅ Stripe webhook signature verification
+- ✅ MercadoPago webhook verification
 - ✅ Credenciales en `.env` (no hardcodeadas)
 - ✅ HTTPS en producción (Render)
 
@@ -250,8 +250,10 @@ DB_PASSWORD=pass
 DB_NAME=cydmonbleu
 DISABLE_DB=false
 
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
+# MercadoPago
+MP_ACCESS_TOKEN=APP_USR_...
+MP_ENV=sandbox
+PUBLIC_BASE_URL=http://localhost:3000
 
 # Shopify
 SHOPIFY_CLIENT_ID=...
@@ -303,7 +305,7 @@ WEBHOOK_API_KEY=webhook-demo-key
 
 3. **Probar flujo end-to-end**
    - Cliente ingresa en CYDMONBLEU
-   - Paga con Stripe (test)
+  - Paga con MercadoPago (sandbox)
    - Webhook dispara en GESTORCYDMONBLEU
    - Admin ve en Kanban
 
@@ -339,7 +341,7 @@ WEBHOOK_API_KEY=webhook-demo-key
 - [x] Guía de implementación
 - [ ] Desplegar GESTORCYDMONBLEU en Render
 - [ ] Configurar variables de entorno en Render
-- [ ] Probar pago Stripe end-to-end
+- [ ] Probar pago MercadoPago end-to-end
 - [ ] Activar webhooks MyeShip (si aplica)
 
 ---
@@ -354,7 +356,7 @@ WEBHOOK_API_KEY=webhook-demo-key
 | Backend (GESTORCYDMONBLEU) | Flask/Python | ✅ Mejorado |
 | BD Transacciones | MySQL | ⚠️ Configurable |
 | BD Admin | PostgreSQL/Neon | ✅ Listo |
-| Pagos | Stripe API | ✅ Listo (test) |
+| Pagos | MercadoPago API | ✅ Listo (test) |
 | Envíos | MyeShip API | ✅ Listo (sandbox) |
 | Órdenes | Shopify API | ✅ Listo |
 | Hosting | Render.com | ✅ Listo |

@@ -18,10 +18,11 @@ CREATE TABLE IF NOT EXISTS returns_requests (
     items_json JSONB NOT NULL,  -- JSONB en PostgreSQL
     files_json JSONB,
     
-    -- Pago (Stripe)
+    -- Pago (MercadoPago)
     amount DECIMAL(10, 2) NOT NULL,
     payment_status VARCHAR(32) DEFAULT 'pending',
-    stripe_session_id VARCHAR(255),
+    payment_provider VARCHAR(32) DEFAULT 'mercadopago',
+    payment_reference VARCHAR(255),
     admin_status VARCHAR(32) DEFAULT 'open',
     refund_status VARCHAR(32) DEFAULT 'pending_receipt',
     

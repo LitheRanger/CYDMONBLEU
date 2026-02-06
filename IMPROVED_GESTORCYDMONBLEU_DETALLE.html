@@ -249,11 +249,11 @@
                 </span>
             </div>
         </div>
-        {% if solicitud.stripe_session_id %}
+        {% if solicitud.payment_reference %}
         <div class="detail-row">
-            <div class="detail-label">Sesión Stripe</div>
+            <div class="detail-label">Referencia MercadoPago</div>
             <div class="detail-value">
-                <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">{{ solicitud.stripe_session_id }}</code>
+                <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">{{ solicitud.payment_reference }}</code>
             </div>
         </div>
         {% endif %}

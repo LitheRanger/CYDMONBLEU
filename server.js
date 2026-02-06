@@ -171,6 +171,9 @@ async function initDb() {
                 await dbPool.query(
                     `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS change_sent_at TIMESTAMP NULL`
                 );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests DROP COLUMN IF EXISTS stripe_session_id`
+                );
                 console.log('✅ DB lista: tabla returns_requests verificada (PostgreSQL)');
             } else {
                 console.warn('⚠️ Tabla returns_requests no existe en PostgreSQL - ejecuta migración en Neon');
@@ -187,7 +190,6 @@ async function initDb() {
                     files_json JSON NULL,
                     amount DECIMAL(10,2) NOT NULL,
                     payment_status VARCHAR(32) DEFAULT 'pending',
-                    stripe_session_id VARCHAR(255) NULL,
                     payment_provider VARCHAR(32) DEFAULT 'mercadopago',
                     payment_reference VARCHAR(255) NULL,
                     customer_name VARCHAR(255) NULL,
@@ -250,6 +252,15 @@ async function initDb() {
             if (customerCols && customerCols[0] && customerCols[0].cnt === 0) {
                 await dbPool.execute(
                     `ALTER TABLE returns_requests ADD COLUMN customer_name VARCHAR(255) NULL`
+                );
+            }
+            const [stripeCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'stripe_session_id']
+            );
+            if (stripeCols && stripeCols[0] && stripeCols[0].cnt > 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests DROP COLUMN stripe_session_id`
                 );
             }
             const [couponCodeCols] = await dbPool.execute(
@@ -937,7 +948,7 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
         }
 
         const [rows] = await executeQuery(
-            `SELECT id, order_id, contact_email, customer_name, return_type, items_json, amount, payment_status, stripe_session_id,
+                `SELECT id, order_id, contact_email, customer_name, return_type, items_json, amount, payment_status, payment_reference,
                     carrier, tracking_number, label_created_at, created_at, admin_status, refund_status,
                     coupon_code, coupon_amount, coupon_sent_at, change_sent_at
              FROM returns_requests

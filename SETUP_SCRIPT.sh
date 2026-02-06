@@ -105,11 +105,11 @@ GESTOR_WEBHOOK_URL=https://gestor-tuapp.onrender.com/webhook/return-requests
 WEBHOOK_API_KEY=webhook-demo-key
 EOF
 
-# En server.js de CYDMONBLEU, en la función stripe webhook, agregar:
+# En server.js de CYDMONBLEU, en la función mp webhook, agregar:
 # (Ya debería estar si usaste el código mejorado)
 
 cat > webhook_integration_snippet.js << 'EOF'
-// En server.js - dentro de /api/stripe-webhook handler
+// En server.js - dentro de /api/mp-webhook handler
 // Después de confirmar payment_status = 'paid':
 
 async function notifyGestorOfPayment(request) {
@@ -137,7 +137,8 @@ async function notifyGestorOfPayment(request) {
                 razon: request.razon || '',
                 amount: request.amount,
                 payment_status: 'paid',
-                stripe_session_id: request.stripe_session_id,
+                payment_provider: request.payment_provider || 'mercadopago',
+                payment_reference: request.payment_reference,
                 carrier: request.carrier || 'FEDEX',
                 tracking_number: request.tracking_number,
                 label_base64: request.label_base64,
@@ -153,7 +154,7 @@ async function notifyGestorOfPayment(request) {
     }
 }
 
-// Llamar en stripe webhook después de pagar:
+// Llamar en mp webhook después de pagar:
 await notifyGestorOfPayment(request);
 EOF
 
@@ -169,7 +170,7 @@ echo "  2. Conecta repo: https://github.com/LitheRanger/CYDMONBLEU"
 echo "  3. Environment: Node"
 echo "  4. Build: npm install"
 echo "  5. Start: npm start"
-echo "  6. Agrega env vars: STRIPE_SECRET_KEY, DB_*, SHOPIFY_*, FEDEX_*, ADMIN_*"
+echo "  6. Agrega env vars: MP_ACCESS_TOKEN, MP_ENV, PUBLIC_BASE_URL, DB_*, SHOPIFY_*, FEDEX_*, ADMIN_*"
 
 echo ""
 echo "Para GESTORCYDMONBLEU (Flask):"
@@ -181,19 +182,16 @@ echo "  5. Start: gunicorn app:app"
 echo "  6. Agrega env vars: DATABASE_URL, SECRET_KEY, WEBHOOK_API_KEY"
 
 # ============================================================================
-# PARTE 6: CONFIGURAR STRIPE WEBHOOK
+# PARTE 6: CONFIGURAR MERCADOPAGO WEBHOOK
 # ============================================================================
 
-echo "💳 PASO 6: Configurar Stripe Webhook..."
+echo "💳 PASO 6: Configurar MercadoPago Webhook..."
 
-echo "En Stripe Dashboard:"
-echo "  1. Ve a Developers → Webhooks"
-echo "  2. Add Endpoint"
-echo "  3. URL: https://tu-cydmonbleu-app.onrender.com/api/stripe-webhook"
-echo "  4. Events to send:"
-echo "     - checkout.session.completed"
-echo "     - checkout.session.async_payment_succeeded"
-echo "  5. Copia el Signing Secret → STRIPE_WEBHOOK_SECRET en .env"
+echo "En MercadoPago Developers:"
+echo "  1. Ve a Webhooks"
+echo "  2. Crea un webhook"
+echo "  3. URL: https://tu-cydmonbleu-app.onrender.com/api/mp-webhook"
+echo "  4. Verifica PUBLIC_BASE_URL en .env"
 
 # ============================================================================
 # PARTE 7: PROBAR WEBHOOK ENTRE APPS
@@ -218,7 +216,8 @@ curl -X POST https://gestor-tuapp.onrender.com/webhook/return-requests \
     "razon": "Prueba webhook",
     "amount": 150,
     "payment_status": "paid",
-    "stripe_session_id": "cs_test_123456",
+    "payment_provider": "mercadopago",
+    "payment_reference": "mp_test_123456",
     "carrier": "FEDEX",
     "tracking_number": "7684294823",
     "label_mime": "application/pdf"
@@ -239,7 +238,7 @@ echo "  ☐ Base de datos PostgreSQL funciona"
 echo "  ☐ Usuarios creados (admin, soporte)"
 echo "  ☐ Dashboard Kanban accesible en /admin"
 echo "  ☐ Webhook test exitoso"
-echo "  ☐ Stripe webhook configurado"
+echo "  ☐ MercadoPago webhook configurado"
 echo "  ☐ CYDMONBLEU puede hacer POST a webhook"
 echo "  ☐ Registros aparecen en GESTORCYDMONBLEU"
 

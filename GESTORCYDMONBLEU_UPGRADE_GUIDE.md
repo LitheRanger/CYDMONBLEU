@@ -2,11 +2,11 @@
 
 ## 📋 Resumen de Cambios
 
-Se ha rediseñado completamente el modelo `Solicitud` en GESTORCYDMONBLEU para que sea compatible con CYDMONBLEU (app Node.js de devoluciones con Stripe + FedEx).
+Se ha rediseñado completamente el modelo `Solicitud` en GESTORCYDMONBLEU para que sea compatible con CYDMONBLEU (app Node.js de devoluciones con MercadoPago + FedEx).
 
 ### Cambios Principales:
 - ✅ **Modelo Solicitud → ReturnRequest** (más descriptivo)
-- ✅ Integración de campos **Stripe**: `payment_status`, `stripe_session_id`, `amount`
+- ✅ Integración de campos **MercadoPago**: `payment_status`, `payment_reference`, `payment_provider`, `amount`
 - ✅ Integración de campos **FedEx**: `carrier`, `tracking_number`, `label_base64`, `label_mime`
 - ✅ Mejora de campos de cliente: `contact_phone` agregado
 - ✅ JSON fields: `items_json` (artículos), `files_json` (archivos)
@@ -104,7 +104,8 @@ fetch(gestorWebhookUrl, {
         razon: request.razon || '',
         amount: request.amount,
         payment_status: 'paid',  // Ya pagado
-        stripe_session_id: request.stripe_session_id,
+        payment_reference: request.payment_reference,
+        payment_provider: request.payment_provider,
         carrier: request.carrier || 'FEDEX',
         tracking_number: request.tracking_number || null,
         label_base64: request.label_base64 || null,
@@ -139,8 +140,8 @@ Carga evidencia (fotos)
     ↓
 Selecciona items a devolver
     ↓
-Paga con Stripe ($150 flat rate)
-    ↓ (checkout.session.completed webhook)
+Paga con MercadoPago ($150 flat rate)
+    ↓ (webhook de MercadoPago)
 Se genera etiqueta FedEx automáticamente
     ↓
 WEBHOOK → GESTORCYDMONBLEU
@@ -262,7 +263,7 @@ UPDATE usuario SET password_hash = 'nuevo_hash' WHERE usuario = 'admin';
 1. Actualizar repositorio GitHub con nuevos archivos:
    ```bash
    git add app.py templates/ MIGRATION_GESTORCYDMONBLEU.sql
-   git commit -m "Actualizar modelo ReturnRequest con integración Stripe + FedEx"
+    git commit -m "Actualizar modelo ReturnRequest con integración MercadoPago + FedEx"
    git push
    ```
 

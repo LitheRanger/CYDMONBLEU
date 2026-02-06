@@ -43,7 +43,7 @@ if (-not (Test-Path $envFile)) {
         Write-Host ""
         Write-Host "⚠️  IMPORTANTE: Edita .env con tus credenciales:" -ForegroundColor Yellow
         Write-Host "   • DB_PASSWORD = contraseña de MySQL"
-        Write-Host "   • STRIPE_SECRET_KEY = tu key de Stripe"
+        Write-Host "   • MP_ACCESS_TOKEN = tu token de MercadoPago"
         Write-Host "   • Otros valores según tu setup"
         Write-Host ""
     } else {

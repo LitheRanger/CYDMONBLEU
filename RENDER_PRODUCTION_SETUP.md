@@ -27,10 +27,10 @@ SHOPIFY_CLIENT_ID=b4381e2ca835d8205ea3e3f3da25a7b5
 SHOPIFY_CLIENT_SECRET=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
 SHOP_DOMAIN=monbleu1221.myshopify.com
 
-# Stripe (PRODUCCIÓN - usa Live keys)
-STRIPE_PUBLISHABLE_KEY=pk_live_...
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# MercadoPago (PRODUCCIÓN)
+MP_ACCESS_TOKEN=APP_USR_...
+MP_ENV=production
+PUBLIC_BASE_URL=https://cydmonbleu.onrender.com
 
 # MyeShip (PRODUCCIÓN)
 MYESHIP_API_KEY=tu_api_key_real
@@ -46,19 +46,12 @@ ADMIN_PASS=TU_CONTRASEÑA_SEGURA
 
 ---
 
-### 2. Configurar Webhook de Stripe (PRODUCCIÓN)
+### 2. Configurar Webhook de MercadoPago (PRODUCCIÓN)
 
-1. Ve a Stripe Dashboard → **Developers** → **Webhooks**
-2. Desactiva **Test mode** (cambia a Live mode)
-3. Click **"Add endpoint"**
-4. Configuración:
-   - **URL**: `https://cydmonbleu.onrender.com/api/stripe-webhook`
-   - **Eventos**:
-     - `checkout.session.completed`
-     - `payment_intent.succeeded`
-     - `payment_intent.payment_failed`
-5. Guarda y copia el **Signing secret** (`whsec_...`)
-6. Agrégalo a Render en `STRIPE_WEBHOOK_SECRET`
+1. Ve a MercadoPago Developers → **Webhooks**
+2. Crea un webhook con:
+   - **URL**: `https://cydmonbleu.onrender.com/api/mp-webhook`
+3. Verifica que `PUBLIC_BASE_URL` esté en Render
 
 ---
 
@@ -103,16 +96,16 @@ https://cydmonbleu.onrender.com/admin.html
 
 ### 3. Test de Pago Real
 
-⚠️ **USA TARJETA DE PRUEBA PRIMERO:**
+⚠️ **USA SANDBOX PRIMERO:**
 
 1. Accede al portal
 2. Completa una solicitud
-3. Usa tarjeta test: `4242 4242 4242 4242`
+3. Usa un usuario y método de prueba de MercadoPago (sandbox)
 4. Verifica que:
    - ✅ Pago procesado
    - ✅ Aparece en admin panel
    - ✅ Se guarda en base de datos
-   - ✅ Webhook recibido (revisa Stripe Dashboard → Webhooks → Logs)
+   - ✅ Webhook recibido (revisa MercadoPago → Webhooks)
 
 ---
 
@@ -124,9 +117,9 @@ Render Dashboard → Tu servicio → Logs
 ```
 Aquí verás todos los logs del servidor en tiempo real.
 
-### Logs en Stripe
+### Logs en MercadoPago
 ```
-Stripe Dashboard → Developers → Webhooks → [Tu endpoint]
+MercadoPago → Developers → Webhooks → [Tu endpoint]
 ```
 Aquí verás si los webhooks están llegando correctamente.
 
@@ -143,8 +136,8 @@ Verás queries y performance de la BD.
 ### ✅ Checklist de Seguridad:
 
 - [ ] `ADMIN_PASS` es una contraseña segura (no `admin123456`)
-- [ ] Stripe keys son **Live keys** (pk_live_, sk_live_)
-- [ ] Webhook secret es el de producción
+- [ ] Credenciales de MercadoPago en producción
+- [ ] Webhook configurado en producción
 - [ ] `NODE_ENV=production`
 - [ ] `.env` NO está en GitHub (verificado en `.gitignore`)
 - [ ] MyeShip API key es de producción (no sandbox)
@@ -163,9 +156,9 @@ Verás queries y performance de la BD.
 
 ### ❌ Webhook no funciona
 ```bash
-# Verifica la URL: https://cydmonbleu.onrender.com/api/stripe-webhook
-# Verifica STRIPE_WEBHOOK_SECRET en Render
-# Revisa logs de Stripe Dashboard
+# Verifica la URL: https://cydmonbleu.onrender.com/api/mp-webhook
+# Verifica PUBLIC_BASE_URL en Render
+# Revisa logs de MercadoPago
 ```
 
 ### ❌ Database connection error
@@ -204,24 +197,23 @@ Render detectará el push y desplegará automáticamente.
 
 ### Cuando estés listo para cobrar real:
 
-1. **Activa Live Mode en Stripe**
+1. **Activa credenciales de producción en MercadoPago**
    - Completa información del negocio
    - Verifica identidad
-   - Obtén Live keys (pk_live_, sk_live_)
+   - Obtén Access Token de producción
 
 2. **Actualiza Variables en Render**
-   - Cambia a Live keys
-   - Actualiza webhook secret
+   - Cambia a credenciales de producción
+   - Actualiza `PUBLIC_BASE_URL`
 
-3. **Test con Tarjeta Real**
-   - Usa tu tarjeta personal
+3. **Test con pago real**
    - Verifica que se cobre $150 USD
-   - Verifica que aparezca en Stripe Dashboard
+   - Verifica que aparezca en MercadoPago
 
 4. **Monitor Performance**
    - Revisa logs diariamente
    - Configura alertas en Render
-   - Monitorea transacciones en Stripe
+   - Monitorea transacciones en MercadoPago
 
 ---
 
@@ -237,11 +229,11 @@ Render detectará el push y desplegará automáticamente.
 ## 📞 SOPORTE
 
 - **Render Docs**: https://render.com/docs
-- **Stripe Docs**: https://stripe.com/docs
+- **MercadoPago Docs**: https://www.mercadopago.com.mx/developers/es/docs
 - **Neon Docs**: https://neon.tech/docs
 
 ---
 
 ✅ **Todo listo para producción!**
 
-Ahora puedes recibir solicitudes de devolución reales con pagos procesados por Stripe.
+Ahora puedes recibir solicitudes de devolución reales con pagos procesados por MercadoPago.

@@ -18,10 +18,11 @@ CREATE TABLE IF NOT EXISTS returns_requests (
     items_json JSON NOT NULL,  -- [{ producto, talla_original, talla_cambio, cantidad, imagen_url }]
     files_json JSON,  -- [{ filename, url, uploaded_at }]
     
-    -- Pago (Stripe)
+    -- Pago (MercadoPago)
     amount DECIMAL(10, 2) NOT NULL,
     payment_status VARCHAR(32) DEFAULT 'pending',  -- pending, paid, failed
-    stripe_session_id VARCHAR(255),
+    payment_provider VARCHAR(32) DEFAULT 'mercadopago',
+    payment_reference VARCHAR(255),
     admin_status VARCHAR(32) DEFAULT 'open',  -- open, completed
     refund_status VARCHAR(32) DEFAULT 'pending_receipt',  -- pending_receipt, pending_shipment
     

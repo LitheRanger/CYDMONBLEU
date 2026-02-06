@@ -100,7 +100,7 @@ Luego acceder a: **http://localhost:3000/admin.html**
 ```
 id, order_id, contact_email, return_type,
 items_json, files_json, amount, payment_status,
-stripe_session_id, carrier, tracking_number,
+payment_reference, carrier, tracking_number,
 label_base64, label_mime, label_created_at, created_at
 ```
 
@@ -146,7 +146,7 @@ Todos requieren Basic Auth
 
 1. **Cliente** → Crea solicitud en `index.html`
 2. **Sistema** → Guarda en BD (returns_requests)
-3. **Cliente** → Realiza pago con Stripe
+3. **Cliente** → Realiza pago con MercadoPago
 4. **Sistema** → Webhook actualiza BD + genera guía FedEx
 5. **Admin** → Accede a `admin.html` y ve todo
    - Listado de solicitudes
@@ -182,7 +182,7 @@ Todos requieren Basic Auth
 - ⚠️ Configurar `.env` con credenciales reales
 - ⚠️ Instalar `npm install`
 - ⚠️ Iniciar `npm start`
-- ⚠️ Configurar Stripe API keys (para pagos reales)
+- ⚠️ Configurar MercadoPago (para pagos reales)
 - ⚠️ Configurar FedEx credenciales (para guías reales)
 - ⚠️ SSL/HTTPS para producción
 
@@ -229,7 +229,7 @@ Ver: `database/INTEGRATION_GUIDE.md` sección Troubleshooting
 | Admin Panel | ✅ Listo | HTML + endpoints conectados |
 | Express API | ✅ Listo | Endpoints /api/admin/* |
 | Shopify | ✅ Listo | Cliente configurado |
-| Stripe | ⚠️ Pendiente | Necesita keys de test |
+| MercadoPago | ⚠️ Pendiente | Necesita credenciales de test |
 | FedEx | ⚠️ Pendiente | Necesita credenciales |
 
 ---
