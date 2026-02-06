@@ -16,6 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "@shopify/shopify-api": "^12.3.0",
+    "@sendgrid/mail": "^8.1.4",
     "axios": "^1.13.4",
     "cloudinary": "^2.7.0",
     "cors": "^2.8.6",

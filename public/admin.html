@@ -459,10 +459,13 @@
                     <tr>
                         <th>ID</th>
                         <th>Orden</th>
+                        <th>Cliente</th>
                         <th>Contacto</th>
                         <th>Pago</th>
+                        <th>Solicitud</th>
                         <th>Estado</th>
                         <th>Monto</th>
+                        <th>Tracking</th>
                         <th>Guía</th>
                         <th>Fecha</th>
                         <th>Acciones</th>
@@ -487,9 +490,12 @@
                     <tr>
                         <th>ID</th>
                         <th>Orden</th>
+                        <th>Cliente</th>
                         <th>Contacto</th>
                         <th>Pago</th>
+                        <th>Solicitud</th>
                         <th>Monto</th>
+                        <th>Tracking</th>
                         <th>Guía</th>
                         <th>Fecha</th>
                         <th>Acciones</th>
@@ -514,10 +520,13 @@
                     <tr>
                         <th>ID</th>
                         <th>Orden</th>
+                        <th>Cliente</th>
                         <th>Contacto</th>
                         <th>Tipo</th>
                         <th>Pago</th>
+                        <th>Solicitud</th>
                         <th>Monto</th>
+                        <th>Tracking</th>
                         <th>Guía</th>
                         <th>Fecha</th>
                         <th>Acciones</th>
@@ -542,10 +551,13 @@
                     <tr>
                         <th>ID</th>
                         <th>Orden</th>
+                        <th>Cliente</th>
                         <th>Contacto</th>
                         <th>Tipo</th>
                         <th>Pago</th>
+                        <th>Solicitud</th>
                         <th>Monto</th>
+                        <th>Tracking</th>
                         <th>Guía</th>
                         <th>Fecha</th>
                         <th>Acciones</th>
@@ -614,6 +626,16 @@
             return items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
         }
 
+        function hasChangeItem(r) {
+            const items = Array.isArray(r.items) ? r.items : [];
+            return items.some(i => String(i.requestType || '').toLowerCase() === 'cambio');
+        }
+
+        function hasRefundItem(r) {
+            const items = Array.isArray(r.items) ? r.items : [];
+            return items.some(i => String(i.requestType || '').toLowerCase() === 'reembolso');
+        }
+
         function isNoPayment(r) {
             const amount = Number(r?.amount || 0);
             return amount <= 0 || hasDefect(r);
@@ -641,6 +663,9 @@
         function adminBadge(status) {
             const s = String(status || 'open').toLowerCase();
             if (s === 'completed') return '<span class="badge paid">Completada</span>';
+            if (s === 'accepted') return '<span class="badge paid">Aceptada</span>';
+            if (s === 'rejected') return '<span class="badge failed">Rechazada</span>';
+            if (s === 'sent') return '<span class="badge warning" style="background:#fef3c7;color:#92400e;">Enviada</span>';
             return '<span class="badge pending">Abierta</span>';
         }
 
@@ -734,7 +759,7 @@
                         const headerTr = document.createElement('tr');
                         headerTr.className = 'group-header';
                         headerTr.innerHTML = `
-                            <td colspan="9" style="padding:10px;border:none;color:#666;font-size:12px;">
+                            <td colspan="12" style="padding:10px;border:none;color:#666;font-size:12px;">
                                 ${status === 'pending_receipt' ? '📥 Por Recibir' : '📦 Por Enviar'}
                             </td>
                         `;
@@ -760,24 +785,35 @@
             const labelBadge = r.tracking_number
                 ? `<span class="badge success" style="background:#dcfce7;color:#16a34a;">${r.carrier || 'Generada'}</span>`
                 : '<span class="badge no-label">Sin guía</span>';
+            const trackingText = r.tracking_number || '—';
 
             const isCambio = tabName === 'cambios';
             const isCompletadas = tabName === 'completadas' || tabName === 'defectos';
+            const isReembolso = tabName === 'reembolsos';
             const actions = `
                 <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
                 <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
+                <button class="link-btn" data-id="${r.id}" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>
+                <button class="link-btn" data-id="${r.id}" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>
+                ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="ship">Enviar</button>` : ''}
+                ${isReembolso ? `<button class="link-btn" data-id="${r.id}" data-action="coupon">Enviar cupón</button>` : ''}
                 ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
                 ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
             `;
 
+            const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
+
             tr.innerHTML = `
                 <td>${r.id}</td>
                 <td><strong>${r.order_id || '—'}</strong></td>
+                <td>${r.customer_name || '—'}</td>
                 <td class="muted">${r.contact_email || '—'}</td>
-                ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${r.return_type || '—'}</td>` : ''}
+                ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
                 <td>${paymentBadge(r)}</td>
+                <td>${adminBadge(r.admin_status)}</td>
                 ${isCambio ? `<td>${refundBadge(r.refund_status)}</td>` : ''}
                 <td>${formatCurrency(r.amount)}</td>
+                <td>${trackingText}</td>
                 <td>${labelBadge}</td>
                 <td class="muted">${formatDate(r.created_at)}</td>
                 <td><div class="actions">${actions}</div></td>
@@ -823,7 +859,7 @@
 
             // Filtrar CAMBIOS
             filteredCambios = cambios.filter(r => {
-                const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+                const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
                 if (!matchesPaymentFilter(r, status)) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
@@ -834,7 +870,7 @@
 
             // Filtrar REEMBOLSOS
             filteredReembolsos = reembolsos.filter(r => {
-                const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+                const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
                 if (!matchesPaymentFilter(r, status)) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
@@ -844,7 +880,7 @@
 
             // Filtrar COMPLETADAS
             filteredCompletadas = completadas.filter(r => {
-                const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+                const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
                 if (!matchesPaymentFilter(r, status)) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
@@ -855,7 +891,7 @@
 
             // Filtrar DEFECTOS
             filteredDefectos = defectos.filter(r => {
-                const hay = `${r.order_id || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+                const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
                 if (!matchesPaymentFilter(r, status)) return false;
                 if (label === 'yes' && !r.tracking_number) return false;
@@ -912,6 +948,7 @@
                     const name = i.name || 'Producto';
                     const variant = i.current_variant_title || 'Variante';
                     const qty = i.quantity || 1;
+                    const price = i.price != null ? formatCurrency(i.price) : '—';
                     const reason = i.reason || 'Sin razón';
                     const replacementTitle = i.replacementTitle || i.replacement_title || i.replacementVariantTitle || '';
                     const replacementId = i.replacementVariantId || i.replacement_variant_id || '';
@@ -922,7 +959,7 @@
                         ? `<div class="muted" style="margin-left:12px;">Reemplazo: ${replacementDisplay}</div>`
                         : '';
                     return `
-                        <div class="muted">- ${name} (${variant}) x${qty} • ${reason}</div>
+                        <div class="muted">- ${name} (${variant}) x${qty} • ${reason} • ${price}</div>
                         ${replacementLine}
                     `;
                 }).join('') || '<span class="muted">Sin items</span>';
@@ -944,6 +981,10 @@
                     <div class="detail-row">
                         <div class="detail-label">Orden</div>
                         <div>${r.order_id}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Cliente</div>
+                        <div>${r.customer_name || '—'}</div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Correo</div>
@@ -1061,6 +1102,72 @@
                 }
             } catch (e) {
                 console.error('Error:', e);
+            }
+        }
+
+        async function updateDecision(requestId, status) {
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/decision`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    loadRequests();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (e) {
+                console.error('Error decision:', e);
+            }
+        }
+
+        async function shipChange(requestId) {
+            const trackingNumber = prompt('Ingresa el tracking de envío:');
+            if (!trackingNumber) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/ship-change`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trackingNumber })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Cambio marcado como enviado');
+                    loadRequests();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (e) {
+                console.error('Error ship change:', e);
+            }
+        }
+
+        async function sendCoupon(requestId) {
+            const couponCode = prompt('Código de cupón:');
+            if (!couponCode) return;
+            const amountRaw = prompt('Monto del cupón (MXN):');
+            const couponAmount = Number(amountRaw || 0);
+            if (!couponAmount || couponAmount <= 0) {
+                alert('Monto inválido');
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/send-coupon`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ couponCode, couponAmount })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Cupón enviado');
+                    loadRequests();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (e) {
+                console.error('Error send coupon:', e);
             }
         }
 
@@ -1300,6 +1407,10 @@
                 else if (action === 'retry') retryLabel(id);
                 else if (action === 'complete') completeRequest(id);
                 else if (action === 'refund-status') changeRefundStatus(id);
+                else if (action === 'accept') updateDecision(id, 'accepted');
+                else if (action === 'reject') updateDecision(id, 'rejected');
+                else if (action === 'ship') shipChange(id);
+                else if (action === 'coupon') sendCoupon(id);
                 return;
             }
             const row = e.target.closest('tr[data-request-id]');
@@ -1316,6 +1427,10 @@
                 if (action === 'label') downloadLabel(id);
                 else if (action === 'retry') retryLabel(id);
                 else if (action === 'complete') completeRequest(id);
+                else if (action === 'accept') updateDecision(id, 'accepted');
+                else if (action === 'reject') updateDecision(id, 'rejected');
+                else if (action === 'ship') shipChange(id);
+                else if (action === 'coupon') sendCoupon(id);
                 return;
             }
             const row = e.target.closest('tr[data-request-id]');
@@ -1331,6 +1446,10 @@
                 const action = btn.getAttribute('data-action');
                 if (action === 'label') downloadLabel(id);
                 else if (action === 'retry') retryLabel(id);
+                else if (action === 'accept') updateDecision(id, 'accepted');
+                else if (action === 'reject') updateDecision(id, 'rejected');
+                else if (action === 'ship') shipChange(id);
+                else if (action === 'coupon') sendCoupon(id);
                 return;
             }
             const row = e.target.closest('tr[data-request-id]');
@@ -1347,6 +1466,10 @@
                 if (action === 'label') downloadLabel(id);
                 else if (action === 'retry') retryLabel(id);
                 else if (action === 'complete') completeRequest(id);
+                else if (action === 'accept') updateDecision(id, 'accepted');
+                else if (action === 'reject') updateDecision(id, 'rejected');
+                else if (action === 'ship') shipChange(id);
+                else if (action === 'coupon') sendCoupon(id);
                 return;
             }
             const row = e.target.closest('tr[data-request-id]');

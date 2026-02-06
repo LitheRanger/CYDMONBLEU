@@ -9,6 +9,7 @@ const pino = require('pino');
 const pinoHttp = require('pino-http');
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
+const sgMail = require('@sendgrid/mail');
 
 // Detectar si es PostgreSQL o MySQL
 const isPostgreSQL = (process.env.DATABASE_URL || '').includes('postgresql://');
@@ -21,6 +22,12 @@ const mpEnv = String(process.env.MP_ENV || 'sandbox').toLowerCase();
 const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessToken }) : null;
 const mpPreference = mpClient ? new Preference(mpClient) : null;
 const mpPayment = mpClient ? new Payment(mpClient) : null;
+
+const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
+const sendgridFrom = process.env.SENDGRID_FROM || '';
+if (sendgridApiKey) {
+    sgMail.setApiKey(sendgridApiKey);
+}
 
 // Importamos tu cliente robusto de Shopify
 const shopifyClient = require('./Shopifyclient.js');
@@ -149,6 +156,21 @@ async function initDb() {
                 await dbPool.query(
                     `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255) NULL`
                 );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255) NULL`
+                );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(64) NULL`
+                );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS coupon_amount DECIMAL(10,2) NULL`
+                );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS coupon_sent_at TIMESTAMP NULL`
+                );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS change_sent_at TIMESTAMP NULL`
+                );
                 console.log('✅ DB lista: tabla returns_requests verificada (PostgreSQL)');
             } else {
                 console.warn('⚠️ Tabla returns_requests no existe en PostgreSQL - ejecuta migración en Neon');
@@ -168,6 +190,11 @@ async function initDb() {
                     stripe_session_id VARCHAR(255) NULL,
                     payment_provider VARCHAR(32) DEFAULT 'mercadopago',
                     payment_reference VARCHAR(255) NULL,
+                    customer_name VARCHAR(255) NULL,
+                    coupon_code VARCHAR(64) NULL,
+                    coupon_amount DECIMAL(10,2) NULL,
+                    coupon_sent_at TIMESTAMP NULL,
+                    change_sent_at TIMESTAMP NULL,
                     carrier VARCHAR(32) NULL,
                     tracking_number VARCHAR(64) NULL,
                     label_base64 MEDIUMTEXT NULL,
@@ -214,6 +241,51 @@ async function initDb() {
             if (payRefCols && payRefCols[0] && payRefCols[0].cnt === 0) {
                 await dbPool.execute(
                     `ALTER TABLE returns_requests ADD COLUMN payment_reference VARCHAR(255) NULL`
+                );
+            }
+            const [customerCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'customer_name']
+            );
+            if (customerCols && customerCols[0] && customerCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN customer_name VARCHAR(255) NULL`
+                );
+            }
+            const [couponCodeCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'coupon_code']
+            );
+            if (couponCodeCols && couponCodeCols[0] && couponCodeCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN coupon_code VARCHAR(64) NULL`
+                );
+            }
+            const [couponAmountCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'coupon_amount']
+            );
+            if (couponAmountCols && couponAmountCols[0] && couponAmountCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN coupon_amount DECIMAL(10,2) NULL`
+                );
+            }
+            const [couponSentCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'coupon_sent_at']
+            );
+            if (couponSentCols && couponSentCols[0] && couponSentCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN coupon_sent_at TIMESTAMP NULL`
+                );
+            }
+            const [changeSentCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'change_sent_at']
+            );
+            if (changeSentCols && changeSentCols[0] && changeSentCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN change_sent_at TIMESTAMP NULL`
                 );
             }
             console.log('✅ DB lista: tabla returns_requests verificada (MySQL)');
@@ -448,7 +520,8 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         const submitParsed = z.object({
             orderId: z.string().trim().min(1).max(64),
             contactEmail: z.string().trim().email().max(255),
-            returnType: z.string().trim().min(1).max(32)
+            returnType: z.string().trim().min(1).max(32),
+            customerName: z.string().trim().min(1).max(255).optional()
         }).safeParse(req.body);
 
         if (!submitParsed.success) {
@@ -459,7 +532,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
             });
         }
 
-        const { orderId, contactEmail, returnType } = submitParsed.data;
+        const { orderId, contactEmail, returnType, customerName } = submitParsed.data;
         
         // Los items vienen como string JSON, hay que parsearlos
         let items = [];
@@ -551,15 +624,16 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
             };
         }));
 
-        const insertSQL = isPostgreSQL 
-            ? `INSERT INTO returns_requests (order_id, contact_email, return_type, items_json, files_json, amount)
-               VALUES (?, ?, ?, ?, ?, ?) RETURNING id`
-            : `INSERT INTO returns_requests (order_id, contact_email, return_type, items_json, files_json, amount)
-               VALUES (?, ?, ?, ?, ?, ?)`;
+          const insertSQL = isPostgreSQL 
+                ? `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`
+                : `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`;
         
         const [result] = await executeQuery(insertSQL, [
             String(orderId || ''),
             String(contactEmail || ''),
+                String(customerName || ''),
             String(returnType || ''),
             JSON.stringify(items),
             JSON.stringify(filesMeta),
@@ -863,8 +937,9 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
         }
 
         const [rows] = await executeQuery(
-            `SELECT id, order_id, contact_email, return_type, items_json, amount, payment_status, stripe_session_id,
-                    carrier, tracking_number, label_created_at, created_at, admin_status, refund_status
+            `SELECT id, order_id, contact_email, customer_name, return_type, items_json, amount, payment_status, stripe_session_id,
+                    carrier, tracking_number, label_created_at, created_at, admin_status, refund_status,
+                    coupon_code, coupon_amount, coupon_sent_at, change_sent_at
              FROM returns_requests
              ORDER BY created_at DESC
              LIMIT 500`,
@@ -1079,6 +1154,111 @@ app.post('/api/admin/requests/:requestId/refund-status', requireAdmin, async (re
     } catch (err) {
         console.error('Error updating refund status:', err);
         res.status(500).json({ success: false, message: 'Error actualizando estado' });
+    }
+});
+
+app.post('/api/admin/requests/:requestId/decision', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const requestId = req.params.requestId;
+        const status = String(req.body?.status || '').toLowerCase();
+        if (!['accepted', 'rejected'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Estado inválido' });
+        }
+
+        await executeQuery(
+            `UPDATE returns_requests SET admin_status = ? WHERE id = ?`,
+            [status, requestId]
+        );
+
+        res.json({ success: true, message: 'Estado actualizado', admin_status: status });
+    } catch (err) {
+        console.error('Error decision:', err);
+        res.status(500).json({ success: false, message: 'Error actualizando estado' });
+    }
+});
+
+app.post('/api/admin/requests/:requestId/ship-change', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const requestId = req.params.requestId;
+        const trackingNumber = String(req.body?.trackingNumber || '').trim();
+        if (!trackingNumber) {
+            return res.status(400).json({ success: false, message: 'Tracking requerido' });
+        }
+
+        await executeQuery(
+            `UPDATE returns_requests SET tracking_number = ?, change_sent_at = ?, admin_status = 'sent' WHERE id = ?`,
+            [trackingNumber, new Date().toISOString(), requestId]
+        );
+
+        res.json({ success: true, message: 'Cambio enviado', trackingNumber });
+    } catch (err) {
+        console.error('Error ship change:', err);
+        res.status(500).json({ success: false, message: 'Error enviando cambio' });
+    }
+});
+
+app.post('/api/admin/requests/:requestId/send-coupon', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const requestId = req.params.requestId;
+        const couponCode = String(req.body?.couponCode || '').trim();
+        const couponAmount = Number(req.body?.couponAmount || 0);
+
+        if (!couponCode || couponAmount <= 0) {
+            return res.status(400).json({ success: false, message: 'Código y monto válidos son requeridos' });
+        }
+
+        const [rows] = await executeQuery(
+            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            [requestId]
+        );
+        const contactEmail = rows?.[0]?.contact_email;
+        const customerName = rows?.[0]?.customer_name || 'Cliente';
+
+        if (!contactEmail) {
+            return res.status(400).json({ success: false, message: 'Email no disponible' });
+        }
+
+        if (!sendgridApiKey || !sendgridFrom) {
+            return res.status(500).json({ success: false, message: 'SendGrid no configurado' });
+        }
+
+        const formattedAmount = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(couponAmount);
+        const msg = {
+            to: contactEmail,
+            from: sendgridFrom,
+            subject: 'Tu cupón MON|BLEU está listo',
+            html: `
+                <p>Hola ${customerName},</p>
+                <p>Tu cupón ha sido confirmado.</p>
+                <p><strong>Código:</strong> ${couponCode}<br />
+                <strong>Monto:</strong> ${formattedAmount}</p>
+                <p>Instrucciones: usa este código en el checkout de MON|BLEU. Si tienes dudas, responde a este correo.</p>
+            `
+        };
+
+        await sgMail.send(msg);
+
+        await executeQuery(
+            `UPDATE returns_requests SET coupon_code = ?, coupon_amount = ?, coupon_sent_at = ? WHERE id = ?`,
+            [couponCode, couponAmount, new Date().toISOString(), requestId]
+        );
+
+        res.json({ success: true, message: 'Cupón enviado' });
+    } catch (err) {
+        console.error('Error send coupon:', err);
+        res.status(500).json({ success: false, message: 'Error enviando cupón' });
     }
 });
 
