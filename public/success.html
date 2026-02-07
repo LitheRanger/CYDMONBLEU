@@ -245,7 +245,18 @@
                 }
 
                 const paymentStatus = verifyData.paymentStatus;
+                const amountValid = verifyData.amountValid;
                 const isPaid = paymentStatus === 'approved';
+
+                if (amountValid === false) {
+                    container.innerHTML = `
+                        <div class="success-icon">❌</div>
+                        <h1>Error de pago</h1>
+                        <p>El monto del pago no coincide con la solicitud. Contacta soporte.</p>
+                        <a href="/" class="btn">Volver al inicio</a>
+                    `;
+                    return;
+                }
 
                 if (!isPaid) {
                     container.innerHTML = `

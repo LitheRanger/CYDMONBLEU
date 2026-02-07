@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
+const crypto = require('crypto');
 const pino = require('pino');
 const pinoHttp = require('pino-http');
 const rateLimit = require('express-rate-limit');
@@ -22,6 +23,7 @@ const mpEnv = String(process.env.MP_ENV || 'sandbox').toLowerCase();
 const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessToken }) : null;
 const mpPreference = mpClient ? new Preference(mpClient) : null;
 const mpPayment = mpClient ? new Payment(mpClient) : null;
+const mpWebhookSecret = process.env.MP_WEBHOOK_SECRET || '';
 
 const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
 const sendgridFrom = process.env.SENDGRID_FROM || '';
@@ -788,6 +790,89 @@ async function handleFailedPayment({ requestId, paymentId }) {
     );
 }
 
+function parseMpSignature(signatureHeader) {
+    if (!signatureHeader) return null;
+    const parts = String(signatureHeader)
+        .split(',')
+        .map(part => part.trim())
+        .filter(Boolean);
+    const signature = {};
+    parts.forEach(part => {
+        const [key, value] = part.split('=');
+        if (key && value) signature[key] = value;
+    });
+    if (!signature.ts || !signature.v1) return null;
+    return signature;
+}
+
+function verifyMpSignature(req) {
+    if (!mpWebhookSecret) {
+        return { ok: false, reason: 'missing_secret' };
+    }
+    const signatureHeader = req.headers['x-signature'] || req.headers['X-Signature'];
+    const requestId = req.headers['x-request-id'] || req.headers['X-Request-Id'];
+    const signature = parseMpSignature(signatureHeader);
+    const dataId = req.body?.data?.id || req.body?.id || req.query?.data?.id || req.query?.id;
+
+    if (!signature || !requestId || !dataId) {
+        return { ok: false, reason: 'missing_signature_fields' };
+    }
+
+    const signedPayload = `id:${dataId};request-id:${requestId};ts:${signature.ts};`;
+    const expected = crypto
+        .createHmac('sha256', mpWebhookSecret)
+        .update(signedPayload)
+        .digest('hex');
+
+    const expectedBuf = Buffer.from(expected, 'hex');
+    const providedBuf = Buffer.from(signature.v1, 'hex');
+    if (expectedBuf.length !== providedBuf.length) {
+        return { ok: false, reason: 'signature_mismatch' };
+    }
+    const ok = crypto.timingSafeEqual(expectedBuf, providedBuf);
+    return { ok, reason: ok ? '' : 'signature_mismatch' };
+}
+
+function getPaymentValue(payment, key, fallback) {
+    if (!payment) return fallback;
+    if (payment[key] !== undefined) return payment[key];
+    if (payment.body && payment.body[key] !== undefined) return payment.body[key];
+    return fallback;
+}
+
+async function getExpectedAmount(requestId) {
+    if (!dbPool || !requestId) return null;
+    const [rows] = await executeQuery(
+        `SELECT amount FROM returns_requests WHERE id = ? LIMIT 1`,
+        [requestId]
+    );
+    if (!rows || !rows[0]) return null;
+    return Number(rows[0].amount || 0);
+}
+
+async function validatePaymentAmount({ requestId, payment }) {
+    const expected = await getExpectedAmount(requestId);
+    if (expected === null) {
+        return { ok: false, reason: 'request_not_found' };
+    }
+
+    const paid = Number(getPaymentValue(payment, 'transaction_amount', 0));
+    if (!Number.isFinite(paid)) {
+        return { ok: false, reason: 'invalid_amount' };
+    }
+
+    const currency = String(getPaymentValue(payment, 'currency_id', 'MXN')).toUpperCase();
+    if (currency && currency !== 'MXN') {
+        return { ok: false, reason: `invalid_currency_${currency}` };
+    }
+
+    if (Math.abs(paid - expected) > 0.01) {
+        return { ok: false, reason: `amount_mismatch_${paid}_${expected}` };
+    }
+
+    return { ok: true };
+}
+
 // --- 4. MERCADOPAGO PREFERENCE ---
 app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
     try {
@@ -877,6 +962,13 @@ app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
 // --- 5. MERCADOPAGO WEBHOOK ---
 app.post('/api/mp-webhook', async (req, res) => {
     try {
+        const signatureCheck = verifyMpSignature(req);
+        if (!signatureCheck.ok) {
+            const status = signatureCheck.reason === 'missing_secret' ? 500 : 401;
+            console.warn(`⚠️ Webhook MP rechazado: ${signatureCheck.reason}`);
+            return res.status(status).json({ received: true });
+        }
+
         const paymentId = req.body?.data?.id || req.query?.data?.id || req.body?.id || req.query?.id;
         if (!paymentId) {
             return res.json({ received: true });
@@ -888,15 +980,30 @@ app.post('/api/mp-webhook', async (req, res) => {
         }
 
         const payment = await mpPayment.get({ id: paymentId });
-        const status = payment?.status || payment?.body?.status;
-        const externalRef = payment?.external_reference || payment?.body?.external_reference;
-        const metadata = payment?.metadata || payment?.body?.metadata || {};
+        const status = getPaymentValue(payment, 'status', '');
+        const externalRef = getPaymentValue(payment, 'external_reference', '');
+        const metadata = getPaymentValue(payment, 'metadata', {}) || {};
         const requestId = externalRef || metadata.requestId;
         const orderId = metadata.orderId;
 
+        if (!requestId) {
+            console.warn('⚠️ Webhook MP sin requestId asociado');
+            return res.json({ received: true });
+        }
+
         if (status === 'approved') {
+            const validation = await validatePaymentAmount({ requestId, payment });
+            if (!validation.ok) {
+                console.warn(`⚠️ Pago MP inválido (${validation.reason}) para request ${requestId}`);
+                return res.json({ received: true });
+            }
             await handleApprovedPayment({ requestId, orderId, paymentId });
         } else if (['rejected', 'cancelled'].includes(status)) {
+            const expected = await getExpectedAmount(requestId);
+            if (expected === null) {
+                console.warn(`⚠️ Pago MP rechazado sin request válido: ${requestId}`);
+                return res.json({ received: true });
+            }
             await handleFailedPayment({ requestId, paymentId });
         }
 
@@ -916,23 +1023,24 @@ app.get('/api/verify-mp-payment/:paymentId', async (req, res) => {
         }
 
         const payment = await mpPayment.get({ id: paymentId });
-        const status = payment?.status || payment?.body?.status;
-        const externalRef = payment?.external_reference || payment?.body?.external_reference;
-        const metadata = payment?.metadata || payment?.body?.metadata || {};
+        const status = getPaymentValue(payment, 'status', '');
+        const externalRef = getPaymentValue(payment, 'external_reference', '');
+        const metadata = getPaymentValue(payment, 'metadata', {}) || {};
         const requestId = externalRef || metadata.requestId;
         const orderId = metadata.orderId;
 
-        if (status === 'approved') {
-            await handleApprovedPayment({ requestId, orderId, paymentId });
-        } else if (['rejected', 'cancelled'].includes(status)) {
-            await handleFailedPayment({ requestId, paymentId });
+        let amountValid = null;
+        if (requestId) {
+            const validation = await validatePaymentAmount({ requestId, payment });
+            amountValid = validation.ok;
         }
 
         res.json({
             success: true,
             paymentStatus: status,
             requestId,
-            orderId
+            orderId,
+            amountValid
         });
     } catch (error) {
         console.error('Error verificando pago MP:', error);
