@@ -15,22 +15,22 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@shopify/shopify-api": "^12.3.0",
     "@sendgrid/mail": "^8.1.4",
+    "@shopify/shopify-api": "^12.3.0",
     "axios": "^1.13.4",
     "cloudinary": "^2.7.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-rate-limit": "^7.4.1",
+    "mercadopago": "^2.12.0",
     "multer": "^2.0.2",
     "mysql2": "^3.16.2",
     "node-fetch": "^3.3.2",
+    "pg": "^8.18.0",
     "pino": "^9.6.0",
     "pino-http": "^10.5.0",
-    "pg": "^8.18.0",
     "qs": "^6.14.1",
-    "mercadopago": "^2.8.1",
     "zod": "^3.24.1"
   }
 }
