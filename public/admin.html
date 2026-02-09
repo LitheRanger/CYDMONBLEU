@@ -5,69 +5,385 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Panel Admin - MON|BLEU</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
         :root {
-            --primary: #151515;
-            --secondary: #fffaf4;
-            --text-primary: #1b1b1b;
-            --text-secondary: #6b6b6b;
-            --bg-light: #fff7ee;
-            --border-light: #eadfd3;
+            --primary: #111111;
+            --secondary: #ffffff;
+            --bg: #f6f4ef;
+            --panel: #ffffff;
+            --border: #e2ded4;
+            --text: #1b1b1b;
+            --muted: #6b6b6b;
             --success: #168f55;
             --warning: #f08c2b;
             --danger: #d64545;
-            --brand: #1b1b1b;
-            --brand-soft: #f3ebe2;
-        .modal-title {
-            font-size: 18px;
-            font-weight: 700;
-            font-family: 'Fraunces', serif;
+            --shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
             margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 28px;
+            background: var(--secondary);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand img {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .brand p {
+            margin: 2px 0 0;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 1px solid var(--border);
+            background: var(--primary);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn.secondary {
+            background: #fff;
+            color: var(--text);
+        }
+
+        .btn.danger {
+            background: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 28px 48px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        .filters {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .filters-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .filters input,
+        .filters select {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 13px;
+            background: #fff;
+        }
+
+        .quick {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .chip.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .tab-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .summary {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .table-wrap {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: auto;
+            box-shadow: var(--shadow);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+
+        th,
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            background: #f9f7f2;
+            font-weight: 700;
+        }
+
+        tr.clickable-row:hover {
+            background: #f4f1ea;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .link-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .link-btn[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            background: #eee;
+        }
+
+        .badge.paid {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge.failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge.info {
+            background: #e0f2fe;
+            color: #075985;
+        }
+
+        .badge.no-label {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .empty {
+            padding: 18px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 0;
+        }
+
+        .pager-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            width: min(900px, 95vw);
+            max-height: 90vh;
+            overflow: auto;
+            border-radius: 16px;
+            padding: 16px 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 18px;
         }
 
         .close-btn {
-            background: none;
             border: none;
-            font-size: 24px;
+            background: transparent;
+            font-size: 20px;
             cursor: pointer;
-            color: var(--text-secondary);
         }
 
         .detail-section {
-            border: 1px solid var(--border-light);
+            border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
+            padding: 12px;
+            margin-bottom: 12px;
             background: #fffdf9;
         }
 
         .detail-section-title {
-            font-family: 'Fraunces', serif;
-            font-size: 14px;
-            margin: 0 0 12px;
+            margin: 0 0 8px;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-secondary);
+            font-size: 11px;
+            color: var(--muted);
         }
 
         .detail-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px 16px;
-        }
-
-        .detail-field {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+            gap: 8px 12px;
         }
 
         .detail-label {
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
-            color: var(--text-secondary);
-            letter-spacing: 0.7px;
+            color: var(--muted);
         }
 
         .detail-value {
@@ -78,821 +394,243 @@
         .files-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
+            gap: 10px;
         }
 
         .item-card,
         .file-card {
-            border: 1px solid var(--border-light);
-            border-radius: 12px;
-            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
             background: #fff;
-            box-shadow: var(--shadow-sm);
         }
 
         .item-title {
             font-weight: 600;
-            margin-bottom: 6px;
         }
 
         .item-meta {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
+            font-size: 11px;
+            color: var(--muted);
         }
 
         .item-replacement {
-            margin-top: 6px;
-            font-size: 12px;
-            color: var(--accent-2);
-            font-weight: 600;
+            font-size: 11px;
+            color: #a16207;
         }
 
         .file-thumb {
             width: 100%;
-            border-radius: 10px;
-            <script src="js/admin.js" defer></script>
-            } else {
-                // Otros tabs: renderizar sin agrupar
-                pageData.forEach(r => renderRow(r, tabName, tbody));
-            }
-
-            updateSummaryTab(tabName, data);
-            updatePaginationTab(tabName, data);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 6px;
         }
 
-        function renderRow(r, tabName, tbody) {
-            const tr = document.createElement('tr');
-            tr.classList.add('clickable-row');
-            tr.setAttribute('data-request-id', r.id);
-            const labelBadge = r.tracking_number
-                ? `<span class="badge success" style="background:#dcfce7;color:#16a34a;">${r.carrier || 'Generada'}</span>`
-                : '<span class="badge no-label">Sin guía</span>';
-            const trackingText = r.tracking_number || '—';
-
-            const isCambio = tabName === 'cambios';
-            const isCompletadas = tabName === 'completadas' || tabName === 'defectos';
-            const isReembolso = tabName === 'reembolsos';
-            const actions = `
-                <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
-                <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
-                <button class="link-btn" data-id="${r.id}" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>
-                <button class="link-btn" data-id="${r.id}" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>
-                ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="ship">Enviar</button>` : ''}
-                ${isReembolso ? `<button class="link-btn" data-id="${r.id}" data-action="coupon">Enviar cupón</button>` : ''}
-                ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
-                ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
-            `;
-
-            const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
-
-            tr.innerHTML = `
-                <td>${r.id}</td>
-                <td><strong>${r.order_id || '—'}</strong></td>
-                <td>${r.customer_name || '—'}</td>
-                <td class="muted">${r.contact_email || '—'}</td>
-                ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
-                <td>${paymentBadge(r)}</td>
-                <td>${adminBadge(r.admin_status)}</td>
-                ${isCambio ? `<td>${refundBadge(r.refund_status)}</td>` : ''}
-                <td>${formatCurrency(r.amount)}</td>
-                <td>${trackingText}</td>
-                <td>${labelBadge}</td>
-                <td class="muted">${formatDate(r.created_at)}</td>
-                <td><div class="actions">${actions}</div></td>
-            `;
-            tbody.appendChild(tr);
-
-        }
-
-        async function loadRequests() {
-            try {
-                document.getElementById('btn-refresh').disabled = true;
-                const res = await fetch(`${API_BASE}/api/admin/requests`);
-                const data = await res.json();
-                if (data.success) {
-                    requests = data.data || [];
-                    // Excluir completadas de cambios y reembolsos
-                    defectos = requests.filter(r => hasDefect(r));
-                    cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio'
-                        && String(r.admin_status || '').toLowerCase() !== 'completed'
-                        && !hasDefect(r));
-                    reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso'
-                        && String(r.admin_status || '').toLowerCase() !== 'completed'
-                        && !hasDefect(r));
-                    completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed'
-                        && !hasDefect(r));
-                    updateStats();
-                    applyFilter();
-                } else {
-                    console.error('Error loading:', data.message || 'Error desconocido');
-                }
-            } catch (e) {
-                console.error('Error loading:', e);
-            } finally {
-                document.getElementById('btn-refresh').disabled = false;
+        @media (max-width: 900px) {
+            .filters-row {
+                grid-template-columns: 1fr;
             }
         }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <img src="logo.png" alt="MON BLEU" />
+            <div>
+                <h1>Panel Admin</h1>
+                <p>Devoluciones y cambios</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn" id="btn-refresh">Actualizar</button>
+            <button class="btn secondary" id="btn-export">Exportar CSV</button>
+            <button class="btn secondary" id="btn-clear-view">Limpiar vista</button>
+            <button class="btn danger" id="btn-delete-all">Eliminar pedidos</button>
+        </div>
+    </header>
 
-        function applyFilter() {
-            if (!suppressChipClear) clearQuickChips();
-            const q = (document.getElementById('search').value || '').toLowerCase();
-            const status = document.getElementById('filter-status').value;
-            const label = document.getElementById('filter-label').value;
-            const refund = document.getElementById('filter-refund').value;
+    <main class="container">
+        <section class="stats">
+            <div class="stat-card"><div class="stat-value" id="total">0</div><div class="stat-label">Total solicitudes</div></div>
+            <div class="stat-card"><div class="stat-value" id="paid-count">0</div><div class="stat-label">Pagadas</div></div>
+            <div class="stat-card"><div class="stat-value" id="pending-count">0</div><div class="stat-label">Pendientes pago</div></div>
+            <div class="stat-card"><div class="stat-value" id="no-payment-count">0</div><div class="stat-label">Sin cobro</div></div>
+            <div class="stat-card"><div class="stat-value" id="labeled-count">0</div><div class="stat-label">Con guia</div></div>
+            <div class="stat-card"><div class="stat-value" id="pending-shipment-count">0</div><div class="stat-label">Por enviar</div></div>
+            <div class="stat-card"><div class="stat-value" id="today-count">0</div><div class="stat-label">Hoy</div></div>
+        </section>
 
-            // Filtrar CAMBIOS
-            filteredCambios = cambios.filter(r => {
-                const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
-                if (!hay.includes(q)) return false;
-                if (!matchesPaymentFilter(r, status)) return false;
-                if (label === 'yes' && !r.tracking_number) return false;
-                if (label === 'no' && r.tracking_number) return false;
-                if (refund && r.refund_status !== refund) return false;
-                return true;
-            });
+        <section class="filters">
+            <div class="filters-row">
+                <input id="search" type="text" placeholder="Buscar por orden, correo o tracking" />
+                <select id="filter-status">
+                    <option value="">Pago: Todos</option>
+                    <option value="paid">Pagado</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="nopay">Sin pago</option>
+                    <option value="failed">Fallido</option>
+                </select>
+                <select id="filter-label">
+                    <option value="">Guia: Todas</option>
+                    <option value="yes">Con guia</option>
+                    <option value="no">Sin guia</option>
+                </select>
+                <select id="filter-refund">
+                    <option value="">Reembolso: Todos</option>
+                    <option value="pending_receipt">Por Recibir</option>
+                    <option value="pending_shipment">Por Enviar</option>
+                </select>
+            </div>
+            <div class="quick">
+                <button class="chip" data-quick data-payment="pending">Pagos pendientes</button>
+                <button class="chip" data-quick data-label="no">Sin guia</button>
+                <button class="chip" data-quick data-tab="cambios" data-refund="pending_shipment">Por enviar</button>
+                <button class="chip" data-quick data-tab="defectos" data-clear="true">Defectos</button>
+            </div>
+        </section>
 
-            // Filtrar REEMBOLSOS
-            filteredReembolsos = reembolsos.filter(r => {
-                const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
-                if (!hay.includes(q)) return false;
-                if (!matchesPaymentFilter(r, status)) return false;
-                if (label === 'yes' && !r.tracking_number) return false;
-                if (label === 'no' && r.tracking_number) return false;
-                return true;
-            });
+        <section class="tabs">
+            <button class="tab-btn active" data-tab="cambios">Cambios</button>
+            <button class="tab-btn" data-tab="reembolsos">Reembolsos</button>
+            <button class="tab-btn" data-tab="defectos">Defectos</button>
+            <button class="tab-btn" data-tab="completadas">Completadas</button>
+        </section>
 
-            // Filtrar COMPLETADAS
-            filteredCompletadas = completadas.filter(r => {
-                const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
-                if (!hay.includes(q)) return false;
-                if (!matchesPaymentFilter(r, status)) return false;
-                if (label === 'yes' && !r.tracking_number) return false;
-                if (label === 'no' && r.tracking_number) return false;
-                if (refund && r.refund_status !== refund) return false;
-                return true;
-            });
+        <section class="tab-content active" id="tab-cambios">
+            <div class="summary" id="summary-cambios">Mostrando 0 de 0 solicitudes</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Orden</th>
+                            <th>Cliente</th>
+                            <th>Correo</th>
+                            <th>Pago</th>
+                            <th>Estado</th>
+                            <th>Reembolso</th>
+                            <th>Monto</th>
+                            <th>Tracking</th>
+                            <th>Guia</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-cambios"></tbody>
+                </table>
+            </div>
+            <div id="empty-cambios" class="empty" style="display:none;">Sin cambios</div>
+            <div class="pagination" id="pagination-cambios" style="display:none;">
+                <button class="pager-btn" id="prev-cambios">Anterior</button>
+                <div class="muted" id="page-info-cambios">Pagina 1</div>
+                <button class="pager-btn" id="next-cambios">Siguiente</button>
+            </div>
+        </section>
 
-            // Filtrar DEFECTOS
-            filteredDefectos = defectos.filter(r => {
-                const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
-                if (!hay.includes(q)) return false;
-                if (!matchesPaymentFilter(r, status)) return false;
-                if (label === 'yes' && !r.tracking_number) return false;
-                if (label === 'no' && r.tracking_number) return false;
-                if (refund && r.refund_status !== refund) return false;
-                return true;
-            });
+        <section class="tab-content" id="tab-reembolsos">
+            <div class="summary" id="summary-reembolsos">Mostrando 0 de 0 solicitudes</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Orden</th>
+                            <th>Cliente</th>
+                            <th>Correo</th>
+                            <th>Pago</th>
+                            <th>Estado</th>
+                            <th>Monto</th>
+                            <th>Tracking</th>
+                            <th>Guia</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-reembolsos"></tbody>
+                </table>
+            </div>
+            <div id="empty-reembolsos" class="empty" style="display:none;">Sin reembolsos</div>
+            <div class="pagination" id="pagination-reembolsos" style="display:none;">
+                <button class="pager-btn" id="prev-reembolsos">Anterior</button>
+                <div class="muted" id="page-info-reembolsos">Pagina 1</div>
+                <button class="pager-btn" id="next-reembolsos">Siguiente</button>
+            </div>
+        </section>
 
-            currentTabCambios = 1;
-            currentTabReembolsos = 1;
-            currentTabDefectos = 1;
-            currentTabCompletadas = 1;
-            renderTab('cambios', filteredCambios);
-            renderTab('reembolsos', filteredReembolsos);
-            renderTab('defectos', filteredDefectos);
-            renderTab('completadas', filteredCompletadas);
-        }
+        <section class="tab-content" id="tab-defectos">
+            <div class="summary" id="summary-defectos">Mostrando 0 de 0 solicitudes</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Orden</th>
+                            <th>Cliente</th>
+                            <th>Correo</th>
+                            <th>Tipo</th>
+                            <th>Pago</th>
+                            <th>Estado</th>
+                            <th>Monto</th>
+                            <th>Tracking</th>
+                            <th>Guia</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-defectos"></tbody>
+                </table>
+            </div>
+            <div id="empty-defectos" class="empty" style="display:none;">Sin defectos</div>
+            <div class="pagination" id="pagination-defectos" style="display:none;">
+                <button class="pager-btn" id="prev-defectos">Anterior</button>
+                <div class="muted" id="page-info-defectos">Pagina 1</div>
+                <button class="pager-btn" id="next-defectos">Siguiente</button>
+            </div>
+        </section>
 
-        async function viewDetail(requestId) {
-            try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}`);
-                const data = await res.json();
-                if (!data.success) {
-                    console.error('Error fetching detail:', data);
-                    return;
-                }
+        <section class="tab-content" id="tab-completadas">
+            <div class="summary" id="summary-completadas">Mostrando 0 de 0 solicitudes</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Orden</th>
+                            <th>Cliente</th>
+                            <th>Correo</th>
+                            <th>Tipo</th>
+                            <th>Pago</th>
+                            <th>Estado</th>
+                            <th>Monto</th>
+                            <th>Tracking</th>
+                            <th>Guia</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-completadas"></tbody>
+                </table>
+            </div>
+            <div id="empty-completadas" class="empty" style="display:none;">Sin completadas</div>
+            <div class="pagination" id="pagination-completadas" style="display:none;">
+                <button class="pager-btn" id="prev-completadas">Anterior</button>
+                <div class="muted" id="page-info-completadas">Pagina 1</div>
+                <button class="pager-btn" id="next-completadas">Siguiente</button>
+            </div>
+        </section>
+    </main>
 
-                const r = data.data;
-                console.log('📋 Detail recibido:', r);
-                let itemsSource = r.items_selected || r.items || [];
-                console.log('Items source (1):', itemsSource);
-                
-                if (!Array.isArray(itemsSource) || itemsSource.length === 0) {
-                    // items_json puede venir ya parseado (PostgreSQL JSONB) o como string
-                    if (typeof r.items_json === 'string') {
-                        try {
-                            const parsed = JSON.parse(r.items_json);
-                            itemsSource = Array.isArray(parsed) ? parsed : [];
-                            console.log('Items parsed from JSON string:', itemsSource);
-                        } catch (e) {
-                            console.error('Error parsing items_json:', e);
-                            itemsSource = [];
-                        }
-                    } else if (r.items_json && typeof r.items_json === 'object') {
-                        // Ya viene parseado (PostgreSQL)
-                        itemsSource = Array.isArray(r.items_json) ? r.items_json : [];
-                        console.log('Items already parsed (JSONB):', itemsSource);
-                    }
-                }
-                console.log('Final itemsSource:', itemsSource);
-                
-                const isCambio = String(r.return_type || '').toLowerCase() === 'cambio';
-                const itemsHtml = itemsSource.map(i => {
-                    const name = i.name || 'Producto';
-                    const variant = i.current_variant_title || 'Variante';
-                    const qty = i.quantity || 1;
-                    const price = i.price != null ? formatCurrency(i.price) : '—';
-                    const reason = i.reason || 'Sin razón';
-                    const replacementTitle = i.replacementTitle || i.replacement_title || i.replacementVariantTitle || '';
-                    const replacementId = i.replacementVariantId || i.replacement_variant_id || '';
-                    const replacementDisplay = replacementTitle
-                        ? replacementTitle
-                        : (replacementId ? `ID ${replacementId}` : 'No seleccionado');
-                    const replacementLine = isCambio
-                        ? `<div class="item-replacement">Reemplazo: ${replacementDisplay}</div>`
-                        : '';
-                    return `
-                        <div class="item-card">
-                            <div class="item-title">${name}</div>
-                            <div class="item-meta">Variante: ${variant}</div>
-                            <div class="item-meta">Cantidad: ${qty}</div>
-                            <div class="item-meta">Motivo: ${reason}</div>
-                            <div class="item-meta">Precio: ${price}</div>
-                            ${replacementLine}
-                        </div>
-                    `;
-                }).join('') || '<div class="muted">Sin items</div>';
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Detalle solicitud #<span id="detail-id">—</span></h2>
+                <button class="close-btn" id="close-modal">×</button>
+            </div>
+            <div id="detail-body"></div>
+        </div>
+    </div>
 
-                const filesHtml = (r.files || []).map(f => {
-                    const isImage = (f.mimetype || '').startsWith('image/');
-                    const rawPath = String(f.path || '').replace(/\\/g, '/');
-                    const normalizedPath = rawPath
-                        ? (rawPath.startsWith('uploads/') ? `/${rawPath}` : (rawPath.startsWith('/') ? rawPath : `/uploads/${rawPath}`))
-                        : '';
-                    const fileUrl = f.cloudinaryUrl || f.dataUrl || f.url || (f.filename ? `/uploads/${f.filename}` : normalizedPath);
-                    const fileName = f.originalname || f.filename || 'Archivo';
-                    if (isImage && fileUrl) {
-                        return `
-                            <div class="file-card">
-                                <img src="${fileUrl}" alt="${fileName}" class="file-thumb" />
-                                <div class="file-meta">${fileName}</div>
-                            </div>
-                        `;
-                    }
-                    return `
-                        <div class="file-card">
-                            <div class="file-meta">${fileName}</div>
-                        </div>
-                    `;
-                }).join('') || '<div class="muted">Sin archivos</div>';
-
-                document.getElementById('detail-id').textContent = r.id;
-                document.getElementById('detail-body').innerHTML = `
-                    <div class="detail-section">
-                        <h3 class="detail-section-title">Cliente</h3>
-                        <div class="detail-grid">
-                            <div class="detail-field">
-                                <div class="detail-label">Orden</div>
-                                <div class="detail-value">${r.order_id || '—'}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Cliente</div>
-                                <div class="detail-value">${r.customer_name || '—'}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Correo</div>
-                                <div class="detail-value">${r.contact_email || '—'}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Creada</div>
-                                <div class="detail-value">${formatDate(r.created_at)}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="detail-section">
-                        <h3 class="detail-section-title">Pago</h3>
-                        <div class="detail-grid">
-                            <div class="detail-field">
-                                <div class="detail-label">Estado de pago</div>
-                                <div class="detail-value">${paymentBadge(r)}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Monto</div>
-                                <div class="detail-value">${formatCurrency(r.amount)}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Proveedor</div>
-                                <div class="detail-value">${r.payment_provider || 'MercadoPago'}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Referencia</div>
-                                <div class="detail-value">${r.payment_reference ? `<span class="tag">${r.payment_reference}</span>` : '<span class="muted">—</span>'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="detail-section">
-                        <h3 class="detail-section-title">Solicitud</h3>
-                        <div class="detail-grid">
-                            <div class="detail-field">
-                                <div class="detail-label">Tipo</div>
-                                <div class="detail-value">${r.return_type || '—'}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Estado admin</div>
-                                <div class="detail-value">${adminBadge(r.admin_status)}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Estado reembolso</div>
-                                <div class="detail-value">${refundBadge(r.refund_status)}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Tracking</div>
-                                <div class="detail-value">${r.tracking_number || '<span class="muted">Sin guia</span>'}</div>
-                            </div>
-                            <div class="detail-field">
-                                <div class="detail-label">Paqueteria</div>
-                                <div class="detail-value">${r.carrier || '—'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="detail-section">
-                        <h3 class="detail-section-title">Items</h3>
-                        <div class="items-grid">${itemsHtml}</div>
-                    </div>
-                    <div class="detail-section">
-                        <h3 class="detail-section-title">Evidencia</h3>
-                        <div class="files-grid">${filesHtml}</div>
-                    </div>
-                `;
-                document.getElementById('modal').classList.add('show');
-            } catch (e) {
-                console.error('Error:', e);
-            }
-        }
-
-        async function downloadLabel(requestId) {
-            try {
-                const res = await fetch(`${API_BASE}/api/label/${encodeURIComponent(requestId)}`);
-                const data = await res.json();
-                if (!data.success || !data.labelBase64) {
-                    alert('Guía no disponible');
-                    return;
-                }
-                const byteChars = atob(data.labelBase64);
-                const byteNumbers = new Array(byteChars.length);
-                for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
-                const blob = new Blob([new Uint8Array(byteNumbers)], { type: data.labelMime || 'application/pdf' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `guia-${data.trackingNumber || requestId}.pdf`;
-                a.click();
-                URL.revokeObjectURL(url);
-            } catch (e) {
-                console.error('Error:', e);
-            }
-        }
-
-        async function retryLabel(requestId) {
-            if (!confirm('¿Regenerar guía MyeShip?')) return;
-            try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/retry-label`, { method: 'POST' });
-                const data = await res.json();
-                if (data.success) {
-                    alert(`Guía regenerada: ${data.trackingNumber}`);
-                    loadRequests();
-                } else {
-                    alert(`Error: ${data.message}`);
-                }
-            } catch (e) {
-                console.error('Error:', e);
-            }
-        }
-
-        async function changeRefundStatus(requestId) {
-            // Obtener solicitud para saber estado actual
-            const req = requests.find(r => r.id == requestId);
-            if (!req) return;
-
-            const currentStatus = req.refund_status || 'pending_receipt';
-            const newStatus = currentStatus === 'pending_receipt' ? 'pending_shipment' : 'pending_receipt';
-            
-            const statusLabel = newStatus === 'pending_receipt' ? 'Por Recibir' : 'Por Enviar';
-            if (!confirm(`¿Cambiar estado a "${statusLabel}"?`)) return;
-
-            try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/refund-status`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert('Estado actualizado correctamente');
-                    loadRequests();
-                } else {
-                    alert(`Error: ${data.message}`);
-                }
-            } catch (e) {
-                console.error('Error:', e);
-            }
-        }
-
-        async function updateDecision(requestId, status) {
-            try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/decision`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    loadRequests();
-                } else {
-                    alert(`Error: ${data.message}`);
-                }
-            } catch (e) {
-                console.error('Error decision:', e);
-            }
-        }
-
-        async function shipChange(requestId) {
-            const trackingNumber = prompt('Ingresa el tracking de envío:');
-            if (!trackingNumber) return;
-            try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/ship-change`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trackingNumber })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert('Cambio marcado como enviado');
-                    loadRequests();
-                } else {
-                    alert(`Error: ${data.message}`);
-                }
-            } catch (e) {
-                console.error('Error ship change:', e);
-            }
-        }
-
-        async function sendCoupon(requestId) {
-            const couponCode = prompt('Código de cupón:');
-            if (!couponCode) return;
-            const amountRaw = prompt('Monto del cupón (MXN):');
-            const couponAmount = Number(amountRaw || 0);
-            if (!couponAmount || couponAmount <= 0) {
-                alert('Monto inválido');
-                return;
-            }
-            try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/send-coupon`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ couponCode, couponAmount })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert('Cupón enviado');
-                    loadRequests();
-                } else {
-                    alert(`Error: ${data.message}`);
-                }
-            } catch (e) {
-                console.error('Error send coupon:', e);
-            }
-        }
-
-        async function completeRequest(requestId) {
-            if (!confirm('¿Marcar solicitud como completada?')) return;
-            try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/complete`, { method: 'POST' });
-                const data = await res.json();
-                if (data.success) {
-                    alert('Solicitud marcada como completada');
-                    loadRequests();
-                } else {
-                    alert(`Error: ${data.message}`);
-                }
-            } catch (e) {
-                console.error('Error:', e);
-            }
-        }
-
-        function exportCSV() {
-            const headers = ['ID', 'Orden', 'Correo', 'Tipo', 'Pago', 'Estado', 'Monto', 'Tracking', 'Fecha'];
-            let source = [];
-            if (activeTab === 'cambios') {
-                source = filteredCambios.length ? filteredCambios : cambios;
-            } else if (activeTab === 'reembolsos') {
-                source = filteredReembolsos.length ? filteredReembolsos : reembolsos;
-            } else if (activeTab === 'defectos') {
-                source = filteredDefectos.length ? filteredDefectos : defectos;
-            } else {
-                source = filteredCompletadas.length ? filteredCompletadas : completadas;
-            }
-            const rows = source.map(r => [
-                r.id,
-                r.order_id,
-                r.contact_email,
-                r.return_type,
-                r.payment_status,
-                r.admin_status || 'open',
-                r.amount,
-                r.tracking_number || '—',
-                new Date(r.created_at).toISOString()
-            ]);
-
-            let csv = headers.join(',') + '\n';
-            rows.forEach(row => {
-                csv += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
-            });
-
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `devoluciones-${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function clearView() {
-            const search = document.getElementById('search');
-            const status = document.getElementById('filter-status');
-            const label = document.getElementById('filter-label');
-            const refund = document.getElementById('filter-refund');
-            if (search) search.value = '';
-            if (status) status.value = '';
-            if (label) label.value = '';
-            if (refund) refund.value = '';
-            clearQuickChips();
-
-            requests = [];
-            cambios = [];
-            reembolsos = [];
-            defectos = [];
-            completadas = [];
-            filteredCambios = [];
-            filteredReembolsos = [];
-            filteredDefectos = [];
-            filteredCompletadas = [];
-            currentTabCambios = 1;
-            currentTabReembolsos = 1;
-            currentTabDefectos = 1;
-            currentTabCompletadas = 1;
-            updateStats();
-            renderTab('cambios', []);
-            renderTab('reembolsos', []);
-            renderTab('defectos', []);
-            renderTab('completadas', []);
-        }
-
-        async function deleteAllRequests() {
-            const proceed = confirm('¿Seguro que quieres eliminar TODOS los pedidos? Esta acción no se puede deshacer.');
-            if (!proceed) return;
-            const typed = prompt('Escribe BORRAR para confirmar la eliminación total:');
-            if (typed !== 'BORRAR') {
-                alert('Confirmación incorrecta. No se eliminó nada.');
-                return;
-            }
-            const confirmPass = prompt('Ingresa tu contraseña de admin para confirmar:');
-            if (!confirmPass) {
-                alert('Confirmación cancelada.');
-                return;
-            }
-
-            const btn = document.getElementById('btn-delete-all');
-            if (btn) btn.disabled = true;
-            try {
-                const res = await fetch(`${API_BASE}/api/admin/requests/delete-all`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ confirmPass })
-                });
-                const data = await res.json();
-                if (!data.success) {
-                    alert(data.message || 'Error eliminando pedidos');
-                    return;
-                }
-                clearView();
-                alert('Pedidos eliminados correctamente.');
-            } catch (e) {
-                console.error('Error eliminando pedidos:', e);
-                alert('Error eliminando pedidos');
-            } finally {
-                if (btn) btn.disabled = false;
-            }
-        }
-
-        let suppressChipClear = false;
-
-        function clearQuickChips() {
-            document.querySelectorAll('.chip.active').forEach(chip => chip.classList.remove('active'));
-        }
-
-        function activateTab(tabName) {
-            if (!tabName) return;
-            activeTab = tabName;
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
-            const tabContent = document.getElementById(`tab-${tabName}`);
-            if (tabBtn) tabBtn.classList.add('active');
-            if (tabContent) tabContent.classList.add('active');
-        }
-
-        function initTabs() {
-            const tabBtns = document.querySelectorAll('.tab-btn');
-            tabBtns.forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const tabName = e.target.getAttribute('data-tab');
-                    if (!tabName) return;
-                    activateTab(tabName);
-                });
-            });
-        }
-
-        function applyQuickFilter(btn) {
-            const statusEl = document.getElementById('filter-status');
-            const labelEl = document.getElementById('filter-label');
-            const refundEl = document.getElementById('filter-refund');
-
-            if (btn.dataset.clear === 'true') {
-                if (statusEl) statusEl.value = '';
-                if (labelEl) labelEl.value = '';
-                if (refundEl) refundEl.value = '';
-            }
-
-            if (btn.dataset.payment && statusEl) statusEl.value = btn.dataset.payment;
-            if (btn.dataset.label && labelEl) labelEl.value = btn.dataset.label;
-            if (btn.dataset.refund && refundEl) refundEl.value = btn.dataset.refund;
-
-            const tabName = btn.dataset.tab;
-            if (tabName) activateTab(tabName);
-
-            clearQuickChips();
-            btn.classList.add('active');
-
-            suppressChipClear = true;
-            applyFilter();
-            suppressChipClear = false;
-        }
-
-        document.querySelectorAll('[data-quick]').forEach(btn => {
-            btn.addEventListener('click', () => applyQuickFilter(btn));
-        });
-
-        // Event listeners para cambios
-        document.getElementById('prev-cambios').addEventListener('click', () => {
-            if (currentTabCambios > 1) {
-                currentTabCambios--;
-                renderTab('cambios', filteredCambios.length ? filteredCambios : cambios);
-            }
-        });
-        document.getElementById('next-cambios').addEventListener('click', () => {
-            const data = filteredCambios.length ? filteredCambios : cambios;
-            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-            if (currentTabCambios < totalPages) {
-                currentTabCambios++;
-                renderTab('cambios', data);
-            }
-        });
-
-        // Event listeners para reembolsos
-        document.getElementById('prev-reembolsos').addEventListener('click', () => {
-            if (currentTabReembolsos > 1) {
-                currentTabReembolsos--;
-                renderTab('reembolsos', filteredReembolsos.length ? filteredReembolsos : reembolsos);
-            }
-        });
-        document.getElementById('next-reembolsos').addEventListener('click', () => {
-            const data = filteredReembolsos.length ? filteredReembolsos : reembolsos;
-            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-            if (currentTabReembolsos < totalPages) {
-                currentTabReembolsos++;
-                renderTab('reembolsos', data);
-            }
-        });
-
-        // Event listeners para defectos
-        document.getElementById('prev-defectos').addEventListener('click', () => {
-            if (currentTabDefectos > 1) {
-                currentTabDefectos--;
-                renderTab('defectos', filteredDefectos.length ? filteredDefectos : defectos);
-            }
-        });
-        document.getElementById('next-defectos').addEventListener('click', () => {
-            const data = filteredDefectos.length ? filteredDefectos : defectos;
-            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-            if (currentTabDefectos < totalPages) {
-                currentTabDefectos++;
-                renderTab('defectos', data);
-            }
-        });
-
-        // Event listeners para completadas
-        document.getElementById('prev-completadas').addEventListener('click', () => {
-            if (currentTabCompletadas > 1) {
-                currentTabCompletadas--;
-                renderTab('completadas', filteredCompletadas.length ? filteredCompletadas : completadas);
-            }
-        });
-        document.getElementById('next-completadas').addEventListener('click', () => {
-            const data = filteredCompletadas.length ? filteredCompletadas : completadas;
-            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-            if (currentTabCompletadas < totalPages) {
-                currentTabCompletadas++;
-                renderTab('completadas', data);
-            }
-        });
-
-        document.getElementById('btn-refresh').addEventListener('click', loadRequests);
-        document.getElementById('btn-export').addEventListener('click', exportCSV);
-        document.getElementById('btn-clear-view').addEventListener('click', clearView);
-        document.getElementById('btn-delete-all').addEventListener('click', deleteAllRequests);
-        document.getElementById('search').addEventListener('input', applyFilter);
-        document.getElementById('filter-status').addEventListener('change', applyFilter);
-        document.getElementById('filter-label').addEventListener('change', applyFilter);
-        document.getElementById('filter-refund').addEventListener('change', applyFilter);
-        document.getElementById('close-modal').addEventListener('click', () => document.getElementById('modal').classList.remove('show'));
-
-        document.getElementById('tbody-cambios').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (btn) {
-                const id = btn.getAttribute('data-id');
-                const action = btn.getAttribute('data-action');
-                if (action === 'label') downloadLabel(id);
-                else if (action === 'retry') retryLabel(id);
-                else if (action === 'complete') completeRequest(id);
-                else if (action === 'refund-status') changeRefundStatus(id);
-                else if (action === 'accept') updateDecision(id, 'accepted');
-                else if (action === 'reject') updateDecision(id, 'rejected');
-                else if (action === 'ship') shipChange(id);
-                else if (action === 'coupon') sendCoupon(id);
-                return;
-            }
-            const row = e.target.closest('tr[data-request-id]');
-            if (!row) return;
-            const id = row.getAttribute('data-request-id');
-            if (id) viewDetail(id);
-        });
-
-        document.getElementById('tbody-reembolsos').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (btn) {
-                const id = btn.getAttribute('data-id');
-                const action = btn.getAttribute('data-action');
-                if (action === 'label') downloadLabel(id);
-                else if (action === 'retry') retryLabel(id);
-                else if (action === 'complete') completeRequest(id);
-                else if (action === 'accept') updateDecision(id, 'accepted');
-                else if (action === 'reject') updateDecision(id, 'rejected');
-                else if (action === 'ship') shipChange(id);
-                else if (action === 'coupon') sendCoupon(id);
-                return;
-            }
-            const row = e.target.closest('tr[data-request-id]');
-            if (!row) return;
-            const id = row.getAttribute('data-request-id');
-            if (id) viewDetail(id);
-        });
-
-        document.getElementById('tbody-completadas').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (btn) {
-                const id = btn.getAttribute('data-id');
-                const action = btn.getAttribute('data-action');
-                if (action === 'label') downloadLabel(id);
-                else if (action === 'retry') retryLabel(id);
-                else if (action === 'accept') updateDecision(id, 'accepted');
-                else if (action === 'reject') updateDecision(id, 'rejected');
-                else if (action === 'ship') shipChange(id);
-                else if (action === 'coupon') sendCoupon(id);
-                return;
-            }
-            const row = e.target.closest('tr[data-request-id]');
-            if (!row) return;
-            const id = row.getAttribute('data-request-id');
-            if (id) viewDetail(id);
-        });
-
-        document.getElementById('tbody-defectos').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (btn) {
-                const id = btn.getAttribute('data-id');
-                const action = btn.getAttribute('data-action');
-                if (action === 'label') downloadLabel(id);
-                else if (action === 'retry') retryLabel(id);
-                else if (action === 'complete') completeRequest(id);
-                else if (action === 'accept') updateDecision(id, 'accepted');
-                else if (action === 'reject') updateDecision(id, 'rejected');
-                else if (action === 'ship') shipChange(id);
-                else if (action === 'coupon') sendCoupon(id);
-                return;
-            }
-            const row = e.target.closest('tr[data-request-id]');
-            if (!row) return;
-            const id = row.getAttribute('data-request-id');
-            if (id) viewDetail(id);
-        });
-
-        // Inicializar tabs y cargar datos
-        initTabs();
-        loadRequests();
-    </script>
+    <script src="js/admin.js" defer></script>
 </body>
 </html>
