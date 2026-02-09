@@ -901,7 +901,17 @@ app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
             });
         }
 
-        const baseUrl = process.env.PUBLIC_BASE_URL || req.headers.origin || 'http://localhost:3000';
+        const rawBaseUrl = process.env.PUBLIC_BASE_URL || req.headers.origin || 'http://localhost:3000';
+        let baseUrl = rawBaseUrl;
+        try {
+            baseUrl = new URL(rawBaseUrl).origin;
+        } catch (error) {
+            try {
+                baseUrl = new URL(`http://${rawBaseUrl}`).origin;
+            } catch (innerError) {
+                baseUrl = 'http://localhost:3000';
+            }
+        }
 
         const preferenceBody = {
             items: [
