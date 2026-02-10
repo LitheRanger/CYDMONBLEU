@@ -15,6 +15,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@paypal/paypal-server-sdk": "^2.2.0",
     "@sendgrid/mail": "^8.1.4",
     "@shopify/shopify-api": "^12.3.0",
     "axios": "^1.13.4",

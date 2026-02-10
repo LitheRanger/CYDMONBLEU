@@ -28,6 +28,25 @@ const mpWebhookSecret = process.env.MP_WEBHOOK_SECRET || '';
 const mpWebhookVerify = String(process.env.MP_WEBHOOK_VERIFY || 'true').toLowerCase() !== 'false';
 const mpWebhookLog = String(process.env.MP_WEBHOOK_LOG || '').toLowerCase() === 'true';
 
+// PayPal (se inicializa si está configurado)
+const paypalSDK = require('@paypal/paypal-server-sdk');
+const paypalClientId = process.env.PAYPAL_CLIENT_ID || '';
+const paypalClientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
+const paypalEnv = String(process.env.PAYPAL_ENV || 'sandbox').toLowerCase();
+const paypalClient = (paypalClientId && paypalClientSecret) ? new paypalSDK.Client({
+    clientCredentialsAuthCredentials: {
+        oAuthClientId: paypalClientId,
+        oAuthClientSecret: paypalClientSecret
+    },
+    environment: paypalEnv === 'production' ? paypalSDK.Environment.Production : paypalSDK.Environment.Sandbox,
+    logging: {
+        logLevel: paypalSDK.LogLevel.Info,
+        logRequest: { logBody: false },
+        logResponse: { logHeaders: false }
+    }
+}) : null;
+const paypalWebhookId = process.env.PAYPAL_WEBHOOK_ID || '';
+
 const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
 const sendgridFrom = process.env.SENDGRID_FROM || '';
 if (sendgridApiKey) {
@@ -1072,6 +1091,144 @@ app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
     }
 });
 
+// --- 4B. PAYPAL ORDER ---
+app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
+    try {
+        const parsed = checkoutSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                success: false,
+                message: 'Datos inválidos',
+                errors: parsed.error.flatten()
+            });
+        }
+
+        const { requestId, amount, currency, description, orderId, contactEmail } = parsed.data;
+
+        if (!paypalClient) {
+            return res.status(500).json({
+                success: false,
+                message: 'PayPal no configurado. Agrega PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET en .env'
+            });
+        }
+
+        if (amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'El monto debe ser mayor a 0'
+            });
+        }
+
+        const rawBaseUrl = process.env.PUBLIC_BASE_URL || req.headers.origin || 'http://localhost:3000';
+        let baseUrl = rawBaseUrl;
+        try {
+            baseUrl = new URL(rawBaseUrl).origin;
+        } catch (error) {
+            try {
+                baseUrl = new URL(`http://${rawBaseUrl}`).origin;
+            } catch (innerError) {
+                baseUrl = 'http://localhost:3000';
+            }
+        }
+
+        const ordersController = new paypalSDK.OrdersController(paypalClient);
+        
+        const orderRequest = {
+            body: {
+                intent: 'CAPTURE',
+                purchaseUnits: [{
+                    referenceId: String(requestId),
+                    description: description || `Guía de Devolución MON|BLEU - Orden ${orderId}`,
+                    customId: String(requestId),
+                    amount: {
+                        currencyCode: (currency || 'MXN').toUpperCase(),
+                        value: amount.toFixed(2)
+                    }
+                }],
+                applicationContext: {
+                    returnUrl: `${baseUrl}/success.html?paypal=true`,
+                    cancelUrl: `${baseUrl}/cancel.html`,
+                    brandName: 'MON|BLEU',
+                    landingPage: 'NO_PREFERENCE',
+                    userAction: 'PAY_NOW'
+                }
+            }
+        };
+
+        const order = await ordersController.ordersCreate(orderRequest);
+        const orderId = order.result?.id;
+        const approveLink = order.result?.links?.find(l => l.rel === 'approve')?.href;
+
+        if (dbPool && requestId) {
+            await executeQuery(
+                `UPDATE returns_requests SET payment_provider = 'paypal', payment_reference = ? WHERE id = ?`,
+                [String(orderId || ''), requestId]
+            );
+        }
+
+        res.json({
+            success: true,
+            orderId,
+            approveUrl: approveLink
+        });
+    } catch (error) {
+        console.error('Error creando orden PayPal:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error al crear orden de pago'
+        });
+    }
+});
+
+// --- 4C. PAYPAL CAPTURE ---
+app.post('/api/capture-paypal-payment', limiterCheckout, async (req, res) => {
+    try {
+        const { orderId, requestId } = req.body;
+        
+        if (!orderId) {
+            return res.status(400).json({ success: false, message: 'orderId requerido' });
+        }
+
+        if (!paypalClient) {
+            return res.status(500).json({ success: false, message: 'PayPal no configurado' });
+        }
+
+        const ordersController = new paypalSDK.OrdersController(paypalClient);
+        const capture = await ordersController.ordersCapture({ id: orderId });
+        
+        const captureStatus = capture.result?.status;
+        const purchaseUnit = capture.result?.purchaseUnits?.[0];
+        const captureId = purchaseUnit?.payments?.captures?.[0]?.id;
+        const refId = purchaseUnit?.referenceId || requestId;
+
+        if (captureStatus === 'COMPLETED' && refId) {
+            await handleApprovedPayment({ 
+                requestId: refId, 
+                orderId: purchaseUnit?.customId || refId, 
+                paymentId: captureId 
+            });
+
+            res.json({
+                success: true,
+                status: 'approved',
+                captureId
+            });
+        } else {
+            res.json({
+                success: false,
+                status: captureStatus,
+                message: 'Pago no completado'
+            });
+        }
+    } catch (error) {
+        console.error('Error capturando pago PayPal:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error al capturar pago'
+        });
+    }
+});
+
 // --- 5. MERCADOPAGO WEBHOOK ---
 app.post('/api/mp-webhook', async (req, res) => {
     try {
@@ -1140,6 +1297,78 @@ app.post('/api/mp-webhook', async (req, res) => {
     } catch (err) {
         console.error('Error en webhook MP:', err.message || err);
         return res.json({ received: true });
+    }
+});
+
+// --- 5B. PAYPAL WEBHOOK ---
+app.post('/api/paypal-webhook', async (req, res) => {
+    try {
+        const event = req.body;
+        const eventType = event?.event_type;
+
+        // PayPal webhook signature verification (si está configurado)
+        if (paypalWebhookId) {
+            const webhookController = new paypalSDK.WebhooksController(paypalClient);
+            try {
+                const headers = {
+                    'paypal-transmission-id': req.headers['paypal-transmission-id'],
+                    'paypal-transmission-time': req.headers['paypal-transmission-time'],
+                    'paypal-transmission-sig': req.headers['paypal-transmission-sig'],
+                    'paypal-cert-url': req.headers['paypal-cert-url'],
+                    'paypal-auth-algo': req.headers['paypal-auth-algo']
+                };
+                
+                const verification = await webhookController.webhooksVerifySignature({
+                    body: {
+                        transmissionId: headers['paypal-transmission-id'],
+                        transmissionTime: headers['paypal-transmission-time'],
+                        transmissionSig: headers['paypal-transmission-sig'],
+                        certUrl: headers['paypal-cert-url'],
+                        authAlgo: headers['paypal-auth-algo'],
+                        webhookId: paypalWebhookId,
+                        webhookEvent: event
+                    }
+                });
+
+                if (verification.result?.verificationStatus !== 'SUCCESS') {
+                    console.warn('⚠️ PayPal webhook signature verification failed');
+                    return res.status(401).json({ received: false });
+                }
+            } catch (verifyErr) {
+                console.warn('⚠️ Error verificando firma PayPal webhook:', verifyErr.message);
+            }
+        }
+
+        // Manejar eventos de pago
+        if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
+            const resource = event.resource;
+            const captureId = resource?.id;
+            const customId = resource?.custom_id;
+            const amount = resource?.amount?.value;
+            
+            if (customId) {
+                await handleApprovedPayment({
+                    requestId: customId,
+                    orderId: customId,
+                    paymentId: captureId
+                });
+            }
+        } else if (eventType === 'PAYMENT.CAPTURE.DENIED' || eventType === 'PAYMENT.CAPTURE.REFUNDED') {
+            const resource = event.resource;
+            const customId = resource?.custom_id;
+            
+            if (customId && dbPool) {
+                await executeQuery(
+                    `UPDATE returns_requests SET payment_status = 'failed', payment_provider = 'paypal' WHERE id = ?`,
+                    [customId]
+                );
+            }
+        }
+
+        res.json({ received: true });
+    } catch (err) {
+        console.error('Error en webhook PayPal:', err.message || err);
+        res.json({ received: true });
     }
 });
 

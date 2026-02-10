@@ -840,10 +840,10 @@ async function procesarPago() {
                 }, 800);
                 return;
             }
-            // Paso 2: Crear preferencia de MercadoPago
+            // Paso 2: Crear orden de PayPal
             loadingToast = showLoadingToast("Redirigiendo a pago seguro...");
 
-            const checkoutRes = await fetch(`${API_BASE}/api/create-mp-preference`, {
+            const checkoutRes = await fetch(`${API_BASE}/api/create-paypal-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 mode: 'cors',
@@ -860,7 +860,7 @@ async function procesarPago() {
             const checkoutData = await checkoutRes.json();
             removeToast(loadingToast);
 
-            if (checkoutData.success && checkoutData.checkoutUrl) {
+            if (checkoutData.success && checkoutData.approveUrl) {
                 // Guardar requestId localmente antes de redirigir
                 localStorage.setItem('mon_request_id', data.requestId);
                 localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
@@ -879,9 +879,9 @@ async function procesarPago() {
 
                 showSuccessToast("✓ Redirigiendo a pago...");
 
-                // Redirigir a MercadoPago
+                // Redirigir a PayPal
                 setTimeout(() => {
-                    window.location.href = checkoutData.checkoutUrl;
+                    window.location.href = checkoutData.approveUrl;
                 }, 800);
             } else {
                 showErrorToast(`❌ ${checkoutData.message || "Error al iniciar pago"}`);
