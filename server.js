@@ -925,6 +925,13 @@ async function resolvePaymentIdFromWebhook(req) {
     try {
         const order = await fetchMerchantOrder(directId);
         const payments = Array.isArray(order?.payments) ? order.payments : [];
+        if (mpWebhookLog) {
+            console.log('MP merchant_order snapshot:', {
+                id: order?.id || directId,
+                status: order?.status,
+                payments: payments.map(p => ({ id: p.id, status: p.status }))
+            });
+        }
         if (!payments.length) return null;
         const approved = payments.find(p => String(p.status || '').toLowerCase() === 'approved');
         return approved?.id || payments[0]?.id || null;
