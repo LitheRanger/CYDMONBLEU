@@ -24,6 +24,7 @@ const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessTo
 const mpPreference = mpClient ? new Preference(mpClient) : null;
 const mpPayment = mpClient ? new Payment(mpClient) : null;
 const mpWebhookSecret = process.env.MP_WEBHOOK_SECRET || '';
+const mpWebhookVerify = String(process.env.MP_WEBHOOK_VERIFY || 'true').toLowerCase() !== 'false';
 
 const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
 const sendgridFrom = process.env.SENDGRID_FROM || '';
@@ -807,7 +808,16 @@ function parseMpSignature(signatureHeader) {
     return signature;
 }
 
+function sanitizeSignatureValue(value, size = 8) {
+    if (!value) return '';
+    const str = String(value);
+    return str.length <= size ? str : `${str.slice(0, size)}…`;
+}
+
 function verifyMpSignature(req) {
+    if (!mpWebhookVerify) {
+        return { ok: true, reason: 'verify_disabled' };
+    }
     if (!mpWebhookSecret) {
         return { ok: false, reason: 'missing_secret' };
     }
@@ -817,7 +827,15 @@ function verifyMpSignature(req) {
     const dataId = req.body?.data?.id || req.body?.id || req.query?.data?.id || req.query?.id;
 
     if (!signature || !requestId || !dataId) {
-        return { ok: false, reason: 'missing_signature_fields' };
+        return {
+            ok: false,
+            reason: 'missing_signature_fields',
+            debug: {
+                requestId,
+                dataId,
+                signatureHeader: sanitizeSignatureValue(signatureHeader, 24)
+            }
+        };
     }
 
     const signedPayload = `id:${dataId};request-id:${requestId};ts:${signature.ts};`;
@@ -829,10 +847,28 @@ function verifyMpSignature(req) {
     const expectedBuf = Buffer.from(expected, 'hex');
     const providedBuf = Buffer.from(signature.v1, 'hex');
     if (expectedBuf.length !== providedBuf.length) {
-        return { ok: false, reason: 'signature_mismatch' };
+        return {
+            ok: false,
+            reason: 'signature_mismatch',
+            debug: {
+                requestId,
+                dataId,
+                ts: signature.ts,
+                v1: sanitizeSignatureValue(signature.v1)
+            }
+        };
     }
     const ok = crypto.timingSafeEqual(expectedBuf, providedBuf);
-    return { ok, reason: ok ? '' : 'signature_mismatch' };
+    return {
+        ok,
+        reason: ok ? '' : 'signature_mismatch',
+        debug: ok ? undefined : {
+            requestId,
+            dataId,
+            ts: signature.ts,
+            v1: sanitizeSignatureValue(signature.v1)
+        }
+    };
 }
 
 function getPaymentValue(payment, key, fallback) {
@@ -978,7 +1014,13 @@ app.post('/api/mp-webhook', async (req, res) => {
         if (!signatureCheck.ok) {
             const status = signatureCheck.reason === 'missing_secret' ? 500 : 401;
             console.warn(`⚠️ Webhook MP rechazado: ${signatureCheck.reason}`);
+            if (signatureCheck.debug) {
+                console.warn('MP webhook debug:', signatureCheck.debug);
+            }
             return res.status(status).json({ received: true });
+        }
+        if (signatureCheck.reason === 'verify_disabled') {
+            console.warn('⚠️ MP webhook verification disabled via MP_WEBHOOK_VERIFY');
         }
 
         const paymentId = req.body?.data?.id || req.query?.data?.id || req.body?.id || req.query?.id;
