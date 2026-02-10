@@ -357,11 +357,6 @@ async function executeQuery(sql, params) {
     }
 }
 
-// Servir archivos estáticos (HTML, CSS, JS desde la carpeta 'public')
-app.use(express.static(path.join(__dirname, 'public')));
-// Asegura que los assets del panel carguen bien bajo /admin (js, logo, fuentes)
-app.use('/admin', requireAdmin, express.static(path.join(__dirname, 'public')));
-
 // --- 1. CONFIGURACIÓN DE MULTER (Para subir fotos) ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -398,10 +393,19 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Panel Admin (HTML)
+// Panel Admin (HTML) - DEBE IR ANTES DEL STATIC MIDDLEWARE
 app.get('/admin', requireAdmin, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
+
+// Servir assets del admin con autenticación (js, css, fuentes)
+app.use('/admin', requireAdmin, express.static(path.join(__dirname, 'public')));
+
+// Servir archivos estáticos públicos (HTML, CSS, JS desde la carpeta 'public')
+// IMPORTANTE: Esta línea va DESPUÉS de las rutas protegidas
+app.use(express.static(path.join(__dirname, 'public'), {
+    index: false // No servir index automáticamente para evitar conflictos
+}));
 
 // --- 2. ENDPOINT: VALIDAR ORDEN Y TRAER TALLAS ---
 const validateOrderSchema = z.object({
