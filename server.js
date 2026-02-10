@@ -335,6 +335,8 @@ async function executeQuery(sql, params) {
 
 // Servir archivos estáticos (HTML, CSS, JS desde la carpeta 'public')
 app.use(express.static(path.join(__dirname, 'public')));
+// Asegura que los assets del panel carguen bien bajo /admin (js, logo, fuentes)
+app.use('/admin', requireAdmin, express.static(path.join(__dirname, 'public')));
 
 // --- 1. CONFIGURACIÓN DE MULTER (Para subir fotos) ---
 const storage = multer.diskStorage({
