@@ -4,6 +4,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const cloudinary = require('cloudinary').v2;
 const crypto = require('crypto');
 const pino = require('pino');
@@ -878,6 +879,60 @@ function getPaymentValue(payment, key, fallback) {
     return fallback;
 }
 
+function fetchMerchantOrder(merchantOrderId) {
+    return new Promise((resolve, reject) => {
+        if (!merchantOrderId) return resolve(null);
+        const options = {
+            hostname: 'api.mercadopago.com',
+            path: `/merchant_orders/${encodeURIComponent(String(merchantOrderId))}`,
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${mpAccessToken}`
+            }
+        };
+
+        const req = https.request(options, res => {
+            let body = '';
+            res.on('data', chunk => { body += chunk; });
+            res.on('end', () => {
+                if (res.statusCode && res.statusCode >= 400) {
+                    return reject(new Error(`MP merchant_order error: ${res.statusCode}`));
+                }
+                try {
+                    resolve(JSON.parse(body));
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.end();
+    });
+}
+
+async function resolvePaymentIdFromWebhook(req) {
+    const topic = String(req.query?.topic || req.body?.type || '').toLowerCase();
+    const directId = req.body?.data?.id || req.query?.data?.id || req.body?.id || req.query?.id;
+
+    if (topic !== 'merchant_order') {
+        return directId || null;
+    }
+
+    if (!mpAccessToken) return null;
+
+    try {
+        const order = await fetchMerchantOrder(directId);
+        const payments = Array.isArray(order?.payments) ? order.payments : [];
+        if (!payments.length) return null;
+        const approved = payments.find(p => String(p.status || '').toLowerCase() === 'approved');
+        return approved?.id || payments[0]?.id || null;
+    } catch (err) {
+        console.warn('Error leyendo merchant_order MP:', err.message || err);
+        return null;
+    }
+}
+
 async function getExpectedAmount(requestId) {
     if (!dbPool || !requestId) return null;
     const [rows] = await executeQuery(
@@ -1023,8 +1078,9 @@ app.post('/api/mp-webhook', async (req, res) => {
             console.warn('⚠️ MP webhook verification disabled via MP_WEBHOOK_VERIFY');
         }
 
-        const paymentId = req.body?.data?.id || req.query?.data?.id || req.body?.id || req.query?.id;
+        const paymentId = await resolvePaymentIdFromWebhook(req);
         if (!paymentId) {
+            console.warn('⚠️ Webhook MP sin paymentId resolvible');
             return res.json({ received: true });
         }
 
