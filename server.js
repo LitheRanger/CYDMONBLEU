@@ -39,6 +39,8 @@ const shopifyClient = require('./Shopifyclient.js');
 const myeshipClient = require('./myeshipClient.js');
 
 const app = express();
+// Render/Cloudflare sends X-Forwarded-For; trust proxy so rate limit can read it
+app.set('trust proxy', 1);
 app.use(cors());
 
 const cloudinaryConfigured = !!(
