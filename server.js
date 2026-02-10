@@ -101,26 +101,26 @@ app.use((req, res, next) => {
 app.use(express.json());
 
 // --- ADMIN BASIC AUTH ---
-const ADMIN_USER = process.env.ADMIN_USER;
-const ADMIN_PASS = process.env.ADMIN_PASS;
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123456';
+
+if (!process.env.ADMIN_USER || !process.env.ADMIN_PASS) {
+    console.warn('⚠️ ADMIN_USER y ADMIN_PASS no configurados. Usando credenciales por defecto: admin/admin123456');
+}
 
 function requireAdmin(req, res, next) {
-    if (!ADMIN_USER || !ADMIN_PASS) {
-        return res.status(500).json({ success: false, message: 'Admin no configurado' });
-    }
-
     const auth = req.headers.authorization || '';
     if (!auth.startsWith('Basic ')) {
-        res.set('WWW-Authenticate', 'Basic realm="Admin"');
-        return res.status(401).send('Auth required');
+        res.set('WWW-Authenticate', 'Basic realm="Admin Panel"');
+        return res.status(401).send('Autenticación requerida');
     }
 
     const base64 = auth.replace('Basic ', '');
     const [user, pass] = Buffer.from(base64, 'base64').toString('utf8').split(':');
 
     if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
-        res.set('WWW-Authenticate', 'Basic realm="Admin"');
-        return res.status(401).send('Invalid credentials');
+        res.set('WWW-Authenticate', 'Basic realm="Admin Panel"');
+        return res.status(401).send('Credenciales inválidas');
     }
 
     next();
