@@ -1094,8 +1094,12 @@ app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
 // --- 4B. PAYPAL ORDER ---
 app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
     try {
+        console.log('📦 Creando orden PayPal...');
+        console.log('Request body:', JSON.stringify(req.body, null, 2));
+        
         const parsed = checkoutSchema.safeParse(req.body);
         if (!parsed.success) {
+            console.error('❌ Validación fallida:', parsed.error.flatten());
             return res.status(400).json({
                 success: false,
                 message: 'Datos inválidos',
@@ -1104,8 +1108,14 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
         }
 
         const { requestId, amount, currency, description, orderId, contactEmail } = parsed.data;
+        console.log(`✅ Datos validados - Request ID: ${requestId}, Amount: ${amount}, Order ID: ${orderId}`);
 
         if (!paypalClient) {
+            console.error('❌ PayPal client no configurado. Variables faltantes:', {
+                hasClientId: !!paypalClientId,
+                hasClientSecret: !!paypalClientSecret,
+                env: paypalEnv
+            });
             return res.status(500).json({
                 success: false,
                 message: 'PayPal no configurado. Agrega PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET en .env'
@@ -1113,6 +1123,7 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
         }
 
         if (amount <= 0) {
+            console.error('❌ Monto inválido:', amount);
             return res.status(400).json({
                 success: false,
                 message: 'El monto debe ser mayor a 0'
@@ -1130,6 +1141,7 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
                 baseUrl = 'http://localhost:3000';
             }
         }
+        console.log('🌐 Base URL:', baseUrl);
 
         const ordersController = new paypalSDK.OrdersController(paypalClient);
         
@@ -1155,7 +1167,10 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
             }
         };
 
+        console.log('📤 Enviando orden a PayPal:', JSON.stringify(orderRequest, null, 2));
         const order = await ordersController.ordersCreate(orderRequest);
+        console.log('✅ Orden creada en PayPal:', order.result?.id);
+        
         const paypalOrderId = order.result?.id;
         const approveLink = order.result?.links?.find(l => l.rel === 'approve')?.href;
 
@@ -1164,6 +1179,7 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
                 `UPDATE returns_requests SET payment_provider = 'paypal', payment_reference = ? WHERE id = ?`,
                 [String(paypalOrderId || ''), requestId]
             );
+            console.log('✅ Base de datos actualizada');
         }
 
         res.json({
@@ -1172,10 +1188,12 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
             approveUrl: approveLink
         });
     } catch (error) {
-        console.error('Error creando orden PayPal:', error);
+        console.error('❌ Error creando orden PayPal:', error);
+        console.error('Stack:', error.stack);
         res.status(500).json({
             success: false,
-            message: error.message || 'Error al crear orden de pago'
+            message: error.message || 'Error al crear orden de pago',
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
