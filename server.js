@@ -1156,19 +1156,19 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
         };
 
         const order = await ordersController.ordersCreate(orderRequest);
-        const orderId = order.result?.id;
+        const paypalOrderId = order.result?.id;
         const approveLink = order.result?.links?.find(l => l.rel === 'approve')?.href;
 
         if (dbPool && requestId) {
             await executeQuery(
                 `UPDATE returns_requests SET payment_provider = 'paypal', payment_reference = ? WHERE id = ?`,
-                [String(orderId || ''), requestId]
+                [String(paypalOrderId || ''), requestId]
             );
         }
 
         res.json({
             success: true,
-            orderId,
+            orderId: paypalOrderId,
             approveUrl: approveLink
         });
     } catch (error) {
