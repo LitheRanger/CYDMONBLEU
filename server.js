@@ -26,6 +26,7 @@ const mpPreference = mpClient ? new Preference(mpClient) : null;
 const mpPayment = mpClient ? new Payment(mpClient) : null;
 const mpWebhookSecret = process.env.MP_WEBHOOK_SECRET || '';
 const mpWebhookVerify = String(process.env.MP_WEBHOOK_VERIFY || 'true').toLowerCase() !== 'false';
+const mpWebhookLog = String(process.env.MP_WEBHOOK_LOG || '').toLowerCase() === 'true';
 
 const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
 const sendgridFrom = process.env.SENDGRID_FROM || '';
@@ -1065,6 +1066,15 @@ app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
 // --- 5. MERCADOPAGO WEBHOOK ---
 app.post('/api/mp-webhook', async (req, res) => {
     try {
+        if (mpWebhookLog) {
+            console.log('MP webhook inbound:', {
+                query: req.query || {},
+                type: req.body?.type,
+                action: req.body?.action,
+                dataId: req.body?.data?.id || req.body?.id,
+                topic: req.query?.topic
+            });
+        }
         const signatureCheck = verifyMpSignature(req);
         if (!signatureCheck.ok) {
             const status = signatureCheck.reason === 'missing_secret' ? 500 : 401;
