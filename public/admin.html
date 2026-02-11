@@ -52,7 +52,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 24px 32px;
+            padding: 18px 22px;
             background: var(--secondary);
             border-bottom: 2px solid var(--border-light);
             position: sticky;
@@ -79,21 +79,21 @@
         }
 
         .container {
-            padding: 24px 28px 40px;
-            max-width: 1280px;
+            padding: 16px 20px 24px;
+            max-width: 100%;
             margin: 0 auto;
         }
 
         .admin-shell {
             display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 24px;
+            grid-template-columns: 240px minmax(0, 1fr);
+            gap: 16px;
             align-items: start;
         }
 
         .sidebar {
             position: sticky;
-            top: 96px;
+            top: 84px;
             display: flex;
             flex-direction: column;
             gap: 16px;
@@ -103,6 +103,7 @@
             display: flex;
             flex-direction: column;
             gap: 18px;
+            min-width: 0;
         }
 
         .panel {
@@ -175,8 +176,8 @@
 
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
         }
 
         .stat-card {
@@ -206,7 +207,7 @@
         }
 
         .stat-value {
-            font-size: 32px;
+            font-size: 26px;
             font-weight: 800;
             font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
             margin-bottom: 4px;
@@ -357,10 +358,10 @@
 
         .table th,
         .table td {
-            padding: 16px;
+            padding: 12px;
             border-bottom: 1px solid var(--border-light);
             text-align: left;
-            font-size: 14px;
+            font-size: 13px;
             vertical-align: top;
         }
 
@@ -654,6 +655,24 @@
             color: var(--text-secondary);
         }
 
+        .detail-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 12px;
+        }
+
+        .detail-actions .btn {
+            padding: 10px 16px;
+            font-size: 12px;
+        }
+
+        .detail-actions .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 1024px) {
             .admin-shell {
                 grid-template-columns: 1fr;
@@ -796,12 +815,9 @@
                             <th>Contacto</th>
                             <th>Pago</th>
                             <th>Solicitud</th>
-                            <th>Estado</th>
-                            <th>Monto</th>
                             <th>Tracking</th>
                             <th>Guía</th>
                             <th>Fecha</th>
-                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-cambios"></tbody>
@@ -829,11 +845,9 @@
                             <th>Contacto</th>
                             <th>Pago</th>
                             <th>Solicitud</th>
-                            <th>Monto</th>
                             <th>Tracking</th>
                             <th>Guía</th>
                             <th>Fecha</th>
-                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-reembolsos"></tbody>
@@ -862,11 +876,9 @@
                             <th>Tipo</th>
                             <th>Pago</th>
                             <th>Solicitud</th>
-                            <th>Monto</th>
                             <th>Tracking</th>
                             <th>Guía</th>
                             <th>Fecha</th>
-                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-defectos"></tbody>
@@ -895,11 +907,9 @@
                             <th>Tipo</th>
                             <th>Pago</th>
                             <th>Solicitud</th>
-                            <th>Monto</th>
                             <th>Tracking</th>
                             <th>Guía</th>
                             <th>Fecha</th>
-                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-completadas"></tbody>
@@ -922,6 +932,7 @@
                 <button class="close-btn" id="close-modal">×</button>
             </div>
             <div id="detail-body"></div>
+            <div class="detail-actions" id="detail-actions"></div>
         </div>
     </div>
 
@@ -1113,7 +1124,7 @@
                         const headerTr = document.createElement('tr');
                         headerTr.className = 'group-header';
                         headerTr.innerHTML = `
-                            <td colspan="12" style="padding:10px;border:none;color:#666;font-size:12px;">
+                            <td colspan="9" style="padding:10px;border:none;color:#666;font-size:12px;">
                                 ${status === 'pending_receipt' ? '📥 Por Recibir' : '📦 Por Enviar'}
                             </td>
                         `;
@@ -1142,19 +1153,6 @@
             const trackingText = r.tracking_number || '—';
 
             const isCambio = tabName === 'cambios';
-            const isCompletadas = tabName === 'completadas' || tabName === 'defectos';
-            const isReembolso = tabName === 'reembolsos';
-            const actions = `
-                <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>
-                <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
-                <button class="link-btn" data-id="${r.id}" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>
-                <button class="link-btn" data-id="${r.id}" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>
-                ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="ship">Enviar</button>` : ''}
-                ${isReembolso ? `<button class="link-btn" data-id="${r.id}" data-action="coupon">Enviar cupón</button>` : ''}
-                ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
-                ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
-            `;
-
             const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
 
             tr.innerHTML = `
@@ -1165,15 +1163,33 @@
                 ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
                 <td>${paymentBadge(r)}</td>
                 <td>${adminBadge(r.admin_status)}</td>
-                ${isCambio ? `<td>${refundBadge(r.refund_status)}</td>` : ''}
-                <td>${formatCurrency(r.amount)}</td>
                 <td>${trackingText}</td>
                 <td>${labelBadge}</td>
                 <td class="muted">${formatDate(r.created_at)}</td>
-                <td><div class="actions">${actions}</div></td>
             `;
             tbody.appendChild(tr);
 
+        }
+
+        function buildActionButtons(r) {
+            const isCambio = normalizeType(r.return_type) === 'cambio' || hasChangeItem(r);
+            const isReembolso = normalizeType(r.return_type) === 'reembolso' || hasRefundItem(r);
+            const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
+            const actions = [];
+
+            actions.push(`<button class="btn secondary" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guia</button>`);
+            actions.push(`<button class="btn secondary" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>`);
+            actions.push(`<button class="btn" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>`);
+            actions.push(`<button class="btn danger" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>`);
+
+            if (isCambio) actions.push(`<button class="btn" data-action="ship">Enviar</button>`);
+            if (isReembolso) actions.push(`<button class="btn" data-action="coupon">Enviar cupon</button>`);
+            if (isCambio) actions.push(`<button class="btn secondary" data-action="refund-status">Cambiar Estado</button>`);
+            if (!isCompletada) {
+                actions.push(`<button class="btn" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`);
+            }
+
+            return actions.join('');
         }
 
         async function loadRequests() {
@@ -1426,6 +1442,11 @@
                         <div class="files-grid">${filesHtml}</div>
                     </div>
                 `;
+                const actionsContainer = document.getElementById('detail-actions');
+                if (actionsContainer) {
+                    actionsContainer.dataset.requestId = r.id;
+                    actionsContainer.innerHTML = buildActionButtons(r);
+                }
                 document.getElementById('modal').classList.add('show');
             } catch (e) {
                 console.error('Error:', e);
@@ -1821,11 +1842,14 @@
         document.getElementById('filter-refund').addEventListener('change', applyFilter);
         document.getElementById('close-modal').addEventListener('click', () => document.getElementById('modal').classList.remove('show'));
 
-        document.getElementById('tbody-cambios').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (btn) {
-                const id = btn.getAttribute('data-id');
+        const detailActions = document.getElementById('detail-actions');
+        if (detailActions) {
+            detailActions.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-action]');
+                if (!btn || btn.disabled) return;
+                const id = detailActions.dataset.requestId;
                 const action = btn.getAttribute('data-action');
+                if (!id || !action) return;
                 if (action === 'label') downloadLabel(id);
                 else if (action === 'retry') retryLabel(id);
                 else if (action === 'complete') completeRequest(id);
@@ -1834,8 +1858,10 @@
                 else if (action === 'reject') updateDecision(id, 'rejected');
                 else if (action === 'ship') shipChange(id);
                 else if (action === 'coupon') sendCoupon(id);
-                return;
-            }
+            });
+        }
+
+        document.getElementById('tbody-cambios').addEventListener('click', (e) => {
             const row = e.target.closest('tr[data-request-id]');
             if (!row) return;
             const id = row.getAttribute('data-request-id');
@@ -1843,19 +1869,6 @@
         });
 
         document.getElementById('tbody-reembolsos').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (btn) {
-                const id = btn.getAttribute('data-id');
-                const action = btn.getAttribute('data-action');
-                if (action === 'label') downloadLabel(id);
-                else if (action === 'retry') retryLabel(id);
-                else if (action === 'complete') completeRequest(id);
-                else if (action === 'accept') updateDecision(id, 'accepted');
-                else if (action === 'reject') updateDecision(id, 'rejected');
-                else if (action === 'ship') shipChange(id);
-                else if (action === 'coupon') sendCoupon(id);
-                return;
-            }
             const row = e.target.closest('tr[data-request-id]');
             if (!row) return;
             const id = row.getAttribute('data-request-id');
@@ -1863,18 +1876,6 @@
         });
 
         document.getElementById('tbody-completadas').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (btn) {
-                const id = btn.getAttribute('data-id');
-                const action = btn.getAttribute('data-action');
-                if (action === 'label') downloadLabel(id);
-                else if (action === 'retry') retryLabel(id);
-                else if (action === 'accept') updateDecision(id, 'accepted');
-                else if (action === 'reject') updateDecision(id, 'rejected');
-                else if (action === 'ship') shipChange(id);
-                else if (action === 'coupon') sendCoupon(id);
-                return;
-            }
             const row = e.target.closest('tr[data-request-id]');
             if (!row) return;
             const id = row.getAttribute('data-request-id');
@@ -1882,19 +1883,6 @@
         });
 
         document.getElementById('tbody-defectos').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (btn) {
-                const id = btn.getAttribute('data-id');
-                const action = btn.getAttribute('data-action');
-                if (action === 'label') downloadLabel(id);
-                else if (action === 'retry') retryLabel(id);
-                else if (action === 'complete') completeRequest(id);
-                else if (action === 'accept') updateDecision(id, 'accepted');
-                else if (action === 'reject') updateDecision(id, 'rejected');
-                else if (action === 'ship') shipChange(id);
-                else if (action === 'coupon') sendCoupon(id);
-                return;
-            }
             const row = e.target.closest('tr[data-request-id]');
             if (!row) return;
             const id = row.getAttribute('data-request-id');
