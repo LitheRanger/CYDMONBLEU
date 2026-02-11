@@ -74,12 +74,12 @@ async function renderSuccess(requestId, noPayment) {
     let summaryHtml = '';
     if (orderData.items && Array.isArray(orderData.items)) {
         summaryHtml = `
-                    <div class="summary">
-                        <h3>Resumen</h3>
+                    <div style="background: var(--bg-lighter); padding: 20px; border-radius: 12px; margin: 20px 0; text-align: left; border: 1px solid var(--border-light);">
+                        <h3 style="font-family: 'HelveticaNeueLTProHv', sans-serif; font-size: 18px; margin-bottom: 16px; color: var(--primary);">Resumen</h3>
                         ${orderData.items.map(item => `
-                            <div class="summary-item">
-                                <div style="font-weight:600;">${item.name}</div>
-                                <div style="font-size:12px;color:var(--text-secondary);">
+                            <div style="padding: 12px 0; border-bottom: 1px solid var(--border-light); last-child:border-bottom: none;">
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">${item.name}</div>
+                                <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
                                     Razon: ${item.reason}
                                     ${item.replacementColor || item.replacementSize ? `<br>Nueva prenda: ${[item.replacementColor ? `Color: ${item.replacementColor}` : '', item.replacementSize ? `Talla: ${item.replacementSize}` : ''].filter(Boolean).join(' • ')}` : (item.replacementTitle ? `<br>Nueva prenda: ${item.replacementTitle}` : '')}
                                 </div>
@@ -142,42 +142,40 @@ async function renderStripeSuccess(requestId) {
     }
 
     container.innerHTML = `
-                <div class="success-icon">✅</div>
-                <h1>¡Pago Confirmado!</h1>
+                <span class="status-pill">✓ Pago Confirmado</span>
+                <h1>¡Pago Exitoso!</h1>
                 <p>Tu solicitud de ${orderData.tipo || 'devolucion'} ha sido procesada exitosamente.</p>
                 
-                <div class="tracking">
-                    <div class="tracking-label">Tu numero de seguimiento:</div>
-                    <div class="tracking-number" id="tracking-number">${trackingNumber}</div>
-                    <div class="tracking-actions">
-                        <button class="tracking-btn" id="btn-copy-tracking" type="button">Copiar</button>
-                        <a class="tracking-btn" id="btn-track-link" href="#" target="_blank" rel="noopener">Rastrear</a>
+                <div style="background: var(--bg-light); padding: 24px; border-radius: 12px; margin: 24px 0; border: 1px solid var(--border-light);">
+                    <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; font-weight: 600;">Numero de seguimiento:</div>
+                    <div id="tracking-number" style="font-size: 20px; font-weight: 700; color: var(--primary); font-family: 'HelveticaNeueLTProHv', sans-serif; margin-bottom: 16px;">${trackingNumber}</div>
+                    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                        <button id="btn-copy-tracking" type="button" style="padding: 10px 20px; background: var(--primary); color: var(--secondary); border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: var(--transition);">Copiar</button>
+                        <a id="btn-track-link" href="#" target="_blank" rel="noopener" style="padding: 10px 20px; background: var(--secondary); color: var(--primary); border: 1px solid var(--primary); border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600; transition: var(--transition); display: inline-block;">Rastrear</a>
                     </div>
                 </div>
 
                 ${summaryHtml}
 
                 <p>Recibiras un correo con los detalles y las instrucciones para enviar tu producto.</p>
-                <p style="font-size:14px;">Guarda tu numero de seguimiento para consultar el estado de tu solicitud.</p>
+                <p style="font-size:14px; color: var(--text-secondary);">Guarda tu numero de seguimiento para consultar el estado de tu solicitud.</p>
 
-                <div class="label-section">
-                    <a id="btn-download-label" class="btn disabled" href="#">Descargar guia</a>
-                    <div id="label-note" class="label-note">Preparando tu guia...</div>
+                <div style="margin: 24px 0;">
+                    <a id="btn-download-label" href="#" style="display: inline-block; padding: 14px 32px; background: var(--primary); color: var(--secondary); border-radius: 8px; text-decoration: none; font-weight: 600; margin-bottom: 12px; opacity: 0.5; pointer-events: none; transition: var(--transition);">Descargar guia</a>
+                    <div id="label-note" style="font-size: 13px; color: var(--text-secondary);">Preparando tu guia...</div>
                 </div>
                 
-                <a href="/" class="btn">Volver al inicio</a>
+                <a href="/" style="display: inline-block; padding: 14px 32px; background: var(--secondary); color: var(--primary); border: 2px solid var(--primary); border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px; transition: var(--transition);">Volver al inicio</a>
             `;
 
     const copyBtn = document.getElementById('btn-copy-tracking');
     const trackLink = document.getElementById('btn-track-link');
     if (copyBtn) {
-        copyBtn.setAttribute('disabled', 'disabled');
-        copyBtn.style.opacity = '0.6';
+        copyBtn.style.opacity = '0.5';
         copyBtn.style.pointerEvents = 'none';
     }
     if (trackLink) {
-        trackLink.setAttribute('aria-disabled', 'true');
-        trackLink.style.opacity = '0.6';
+        trackLink.style.opacity = '0.5';
         trackLink.style.pointerEvents = 'none';
     }
 
@@ -275,7 +273,8 @@ async function initLabelDownload(requestId) {
         const ext = getExtension(mime);
         const filename = `guia-${data.trackingNumber || 'myeship'}.${ext}`;
 
-        btn.classList.remove('disabled');
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
         btn.href = url;
         btn.download = filename;
         note.textContent = data.trackingNumber

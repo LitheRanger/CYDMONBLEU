@@ -78,10 +78,25 @@
             margin-bottom: 10px;
         }
 
+        h3 {
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            font-size: 18px;
+            color: var(--text-primary);
+        }
+
         p {
             color: var(--text-secondary);
             margin-bottom: 16px;
             font-size: 16px;
+        }
+
+        button:hover, a:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        button:active, a:active {
+            transform: translateY(0);
         }
 
         .loading {
