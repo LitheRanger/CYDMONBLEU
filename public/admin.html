@@ -176,19 +176,18 @@
 
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 12px;
         }
 
         .stat-card {
-            background: var(--secondary);
-            padding: 20px;
-            border-radius: 16px;
+            background: var(--bg-lighter);
+            padding: 14px 16px;
+            border-radius: 12px;
             border: 1px solid var(--border-light);
-            box-shadow: var(--shadow-sm);
+            box-shadow: none;
             position: relative;
             overflow: hidden;
-            transition: var(--transition);
         }
 
         .stat-card::before {
@@ -197,20 +196,15 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--text-secondary));
-        }
-
-        .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-lg);
+            height: 2px;
+            background: var(--border-dark);
         }
 
         .stat-value {
-            font-size: 26px;
+            font-size: 22px;
             font-weight: 800;
             font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .stat-label {
@@ -704,16 +698,6 @@
         <div class="admin-shell">
             <aside class="sidebar">
                 <div class="panel">
-                    <div class="panel-title">Atajos</div>
-                    <div class="chip-group">
-                        <button class="chip" data-quick data-payment="pending">Pagos pendientes</button>
-                        <button class="chip" data-quick data-label="no">Sin guia</button>
-                        <button class="chip" data-quick data-tab="cambios" data-refund="pending_shipment">Por enviar</button>
-                        <button class="chip" data-quick data-tab="defectos" data-clear="true">Defectos</button>
-                    </div>
-                </div>
-
-                <div class="panel">
                     <div class="panel-title">Buscar</div>
                     <input type="text" id="search" placeholder="Buscar por orden, correo o tracking..." />
                     <div class="panel-help">Filtra rapidamente por datos de cliente o guia.</div>
@@ -759,8 +743,6 @@
                     <div class="overview-header">
                         <div>
                             <h2 class="overview-title">Centro de devoluciones</h2>
-                            <p class="overview-subtitle">Organiza solicitudes, pagos y guias desde un solo lugar.</p>
-                        </div>
                     </div>
                     <div class="stats">
                         <div class="stat-card">
@@ -768,28 +750,12 @@
                             <div class="stat-label">Total solicitudes</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value" id="paid-count">0</div>
-                            <div class="stat-label">Pagadas</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="pending-count">0</div>
-                            <div class="stat-label">Pendientes pago</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="no-payment-count">0</div>
-                            <div class="stat-label">Sin pago</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="labeled-count">0</div>
-                            <div class="stat-label">Con guia</div>
+                            <div class="stat-value" id="pending-receipt-count">0</div>
+                            <div class="stat-label">Por recibir</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value" id="pending-shipment-count">0</div>
                             <div class="stat-label">Por enviar</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="today-count">0</div>
-                            <div class="stat-label">Creadas hoy</div>
                         </div>
                     </div>
                 </section>
@@ -1037,22 +1003,16 @@
 
         function updateStats() {
             const total = requests.length;
-            const paid = requests.filter(r => r.payment_status === 'paid').length;
-            const pending = requests.filter(r => r.payment_status === 'pending' && !isNoPayment(r)).length;
-            const noPayment = requests.filter(r => isNoPayment(r)).length;
-            const labeled = requests.filter(r => r.tracking_number).length;
+            const pendingReceipt = requests.filter(r => String(r.refund_status || '').toLowerCase() === 'pending_receipt').length;
             const pendingShipment = requests.filter(r => String(r.refund_status || '').toLowerCase() === 'pending_shipment').length;
-            const todayCount = requests.filter(r => isSameDay(r.created_at, new Date())).length;
 
-            document.getElementById('total').textContent = total;
-            document.getElementById('paid-count').textContent = paid;
-            document.getElementById('pending-count').textContent = pending;
-            document.getElementById('no-payment-count').textContent = noPayment;
-            document.getElementById('labeled-count').textContent = labeled;
+            const totalEl = document.getElementById('total');
+            const pendingReceiptEl = document.getElementById('pending-receipt-count');
             const pendingShipmentEl = document.getElementById('pending-shipment-count');
-            const todayEl = document.getElementById('today-count');
+
+            if (totalEl) totalEl.textContent = total;
+            if (pendingReceiptEl) pendingReceiptEl.textContent = pendingReceipt;
             if (pendingShipmentEl) pendingShipmentEl.textContent = pendingShipment;
-            if (todayEl) todayEl.textContent = todayCount;
         }
 
         function updateSummaryTab(tabName, data) {
