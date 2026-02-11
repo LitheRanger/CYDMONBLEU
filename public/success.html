@@ -44,147 +44,34 @@
         .container {
             max-width: 600px;
             width: 100%;
-            font-weight: 700;
-            font-size: 13px;
-            cursor: pointer;
+            background: var(--secondary);
+            padding: 48px 32px;
+            border-radius: 16px;
+            box-shadow: var(--shadow-md);
+            text-align: center;
         }
 
-        .summary {
-            text-align: left;
-            margin: 24px 0;
-            padding: 20px;
-            background: var(--bg-light);
-            border-radius: 12px;
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
         }
 
-        .summary h3 {
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            <script src="js/success.js" defer></script>
-                <div class="tracking">
-                    <div class="tracking-label">Tu número de seguimiento:</div>
-                    <div class="tracking-number" id="tracking-number">${trackingNumber}</div>
-                    <div class="tracking-actions">
-                        <button class="tracking-btn" id="btn-copy-tracking" type="button">Copiar</button>
-                        <a class="tracking-btn" id="btn-track-link" href="#" target="_blank" rel="noopener">Rastrear</a>
-                    </div>
-                </div>
-
-                ${summaryHtml}
-
-                <p>Recibirás un correo con los detalles y las instrucciones para enviar tu producto.</p>
-
-                <div class="label-section">
-                    <a id="btn-download-label" class="btn disabled" href="#">Descargar guía</a>
-                    <div id="label-note" class="label-note">Preparando tu guía...</div>
-                </div>
-                
-                <a href="/" class="btn">Volver al inicio</a>
-            `;
-
-            await initLabelDownload(requestId);
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
+    </style>
+</head>
+<body>
+    <div class="container" id="content">
+        <div class="loading"></div>
+        <p>Verificando pago...</p>
+    </div>
 
-        function base64ToBlob(base64, mime) {
-            const byteChars = atob(base64);
-            const byteNumbers = new Array(byteChars.length);
-            for (let i = 0; i < byteChars.length; i++) {
-                byteNumbers[i] = byteChars.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            return new Blob([byteArray], { type: mime });
-        }
-
-        function getExtension(mime) {
-            if (!mime) return 'pdf';
-            const lower = mime.toLowerCase();
-            if (lower.includes('pdf')) return 'pdf';
-            if (lower.includes('png')) return 'png';
-            if (lower.includes('jpeg') || lower.includes('jpg')) return 'jpg';
-            return 'pdf';
-        }
-
-        async function initLabelDownload(requestId) {
-            const btn = document.getElementById('btn-download-label');
-            const note = document.getElementById('label-note');
-            const trackingEl = document.getElementById('tracking-number');
-            const copyBtn = document.getElementById('btn-copy-tracking');
-            const trackLink = document.getElementById('btn-track-link');
-
-            if (!btn || !note) return;
-
-            if (!requestId) {
-                note.textContent = 'Guía no disponible en este momento.';
-                return;
-            }
-
-            try {
-                const res = await fetch(`${API_BASE}/api/label/${encodeURIComponent(requestId)}`);
-                const data = await res.json();
-
-                if (!data.success) {
-                    note.textContent = 'Tu guía aún no está lista. Intenta más tarde.';
-                    return;
-                }
-
-                if (data.trackingNumber && trackingEl) {
-                    trackingEl.textContent = data.trackingNumber;
-                }
-
-                if (data.trackingNumber && trackLink) {
-                    trackLink.href = 'https://track.myeship.co/en/track/eship-es';
-                    trackLink.setAttribute('aria-disabled', 'false');
-                    trackLink.style.opacity = '1';
-                    trackLink.style.pointerEvents = 'auto';
-                }
-
-                if (data.trackingNumber && copyBtn) {
-                    copyBtn.removeAttribute('disabled');
-                    copyBtn.style.opacity = '1';
-                    copyBtn.style.pointerEvents = 'auto';
-                    copyBtn.addEventListener('click', async () => {
-                        try {
-                            await navigator.clipboard.writeText(data.trackingNumber);
-                            copyBtn.textContent = 'Copiado';
-                            setTimeout(() => (copyBtn.textContent = 'Copiar'), 1200);
-                        } catch (e) {
-                            const temp = document.createElement('textarea');
-                            temp.value = data.trackingNumber;
-                            document.body.appendChild(temp);
-                            temp.select();
-                            document.execCommand('copy');
-                            document.body.removeChild(temp);
-                            copyBtn.textContent = 'Copiado';
-                            setTimeout(() => (copyBtn.textContent = 'Copiar'), 1200);
-                        }
-                    }, { once: true });
-                }
-
-                if (!data.labelBase64) {
-                    note.textContent = 'Tu guía aún no está lista. Intenta más tarde.';
-                    return;
-                }
-
-                const mime = data.labelMime || 'application/pdf';
-                const blob = base64ToBlob(data.labelBase64, mime);
-                const url = URL.createObjectURL(blob);
-                const ext = getExtension(mime);
-                const filename = `guia-${data.trackingNumber || 'myeship'}.${ext}`;
-
-                btn.classList.remove('disabled');
-                btn.href = url;
-                btn.download = filename;
-                note.textContent = data.trackingNumber
-                    ? `Tracking MyeShip: ${data.trackingNumber}`
-                    : 'Guía lista para descargar.';
-            } catch (err) {
-                console.error('Error descargando guía:', err);
-                note.textContent = 'No se pudo obtener la guía. Intenta más tarde.';
-            }
-        }
-
-        verifyPayment();
-    </script>
+    <script src="js/success.js" defer></script>
 </body>
 </html>
