@@ -20,6 +20,10 @@ services:
         value: sandbox
       - key: PAYPAL_WEBHOOK_ID
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
       - key: MYESHIP_API_KEY
         sync: false
       - key: MP_ACCESS_TOKEN

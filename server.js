@@ -47,6 +47,12 @@ const paypalClient = (paypalClientId && paypalClientSecret) ? new paypalSDK.Clie
 }) : null;
 const paypalWebhookId = process.env.PAYPAL_WEBHOOK_ID || '';
 
+// Stripe (se inicializa si está configurado)
+const stripe = process.env.STRIPE_SECRET_KEY
+    ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+    : null;
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+
 const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
 const sendgridFrom = process.env.SENDGRID_FROM || '';
 if (sendgridApiKey) {
@@ -97,8 +103,13 @@ app.use((req, res, next) => {
     next();
 });
 
-// JSON parser para todas las rutas
-app.use(express.json());
+// JSON parser para todas las rutas excepto Stripe webhook (requiere body raw)
+app.use((req, res, next) => {
+    if (req.originalUrl === '/api/stripe-webhook') {
+        return next();
+    }
+    return express.json()(req, res, next);
+});
 
 // --- ADMIN BASIC AUTH ---
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
@@ -767,7 +778,7 @@ async function resolveOrderForLabel(orderId) {
     return order || null;
 }
 
-async function handleApprovedPayment({ requestId, orderId, paymentId }) {
+async function handleApprovedPayment({ requestId, orderId, paymentId, paymentProvider = 'mercadopago' }) {
     if (!dbPool || !requestId) return;
 
     const [rows] = await executeQuery(
@@ -778,8 +789,8 @@ async function handleApprovedPayment({ requestId, orderId, paymentId }) {
     const finalOrderId = orderId || storedOrderId;
 
     await executeQuery(
-        `UPDATE returns_requests SET payment_status = 'paid', payment_provider = 'mercadopago', payment_reference = ? WHERE id = ?`,
-        [String(paymentId || ''), requestId]
+        `UPDATE returns_requests SET payment_status = 'paid', payment_provider = ?, payment_reference = ? WHERE id = ?`,
+        [String(paymentProvider || 'mercadopago'), String(paymentId || ''), requestId]
     );
 
     if (rows && rows[0] && rows[0].tracking_number) {
@@ -812,11 +823,11 @@ async function handleApprovedPayment({ requestId, orderId, paymentId }) {
     }
 }
 
-async function handleFailedPayment({ requestId, paymentId }) {
+async function handleFailedPayment({ requestId, paymentId, paymentProvider = 'mercadopago' }) {
     if (!dbPool || !requestId) return;
     await executeQuery(
-        `UPDATE returns_requests SET payment_status = 'failed', payment_provider = 'mercadopago', payment_reference = ? WHERE id = ?`,
-        [String(paymentId || ''), requestId]
+        `UPDATE returns_requests SET payment_status = 'failed', payment_provider = ?, payment_reference = ? WHERE id = ?`,
+        [String(paymentProvider || 'mercadopago'), String(paymentId || ''), requestId]
     );
 }
 
@@ -1227,7 +1238,8 @@ app.post('/api/capture-paypal-payment', limiterCheckout, async (req, res) => {
             await handleApprovedPayment({ 
                 requestId: refId, 
                 orderId: purchaseUnit?.customId || refId, 
-                paymentId: captureId 
+                paymentId: captureId,
+                paymentProvider: 'paypal'
             });
 
             res.json({
@@ -1248,6 +1260,154 @@ app.post('/api/capture-paypal-payment', limiterCheckout, async (req, res) => {
             success: false,
             message: error.message || 'Error al capturar pago'
         });
+    }
+});
+
+// --- 4D. STRIPE CHECKOUT SESSION ---
+app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
+    try {
+        const parsed = checkoutSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                success: false,
+                message: 'Datos inválidos',
+                errors: parsed.error.flatten()
+            });
+        }
+
+        const { requestId, amount, currency, description, orderId, contactEmail } = parsed.data;
+
+        if (!stripe) {
+            return res.status(500).json({
+                success: false,
+                message: 'Stripe no configurado. Agrega STRIPE_SECRET_KEY en .env'
+            });
+        }
+
+        if (amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'El monto debe ser mayor a 0'
+            });
+        }
+
+        const rawBaseUrl = process.env.PUBLIC_BASE_URL || req.headers.origin || 'http://localhost:3000';
+        let baseUrl = rawBaseUrl;
+        try {
+            baseUrl = new URL(rawBaseUrl).origin;
+        } catch (error) {
+            try {
+                baseUrl = new URL(`http://${rawBaseUrl}`).origin;
+            } catch (innerError) {
+                baseUrl = 'http://localhost:3000';
+            }
+        }
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price_data: {
+                    currency: (currency || 'mxn').toLowerCase(),
+                    product_data: {
+                        name: 'Guía de Devolución MON|BLEU',
+                        description: description || `Guía para orden ${orderId}`
+                    },
+                    unit_amount: Math.round(amount * 100)
+                },
+                quantity: 1
+            }],
+            mode: 'payment',
+            success_url: `${baseUrl}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${baseUrl}/cancel.html`,
+            metadata: {
+                requestId: String(requestId),
+                orderId: String(orderId),
+                contactEmail: String(contactEmail)
+            },
+            customer_email: contactEmail
+        });
+
+        if (dbPool && requestId) {
+            await executeQuery(
+                `UPDATE returns_requests SET payment_provider = 'stripe', payment_reference = ? WHERE id = ?`,
+                [String(session.id || ''), requestId]
+            );
+        }
+
+        res.json({
+            success: true,
+            sessionId: session.id,
+            url: session.url
+        });
+    } catch (error) {
+        console.error('Error creando sesión de Stripe:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error al crear sesión de pago'
+        });
+    }
+});
+
+// --- 4E. STRIPE WEBHOOK (Confirmar pagos) ---
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+
+    if (!stripe) {
+        console.warn('⚠️ Stripe no configurado');
+        return res.status(400).send('Stripe no configurado');
+    }
+
+    if (!stripeWebhookSecret) {
+        console.warn('⚠️ STRIPE_WEBHOOK_SECRET no configurado');
+        return res.status(400).send('Webhook secret no configurado');
+    }
+
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
+    } catch (err) {
+        console.error('❌ Error verificando webhook Stripe:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        const metadata = session.metadata || {};
+        const requestId = metadata.requestId;
+        const orderId = metadata.orderId;
+
+        if (requestId) {
+            await handleApprovedPayment({
+                requestId,
+                orderId,
+                paymentId: session.id,
+                paymentProvider: 'stripe'
+            });
+        }
+    }
+
+    res.json({ received: true });
+});
+
+// --- 4F. VERIFICAR SESIÓN STRIPE ---
+app.get('/api/verify-payment/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+
+        if (!stripe) {
+            return res.status(500).json({ success: false, message: 'Stripe no configurado' });
+        }
+
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        res.json({
+            success: true,
+            paymentStatus: session.payment_status,
+            metadata: session.metadata || {}
+        });
+    } catch (error) {
+        console.error('Error verificando pago:', error);
+        res.status(500).json({ success: false, message: 'Error al verificar pago' });
     }
 });
 
@@ -1305,14 +1465,14 @@ app.post('/api/mp-webhook', async (req, res) => {
                 console.warn(`⚠️ Pago MP inválido (${validation.reason}) para request ${requestId}`);
                 return res.json({ received: true });
             }
-            await handleApprovedPayment({ requestId, orderId, paymentId });
+            await handleApprovedPayment({ requestId, orderId, paymentId, paymentProvider: 'mercadopago' });
         } else if (['rejected', 'cancelled'].includes(status)) {
             const expected = await getExpectedAmount(requestId);
             if (expected === null) {
                 console.warn(`⚠️ Pago MP rechazado sin request válido: ${requestId}`);
                 return res.json({ received: true });
             }
-            await handleFailedPayment({ requestId, paymentId });
+            await handleFailedPayment({ requestId, paymentId, paymentProvider: 'mercadopago' });
         }
 
         return res.json({ received: true });
@@ -1372,7 +1532,8 @@ app.post('/api/paypal-webhook', async (req, res) => {
                 await handleApprovedPayment({
                     requestId: customId,
                     orderId: customId,
-                    paymentId: captureId
+                    paymentId: captureId,
+                    paymentProvider: 'paypal'
                 });
             }
         } else if (eventType === 'PAYMENT.CAPTURE.DENIED' || eventType === 'PAYMENT.CAPTURE.REFUNDED') {

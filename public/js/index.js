@@ -840,10 +840,10 @@ async function procesarPago() {
                 }, 800);
                 return;
             }
-            // Paso 2: Crear orden de PayPal
+            // Paso 2: Crear sesión de Stripe
             loadingToast = showLoadingToast("Redirigiendo a pago seguro...");
 
-            const checkoutRes = await fetch(`${API_BASE}/api/create-paypal-order`, {
+            const checkoutRes = await fetch(`${API_BASE}/api/create-checkout-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 mode: 'cors',
@@ -860,7 +860,7 @@ async function procesarPago() {
             const checkoutData = await checkoutRes.json();
             removeToast(loadingToast);
 
-            if (checkoutData.success && checkoutData.approveUrl) {
+            if (checkoutData.success && checkoutData.url) {
                 // Guardar requestId localmente antes de redirigir
                 localStorage.setItem('mon_request_id', data.requestId);
                 localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
@@ -879,9 +879,9 @@ async function procesarPago() {
 
                 showSuccessToast("✓ Redirigiendo a pago...");
 
-                // Redirigir a PayPal
+                // Redirigir a Stripe
                 setTimeout(() => {
-                    window.location.href = checkoutData.approveUrl;
+                    window.location.href = checkoutData.url;
                 }, 800);
             } else {
                 showErrorToast(`❌ ${checkoutData.message || "Error al iniciar pago"}`);
