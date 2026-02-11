@@ -178,6 +178,9 @@ async function initDb() {
                     `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255) NULL`
                 );
                 await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS order_number VARCHAR(64) NULL`
+                );
+                await dbPool.query(
                     `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(64) NULL`
                 );
                 await dbPool.query(
@@ -202,6 +205,7 @@ async function initDb() {
                 CREATE TABLE IF NOT EXISTS returns_requests (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     order_id VARCHAR(64) NOT NULL,
+                    order_number VARCHAR(64) NULL,
                     contact_email VARCHAR(255) NOT NULL,
                     return_type VARCHAR(32) NOT NULL,
                     items_json JSON NOT NULL,
@@ -270,6 +274,15 @@ async function initDb() {
             if (customerCols && customerCols[0] && customerCols[0].cnt === 0) {
                 await dbPool.execute(
                     `ALTER TABLE returns_requests ADD COLUMN customer_name VARCHAR(255) NULL`
+                );
+            }
+            const [orderNumberCols] = await dbPool.execute(
+                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                [process.env.DB_NAME, 'returns_requests', 'order_number']
+            );
+            if (orderNumberCols && orderNumberCols[0] && orderNumberCols[0].cnt === 0) {
+                await dbPool.execute(
+                    `ALTER TABLE returns_requests ADD COLUMN order_number VARCHAR(64) NULL`
                 );
             }
             const [stripeCols] = await dbPool.execute(
@@ -663,13 +676,14 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         }));
 
           const insertSQL = isPostgreSQL 
-                ? `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
-                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`
-                : `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)`;
+                ? `INSERT INTO returns_requests (order_id, order_number, contact_email, customer_name, return_type, items_json, files_json, amount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+                : `INSERT INTO returns_requests (order_id, order_number, contact_email, customer_name, return_type, items_json, files_json, amount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         
         const [result] = await executeQuery(insertSQL, [
             String(orderIdForStorage || ''),
+            String(orderNumber || ''),
             String(contactEmail || ''),
                 String(customerName || ''),
             String(returnType || ''),
@@ -1446,7 +1460,7 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
         }
 
         const [rows] = await executeQuery(
-                `SELECT id, order_id, contact_email, customer_name, return_type, items_json, amount, payment_status, payment_reference,
+                    `SELECT id, order_id, order_number, contact_email, customer_name, return_type, items_json, amount, payment_status, payment_reference,
                     carrier, tracking_number, label_created_at, created_at, admin_status, refund_status,
                     coupon_code, coupon_amount, coupon_sent_at, change_sent_at
              FROM returns_requests
