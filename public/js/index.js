@@ -768,7 +768,9 @@ async function procesarPago() {
     btn.innerHTML = '<div class="loading-spinner" style="display:inline-block;margin-right:8px;"></div>Procesando solicitud...';
 
     const formData = new FormData();
+    const orderNumber = orderData.orderNumber || orderData.orderId;
     formData.append('orderId', orderData.orderId);
+    formData.append('orderNumber', orderNumber);
     formData.append('returnType', tipoFinal);
     formData.append('contactEmail', document.getElementById('email').value);
     if (orderData && orderData.customer) {
@@ -852,7 +854,7 @@ async function procesarPago() {
                     amount: data.paymentDetails.amount,
                     currency: data.paymentDetails.currency.toLowerCase(),
                     description: data.paymentDetails.description,
-                    orderId: orderData.orderId,
+                    orderId: orderNumber,
                     contactEmail: document.getElementById('email').value
                 })
             });

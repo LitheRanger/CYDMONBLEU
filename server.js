@@ -554,6 +554,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         // Datos del formulario
         const submitParsed = z.object({
             orderId: z.string().trim().min(1).max(64),
+            orderNumber: z.string().trim().min(1).max(64).optional(),
             contactEmail: z.string().trim().email().max(255),
             returnType: z.string().trim().min(1).max(32),
             customerName: z.string().trim().min(1).max(255).optional()
@@ -567,7 +568,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
             });
         }
 
-        const { orderId, contactEmail, returnType, customerName } = submitParsed.data;
+        const { orderId, orderNumber, contactEmail, returnType, customerName } = submitParsed.data;
+        const orderIdForStorage = String(orderNumber || orderId || '').trim();
+        const orderIdForLookup = String(orderId || orderNumber || '').trim();
         
         // Los items vienen como string JSON, hay que parsearlos
         let items = [];
@@ -600,7 +603,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
             return res.status(400).json({ success: false, message: "No hay items seleccionados" });
         }
 
-        console.log(`> Orden: ${orderId}`);
+        console.log(`> Orden: ${orderIdForStorage}`);
         console.log(`> Tipo: ${returnType}`);
         console.log(`> Items: ${items.length}`);
         console.log(`> Fotos: ${files.length}`);
@@ -666,7 +669,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                     VALUES (?, ?, ?, ?, ?, ?, ?)`;
         
         const [result] = await executeQuery(insertSQL, [
-            String(orderId || ''),
+            String(orderIdForStorage || ''),
             String(contactEmail || ''),
                 String(customerName || ''),
             String(returnType || ''),
@@ -685,9 +688,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                 );
 
                 if (myeshipClient.isConfigured()) {
-                    let order = await shopifyClient.getOrderById(orderId);
+                    let order = await shopifyClient.getOrderById(orderIdForLookup);
                     if (!order) {
-                        const rawOrderId = String(orderId || '').trim();
+                        const rawOrderId = String(orderIdForLookup || '').trim();
                         const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
                         order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
                     }
@@ -717,7 +720,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
             paymentDetails: {
                 amount: amountToPay,
                 currency: "MXN",
-                description: `Guía de devolución - Orden ${orderId}`
+                description: `Guía de devolución - Orden ${orderIdForStorage}`
             },
             skipPayment: isDefectRequest
         });
