@@ -28,25 +28,6 @@ const mpWebhookSecret = process.env.MP_WEBHOOK_SECRET || '';
 const mpWebhookVerify = String(process.env.MP_WEBHOOK_VERIFY || 'true').toLowerCase() !== 'false';
 const mpWebhookLog = String(process.env.MP_WEBHOOK_LOG || '').toLowerCase() === 'true';
 
-// PayPal (se inicializa si está configurado)
-const paypalSDK = require('@paypal/paypal-server-sdk');
-const paypalClientId = process.env.PAYPAL_CLIENT_ID || '';
-const paypalClientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
-const paypalEnv = String(process.env.PAYPAL_ENV || 'sandbox').toLowerCase();
-const paypalClient = (paypalClientId && paypalClientSecret) ? new paypalSDK.Client({
-    clientCredentialsAuthCredentials: {
-        oAuthClientId: paypalClientId,
-        oAuthClientSecret: paypalClientSecret
-    },
-    environment: paypalEnv === 'production' ? paypalSDK.Environment.Production : paypalSDK.Environment.Sandbox,
-    logging: {
-        logLevel: paypalSDK.LogLevel.Info,
-        logRequest: { logBody: false },
-        logResponse: { logHeaders: false }
-    }
-}) : null;
-const paypalWebhookId = process.env.PAYPAL_WEBHOOK_ID || '';
-
 // Stripe (se inicializa si está configurado)
 const stripe = process.env.STRIPE_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_SECRET_KEY)
@@ -1138,7 +1119,6 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
         }
 
         if (amount <= 0) {
-            console.error('❌ Monto inválido:', amount);
             return res.status(400).json({
                 success: false,
                 message: 'El monto debe ser mayor a 0'
@@ -1156,114 +1136,53 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
                 baseUrl = 'http://localhost:3000';
             }
         }
-        console.log('🌐 Base URL:', baseUrl);
 
-        const ordersController = new paypalSDK.OrdersController(paypalClient);
-        
-        const orderRequest = {
-            body: {
-                intent: 'CAPTURE',
-                purchaseUnits: [{
-                    referenceId: String(requestId),
-                    description: description || `Guía de Devolución MON|BLEU - Orden ${orderId}`,
-                    customId: String(requestId),
-                    amount: {
-                        currencyCode: (currency || 'MXN').toUpperCase(),
-                        value: amount.toFixed(2)
-                    }
-                }],
-                applicationContext: {
-                    returnUrl: `${baseUrl}/success.html?paypal=true`,
-                    cancelUrl: `${baseUrl}/cancel.html`,
-                    brandName: 'MON|BLEU',
-                    landingPage: 'NO_PREFERENCE',
-                    userAction: 'PAY_NOW'
-                }
-            }
-        };
-
-        console.log('📤 Enviando orden a PayPal:', JSON.stringify(orderRequest, null, 2));
-        const order = await ordersController.ordersCreate(orderRequest);
-        console.log('✅ Orden creada en PayPal:', order.result?.id);
-        
-        const paypalOrderId = order.result?.id;
-        const approveLink = order.result?.links?.find(l => l.rel === 'approve')?.href;
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price_data: {
+                    currency: (currency || 'mxn').toLowerCase(),
+                    product_data: {
+                        name: 'Guía de Devolución MON|BLEU',
+                        description: description || `Guía para orden ${orderId}`
+                    },
+                    unit_amount: Math.round(amount * 100)
+                },
+                quantity: 1
+            }],
+            mode: 'payment',
+            success_url: `${baseUrl}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${baseUrl}/cancel.html`,
+            metadata: {
+                requestId: String(requestId),
+                orderId: String(orderId),
+                contactEmail: String(contactEmail)
+            },
+            customer_email: contactEmail
+        });
 
         if (dbPool && requestId) {
             await executeQuery(
-                `UPDATE returns_requests SET payment_provider = 'paypal', payment_reference = ? WHERE id = ?`,
-                [String(paypalOrderId || ''), requestId]
+                `UPDATE returns_requests SET payment_provider = 'stripe', payment_reference = ? WHERE id = ?`,
+                [String(session.id || ''), requestId]
             );
-            console.log('✅ Base de datos actualizada');
         }
 
         res.json({
             success: true,
-            orderId: paypalOrderId,
-            approveUrl: approveLink
+            sessionId: session.id,
+            url: session.url
         });
     } catch (error) {
-        console.error('❌ Error creando orden PayPal:', error);
-        console.error('Stack:', error.stack);
+        console.error('Error creando sesión de Stripe:', error);
         res.status(500).json({
             success: false,
-            message: error.message || 'Error al crear orden de pago',
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            message: error.message || 'Error al crear sesión de pago'
         });
     }
 });
 
-// --- 4C. PAYPAL CAPTURE ---
-app.post('/api/capture-paypal-payment', limiterCheckout, async (req, res) => {
-    try {
-        const { orderId, requestId } = req.body;
-        
-        if (!orderId) {
-            return res.status(400).json({ success: false, message: 'orderId requerido' });
-        }
-
-        if (!paypalClient) {
-            return res.status(500).json({ success: false, message: 'PayPal no configurado' });
-        }
-
-        const ordersController = new paypalSDK.OrdersController(paypalClient);
-        const capture = await ordersController.ordersCapture({ id: orderId });
-        
-        const captureStatus = capture.result?.status;
-        const purchaseUnit = capture.result?.purchaseUnits?.[0];
-        const captureId = purchaseUnit?.payments?.captures?.[0]?.id;
-        const refId = purchaseUnit?.referenceId || requestId;
-
-        if (captureStatus === 'COMPLETED' && refId) {
-            await handleApprovedPayment({ 
-                requestId: refId, 
-                orderId: purchaseUnit?.customId || refId, 
-                paymentId: captureId,
-                paymentProvider: 'paypal'
-            });
-
-            res.json({
-                success: true,
-                status: 'approved',
-                captureId
-            });
-        } else {
-            res.json({
-                success: false,
-                status: captureStatus,
-                message: 'Pago no completado'
-            });
-        }
-    } catch (error) {
-        console.error('Error capturando pago PayPal:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Error al capturar pago'
-        });
-    }
-});
-
-// --- 4D. STRIPE CHECKOUT SESSION ---
+// --- 4E. STRIPE WEBHOOK (Confirmar pagos) ---
 app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
     try {
         const parsed = checkoutSchema.safeParse(req.body);
@@ -1479,79 +1398,6 @@ app.post('/api/mp-webhook', async (req, res) => {
     } catch (err) {
         console.error('Error en webhook MP:', err.message || err);
         return res.json({ received: true });
-    }
-});
-
-// --- 5B. PAYPAL WEBHOOK ---
-app.post('/api/paypal-webhook', async (req, res) => {
-    try {
-        const event = req.body;
-        const eventType = event?.event_type;
-
-        // PayPal webhook signature verification (si está configurado)
-        if (paypalWebhookId) {
-            const webhookController = new paypalSDK.WebhooksController(paypalClient);
-            try {
-                const headers = {
-                    'paypal-transmission-id': req.headers['paypal-transmission-id'],
-                    'paypal-transmission-time': req.headers['paypal-transmission-time'],
-                    'paypal-transmission-sig': req.headers['paypal-transmission-sig'],
-                    'paypal-cert-url': req.headers['paypal-cert-url'],
-                    'paypal-auth-algo': req.headers['paypal-auth-algo']
-                };
-                
-                const verification = await webhookController.webhooksVerifySignature({
-                    body: {
-                        transmissionId: headers['paypal-transmission-id'],
-                        transmissionTime: headers['paypal-transmission-time'],
-                        transmissionSig: headers['paypal-transmission-sig'],
-                        certUrl: headers['paypal-cert-url'],
-                        authAlgo: headers['paypal-auth-algo'],
-                        webhookId: paypalWebhookId,
-                        webhookEvent: event
-                    }
-                });
-
-                if (verification.result?.verificationStatus !== 'SUCCESS') {
-                    console.warn('⚠️ PayPal webhook signature verification failed');
-                    return res.status(401).json({ received: false });
-                }
-            } catch (verifyErr) {
-                console.warn('⚠️ Error verificando firma PayPal webhook:', verifyErr.message);
-            }
-        }
-
-        // Manejar eventos de pago
-        if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
-            const resource = event.resource;
-            const captureId = resource?.id;
-            const customId = resource?.custom_id;
-            const amount = resource?.amount?.value;
-            
-            if (customId) {
-                await handleApprovedPayment({
-                    requestId: customId,
-                    orderId: customId,
-                    paymentId: captureId,
-                    paymentProvider: 'paypal'
-                });
-            }
-        } else if (eventType === 'PAYMENT.CAPTURE.DENIED' || eventType === 'PAYMENT.CAPTURE.REFUNDED') {
-            const resource = event.resource;
-            const customId = resource?.custom_id;
-            
-            if (customId && dbPool) {
-                await executeQuery(
-                    `UPDATE returns_requests SET payment_status = 'failed', payment_provider = 'paypal' WHERE id = ?`,
-                    [customId]
-                );
-            }
-        }
-
-        res.json({ received: true });
-    } catch (err) {
-        console.error('Error en webhook PayPal:', err.message || err);
-        res.json({ received: true });
     }
 });
 
