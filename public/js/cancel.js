@@ -26,7 +26,7 @@ if (!requestId || !orderDataRaw || !retryBtn) {
         }
 
         try {
-            const res = await fetch(`${API_BASE}/api/create-mp-preference`, {
+            const res = await fetch(`${API_BASE}/api/create-checkout-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 mode: 'cors',
@@ -40,8 +40,8 @@ if (!requestId || !orderDataRaw || !retryBtn) {
                 })
             });
             const data = await res.json();
-            if (data.success && data.checkoutUrl) {
-                window.location.href = data.checkoutUrl;
+            if (data.success && data.url) {
+                window.location.href = data.url;
             } else {
                 retryBtn.disabled = false;
                 retryBtn.textContent = 'Reintentar pago';
