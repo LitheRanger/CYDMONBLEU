@@ -5,18 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pago Exitoso - MON|BLEU</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
         :root {
-            --ink: #1b1b1b;
-            --ink-soft: #4b4b4b;
-            --cream: #fff7ee;
-            --paper: #fffaf4;
-            --accent: #ff6b3d;
-            --accent-2: #1e8f85;
-            --success: #168f55;
-            --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
-            --shadow-md: 0 18px 42px rgba(15, 23, 42, 0.16);
+            --primary: #000;
+            --secondary: #fff;
+            --text-primary: #000;
+            --text-secondary: #666;
+            --border-light: #e0e0e0;
+            --bg-light: #f9f9f9;
+            --bg-lighter: #fafafa;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+            --transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            --success-color: #388e3c;
+        }
+
+        @font-face {
+            font-family: 'HelveticaNeueLTProHv';
+            src: url('HelveticaNeueLTProHv.otf') format('opentype');
+            font-weight: 800;
+            font-style: normal;
+            font-display: swap;
         }
 
         * {
@@ -26,11 +34,9 @@
         }
 
         body {
-            font-family: 'Space Grotesk', sans-serif;
-            background: radial-gradient(circle at 15% 10%, rgba(255, 107, 61, 0.08), transparent 45%),
-                radial-gradient(circle at 80% 15%, rgba(30, 143, 133, 0.08), transparent 40%),
-                linear-gradient(135deg, #fff3e6 0%, #f7efe7 60%, #f2ede6 100%);
-            color: var(--ink);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-lighter) 100%);
+            color: var(--text-primary);
             line-height: 1.6;
             min-height: 100vh;
             display: flex;
@@ -41,52 +47,39 @@
 
         .container {
             width: min(640px, 100%);
-            background: var(--paper);
-            border-radius: 18px;
-            box-shadow: var(--shadow-md);
+            background: var(--secondary);
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
             padding: 40px 32px;
             text-align: center;
-            position: relative;
-            overflow: hidden;
+            border: 1px solid var(--border-light);
             animation: riseIn 0.5s ease;
-        }
-
-        .container::before {
-            content: '';
-            position: absolute;
-            inset: -40% -20% auto -20%;
-            height: 140px;
-            background: linear-gradient(120deg, rgba(255, 107, 61, 0.18), rgba(30, 143, 133, 0.15));
-            transform: rotate(-2deg);
-        }
-
-        .container > * {
-            position: relative;
-            z-index: 1;
         }
 
         .status-pill {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(22, 143, 85, 0.12);
-            color: var(--success);
+            background: rgba(56, 142, 60, 0.12);
+            color: var(--success-color);
             padding: 6px 12px;
             border-radius: 999px;
             font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
             margin-bottom: 18px;
         }
 
         h1 {
-            font-family: 'Fraunces', serif;
-            font-size: clamp(26px, 4vw, 34px);
+            font-family: 'HelveticaNeueLTProHv', 'Helvetica Neue', Arial, sans-serif;
+            font-size: clamp(24px, 4vw, 32px);
             margin-bottom: 10px;
         }
 
         p {
-            color: var(--ink-soft);
+            color: var(--text-secondary);
             margin-bottom: 16px;
             font-size: 16px;
         }
@@ -95,8 +88,8 @@
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid rgba(27, 27, 27, 0.12);
-            border-top-color: var(--accent);
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
