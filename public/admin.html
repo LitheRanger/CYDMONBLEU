@@ -1136,13 +1136,17 @@
         function buildActionButtons(r) {
             const isCambio = normalizeType(r.return_type) === 'cambio' || hasChangeItem(r);
             const isReembolso = normalizeType(r.return_type) === 'reembolso' || hasRefundItem(r);
+            const isDefecto = hasDefect(r);
             const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
             const actions = [];
 
             actions.push(`<button class="btn secondary" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guia</button>`);
             actions.push(`<button class="btn secondary" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>`);
-            actions.push(`<button class="btn" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>`);
-            actions.push(`<button class="btn danger" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>`);
+
+            if (isDefecto) {
+                actions.push(`<button class="btn" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>`);
+                actions.push(`<button class="btn danger" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>`);
+            }
 
             if (isCambio) actions.push(`<button class="btn" data-action="ship">Enviar</button>`);
             if (isReembolso) actions.push(`<button class="btn" data-action="coupon">Enviar cupon</button>`);
