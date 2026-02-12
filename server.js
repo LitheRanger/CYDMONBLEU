@@ -397,6 +397,192 @@ app.use('/uploads', express.static('uploads'));
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+// ========== EMAIL UTILITIES ==========
+/**
+ * Envía un email de confirmación cuando se crea una solicitud de devolución
+ */
+async function sendConfirmationEmail(contactEmail, customerName, requestId, orderNumber) {
+    if (!sendgridApiKey || !sendgridFrom) {
+        console.warn('⚠️ SendGrid no configurado para confirmation email');
+        return;
+    }
+    try {
+        const msg = {
+            to: contactEmail,
+            from: sendgridFrom,
+            subject: 'Devolución recibida | MON|BLEU',
+            html: `
+                <h2>¡Hola ${customerName || 'Cliente'}!</h2>
+                <p>Tu solicitud de devolución ha sido recibida exitosamente.</p>
+                <p><strong>Número de solicitud:</strong> #${requestId}</p>
+                <p><strong>Orden Shopify:</strong> ${orderNumber || 'N/A'}</p>
+                <p>Revisaremos tu solicitud pronto y te contactaremos con los próximos pasos.</p>
+                <p style="margin-top: 20px; font-size: 12px; color: #666;">
+                    Si tienes preguntas, no dudes en contactarnos a <strong>${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</strong>
+                </p>
+            `
+        };
+        await sgMail.send(msg);
+        console.log(`✅ Email de confirmación enviado a ${contactEmail}`);
+    } catch (error) {
+        console.error('❌ Error enviando confirmation email:', error.message || error);
+    }
+}
+
+/**
+ * Envía un email cuando el pago es aprobado y la guía está lista
+ */
+async function sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber) {
+    if (!sendgridApiKey || !sendgridFrom) {
+        console.warn('⚠️ SendGrid no configurado para payment email');
+        return;
+    }
+    try {
+        let trackingContent = '';
+        if (trackingNumber) {
+            trackingContent = `
+                <p><strong>Tu número de guía:</strong> ${trackingNumber}</p>
+                <p>Usa este número para rastrear tu paquete de devolución.</p>
+            `;
+        }
+
+        const msg = {
+            to: contactEmail,
+            from: sendgridFrom,
+            subject: 'Pago confirmado y guía de devolución lista | MON|BLEU',
+            html: `
+                <h2>¡Gracias ${customerName || 'Cliente'}!</h2>
+                <p>Tu pago ha sido procesado correctamente y tu guía de devolución está lista.</p>
+                <p><strong>Solicitud #:</strong> ${requestId}</p>
+                ${trackingContent}
+                <p><strong>Pasos siguientes:</strong></p>
+                <ol>
+                    <li>Descarga tu guía de devolución</li>
+                    <li>Empaca los artículos que devuelves</li>
+                    <li>Pega la guía en el paquete</li>
+                    <li>Entrega en el punto de origen indicado</li>
+                </ol>
+                <p style="margin-top: 20px; font-size: 12px; color: #666;">
+                    Preguntas? Contáctanos: <strong>${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</strong>
+                </p>
+            `
+        };
+        await sgMail.send(msg);
+        console.log(`✅ Email de pago confirmado enviado a ${contactEmail}`);
+    } catch (error) {
+        console.error('❌ Error enviando payment confirmation email:', error.message || error);
+    }
+}
+
+/**
+ * Envía email cuando el admin acepta o rechaza una devolución
+ */
+async function sendDecisionEmail(contactEmail, customerName, requestId, decision, rejectionReason) {
+    if (!sendgridApiKey || !sendgridFrom) {
+        console.warn('⚠️ SendGrid no configurado para decision email');
+        return;
+    }
+    try {
+        const isAccepted = decision === 'accepted';
+        let subject = isAccepted 
+            ? '¡Tu devolución fue aceptada! | MON|BLEU'
+            : 'Referente a tu solicitud de devolución | MON|BLEU';
+        
+        let content = isAccepted
+            ? `
+                <h2>¡Buenas noticias ${customerName || 'Cliente'}!</h2>
+                <p>Tu solicitud de devolución ha sido <strong>aceptada</strong>.</p>
+                <p><strong>Solicitud #:</strong> ${requestId}</p>
+                <p>Próximamente recibirás los artículos de reemplazo en la dirección que registraste.</p>
+                <p>Agradecemos tu paciencia y confianza en MON|BLEU.</p>
+              `
+            : `
+                <h2>Hola ${customerName || 'Cliente'},</h2>
+                <p>Revisamos tu solicitud de devolución (Solicitud #${requestId}).</p>
+                <p><strong>Estado:</strong> No fue posible procesarla</p>
+                ${rejectionReason ? `<p><strong>Motivo:</strong> ${rejectionReason}</p>` : ''}
+                <p>Si tienes preguntas, responde a este correo o contáctanos a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</p>
+              `;
+
+        const msg = {
+            to: contactEmail,
+            from: sendgridFrom,
+            subject,
+            html: content + `
+                <p style="margin-top: 20px; font-size: 12px; color: #666;">
+                    MON|BLEU | Servicio de Devoluciones
+                </p>
+            `
+        };
+        await sgMail.send(msg);
+        console.log(`✅ Email de decisión (${decision}) enviado a ${contactEmail}`);
+    } catch (error) {
+        console.error('❌ Error enviando decision email:', error.message || error);
+    }
+}
+
+/**
+ * Envía email cuando se envía un cambio (producto de reemplazo)
+ */
+async function sendShipmentEmail(contactEmail, customerName, requestId, trackingNumber) {
+    if (!sendgridApiKey || !sendgridFrom) {
+        console.warn('⚠️ SendGrid no configurado para shipment email');
+        return;
+    }
+    try {
+        const msg = {
+            to: contactEmail,
+            from: sendgridFrom,
+            subject: 'Tu producto de reemplazo está en camino | MON|BLEU',
+            html: `
+                <h2>¡Tu reemplazo está en camino ${customerName || 'Cliente'}!</h2>
+                <p>Hemos enviado tu producto de reemplazo.</p>
+                <p><strong>Solicitud #:</strong> ${requestId}</p>
+                <p><strong>Número de rastreo:</strong> ${trackingNumber || 'Por determinar'}</p>
+                <p>Puedes rastrear tu paquete usando el número anterior en el sitio del transportista.</p>
+                <p>Recibirás el producto en 5-8 días hábiles aproximadamente.</p>
+                <p style="margin-top: 20px; font-size: 12px; color: #666;">
+                    Preguntas? Contacta a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}
+                </p>
+            `
+        };
+        await sgMail.send(msg);
+        console.log(`✅ Email de envío enviado a ${contactEmail}`);
+    } catch (error) {
+        console.error('❌ Error enviando shipment email:', error.message || error);
+    }
+}
+
+/**
+ * Envía email de notificación de devolución completada
+ */
+async function sendCompletionEmail(contactEmail, customerName, requestId) {
+    if (!sendgridApiKey || !sendgridFrom) {
+        console.warn('⚠️ SendGrid no configurado para completion email');
+        return;
+    }
+    try {
+        const msg = {
+            to: contactEmail,
+            from: sendgridFrom,
+            subject: 'Tu devolución está completa | MON|BLEU',
+            html: `
+                <h2>¡Listo ${customerName || 'Cliente'}!</h2>
+                <p>Tu solicitud de devolución ha sido <strong>completada</strong>.</p>
+                <p><strong>Solicitud #:</strong> ${requestId}</p>
+                <p>Todos los pasos han sido finalizados. Gracias por tu paciencia.</p>
+                <p>Si tienes más preguntas o necesitas ayuda, no dudes en contactarnos.</p>
+                <p style="margin-top: 20px; font-size: 12px; color: #666;">
+                    Gracias por confiar en MON|BLEU 💙
+                </p>
+            `
+        };
+        await sgMail.send(msg);
+        console.log(`✅ Email de finalización enviado a ${contactEmail}`);
+    } catch (error) {
+        console.error('❌ Error enviando completion email:', error.message || error);
+    }
+}
 
 // Panel Admin (HTML) - DEBE IR ANTES DEL STATIC MIDDLEWARE
 app.get('/admin', requireAdmin, (req, res) => {
@@ -725,6 +911,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
             }
         }
 
+        // Enviar email de confirmación (async, no esperar)
+        sendConfirmationEmail(contactEmail, customerName, requestId, orderNumber);
+
         // Respuesta al Frontend
         res.json({
             success: true,
@@ -780,18 +969,26 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
     if (!dbPool || !requestId) return;
 
     const [rows] = await executeQuery(
-        `SELECT order_id, tracking_number FROM returns_requests WHERE id = ? LIMIT 1`,
+        `SELECT order_id, tracking_number, contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
         [requestId]
     );
+    
     const storedOrderId = rows && rows[0] ? rows[0].order_id : null;
     const finalOrderId = orderId || storedOrderId;
+    const contactEmail = rows && rows[0] ? rows[0].contact_email : null;
+    const customerName = rows && rows[0] ? rows[0].customer_name : null;
 
     await executeQuery(
         `UPDATE returns_requests SET payment_status = 'paid', payment_provider = ?, payment_reference = ? WHERE id = ?`,
         [String(paymentProvider || 'mercadopago'), String(paymentId || ''), requestId]
     );
 
+    let trackingNumber = null;
+
     if (rows && rows[0] && rows[0].tracking_number) {
+        trackingNumber = rows[0].tracking_number;
+        // Enviar email de coincidencia de pago (async, no esperar)
+        sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
         return;
     }
 
@@ -800,10 +997,13 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
             const order = await resolveOrderForLabel(finalOrderId);
             if (!order) {
                 console.warn('⚠️ No se pudo obtener la orden para generar guía');
+                // Aún así enviar email de pago confirmado
+                sendPaymentConfirmationEmail(contactEmail, customerName, requestId, null);
                 return;
             }
             const label = await myeshipClient.createReturnLabel({ order, requestId });
             if (label && label.trackingNumber) {
+                trackingNumber = label.trackingNumber;
                 const now = new Date().toISOString();
                 await executeQuery(
                     `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
@@ -819,6 +1019,9 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
     } else {
         console.warn('ℹ️ MyeShip no configurado: no se generó guía');
     }
+
+    // Enviar email de pago confirmado (async, no esperar)
+    sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
 }
 
 async function handleFailedPayment({ requestId, paymentId, paymentProvider = 'mercadopago' }) {
@@ -1615,10 +1818,22 @@ app.post('/api/admin/requests/:requestId/complete', requireAdmin, async (req, re
         }
 
         const requestId = req.params.requestId;
+
+        // Obtener info del cliente para enviar email
+        const [rows] = await executeQuery(
+            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            [requestId]
+        );
+        const contactEmail = rows?.[0]?.contact_email;
+        const customerName = rows?.[0]?.customer_name;
+
         await executeQuery(
             `UPDATE returns_requests SET admin_status = 'completed' WHERE id = ?`,
             [requestId]
         );
+
+        // Enviar email de finalización (async, no esperar)
+        sendCompletionEmail(contactEmail, customerName, requestId);
 
         res.json({ success: true, message: 'Solicitud marcada como completada' });
     } catch (err) {
@@ -1688,14 +1903,27 @@ app.post('/api/admin/requests/:requestId/decision', requireAdmin, async (req, re
 
         const requestId = req.params.requestId;
         const status = String(req.body?.status || '').toLowerCase();
+        const rejectionReason = String(req.body?.rejectionReason || '').trim() || null;
+        
         if (!['accepted', 'rejected'].includes(status)) {
             return res.status(400).json({ success: false, message: 'Estado inválido' });
         }
+
+        // Obtener info del cliente para enviar email
+        const [rows] = await executeQuery(
+            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            [requestId]
+        );
+        const contactEmail = rows?.[0]?.contact_email;
+        const customerName = rows?.[0]?.customer_name;
 
         await executeQuery(
             `UPDATE returns_requests SET admin_status = ? WHERE id = ?`,
             [status, requestId]
         );
+
+        // Enviar email de decisión (async, no esperar)
+        sendDecisionEmail(contactEmail, customerName, requestId, status, rejectionReason);
 
         res.json({ success: true, message: 'Estado actualizado', admin_status: status });
     } catch (err) {
@@ -1716,10 +1944,21 @@ app.post('/api/admin/requests/:requestId/ship-change', requireAdmin, async (req,
             return res.status(400).json({ success: false, message: 'Tracking requerido' });
         }
 
+        // Obtener info del cliente para enviar email
+        const [rows] = await executeQuery(
+            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            [requestId]
+        );
+        const contactEmail = rows?.[0]?.contact_email;
+        const customerName = rows?.[0]?.customer_name;
+
         await executeQuery(
             `UPDATE returns_requests SET tracking_number = ?, change_sent_at = ?, admin_status = 'sent' WHERE id = ?`,
             [trackingNumber, new Date().toISOString(), requestId]
         );
+
+        // Enviar email de envío (async, no esperar)
+        sendShipmentEmail(contactEmail, customerName, requestId, trackingNumber);
 
         res.json({ success: true, message: 'Cambio enviado', trackingNumber });
     } catch (err) {
