@@ -36,6 +36,13 @@ const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
 const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
 const sendgridFrom = process.env.SENDGRID_FROM || '';
+const sendgridTemplateConfirmation = process.env.SENDGRID_TEMPLATE_CONFIRMATION || '';
+const sendgridTemplatePayment = process.env.SENDGRID_TEMPLATE_PAYMENT || '';
+const sendgridTemplateDecisionAccepted = process.env.SENDGRID_TEMPLATE_DECISION_ACCEPTED || '';
+const sendgridTemplateDecisionRejected = process.env.SENDGRID_TEMPLATE_DECISION_REJECTED || '';
+const sendgridTemplateShipment = process.env.SENDGRID_TEMPLATE_SHIPMENT || '';
+const sendgridTemplateCoupon = process.env.SENDGRID_TEMPLATE_COUPON || '';
+const sendgridTemplateCompletion = process.env.SENDGRID_TEMPLATE_COMPLETION || '';
 if (sendgridApiKey) {
     sgMail.setApiKey(sendgridApiKey);
 }
@@ -398,6 +405,71 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 // ========== EMAIL UTILITIES ==========
+function buildEmailHtml({ title, preheader, bodyHtml, footerText }) {
+    const safePreheader = preheader || '';
+    const safeFooter = footerText || 'MON|BLEU | Servicio de Devoluciones';
+    return `
+        <!doctype html>
+        <html lang="es">
+        <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>${title}</title>
+        </head>
+        <body style="margin:0; padding:0; background-color:#f5f6f8; font-family:Arial, Helvetica, sans-serif; color:#111827;">
+            <span style="display:none; visibility:hidden; opacity:0; height:0; width:0;">
+                ${safePreheader}
+            </span>
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f5f6f8; padding:24px 16px;">
+                <tr>
+                    <td align="center">
+                        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 6px 20px rgba(15, 23, 42, 0.08);">
+                            <tr>
+                                <td style="padding:24px 28px; border-bottom:1px solid #e5e7eb;">
+                                    <div style="font-size:18px; font-weight:700; letter-spacing:0.2px;">MON|BLEU</div>
+                                    <div style="font-size:12px; color:#6b7280; margin-top:4px;">Centro de Devoluciones</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:28px;">
+                                    <h1 style="margin:0 0 12px; font-size:20px; font-weight:700; color:#111827;">${title}</h1>
+                                    <div style="font-size:14px; line-height:1.6; color:#1f2937;">
+                                        ${bodyHtml}
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding:16px 28px 24px; border-top:1px solid #e5e7eb;">
+                                    <div style="font-size:12px; color:#6b7280;">${safeFooter}</div>
+                                </td>
+                            </tr>
+                        </table>
+                        <div style="font-size:11px; color:#9ca3af; margin-top:12px;">Este correo fue enviado automáticamente. Si tienes dudas, responde a este email.</div>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+    `;
+}
+
+async function sendGridMessage({ to, subject, html, templateId, dynamicTemplateData }) {
+    const msg = templateId
+        ? {
+            to,
+            from: sendgridFrom,
+            templateId,
+            dynamicTemplateData
+        }
+        : {
+            to,
+            from: sendgridFrom,
+            subject,
+            html
+        };
+    await sgMail.send(msg);
+}
+
 /**
  * Envía un email de confirmación cuando se crea una solicitud de devolución
  */
@@ -407,22 +479,33 @@ async function sendConfirmationEmail(contactEmail, customerName, requestId, orde
         return;
     }
     try {
-        const msg = {
+        const bodyHtml = `
+            <p>Hola ${customerName || 'Cliente'},</p>
+            <p>Recibimos tu solicitud de devolucion y ya esta en proceso.</p>
+            <div style="margin:16px 0; padding:12px 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+                <div><strong>Numero de solicitud:</strong> #${requestId}</div>
+                <div><strong>Orden Shopify:</strong> ${orderNumber || 'N/A'}</div>
+            </div>
+            <p>Te contactaremos pronto con los siguientes pasos.</p>
+            <p>Si tienes preguntas, escribe a <strong>${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</strong>.</p>
+        `;
+        await sendGridMessage({
             to: contactEmail,
-            from: sendgridFrom,
-            subject: 'Devolución recibida | MON|BLEU',
-            html: `
-                <h2>¡Hola ${customerName || 'Cliente'}!</h2>
-                <p>Tu solicitud de devolución ha sido recibida exitosamente.</p>
-                <p><strong>Número de solicitud:</strong> #${requestId}</p>
-                <p><strong>Orden Shopify:</strong> ${orderNumber || 'N/A'}</p>
-                <p>Revisaremos tu solicitud pronto y te contactaremos con los próximos pasos.</p>
-                <p style="margin-top: 20px; font-size: 12px; color: #666;">
-                    Si tienes preguntas, no dudes en contactarnos a <strong>${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</strong>
-                </p>
-            `
-        };
-        await sgMail.send(msg);
+            subject: 'Devolucion recibida | MON|BLEU',
+            html: buildEmailHtml({
+                title: 'Devolucion recibida',
+                preheader: 'Hemos recibido tu solicitud y ya esta en proceso.',
+                bodyHtml,
+                footerText: 'MON|BLEU | Servicio de Devoluciones'
+            }),
+            templateId: sendgridTemplateConfirmation,
+            dynamicTemplateData: {
+                customerName: customerName || 'Cliente',
+                requestId,
+                orderNumber: orderNumber || 'N/A',
+                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com'
+            }
+        });
         console.log(`✅ Email de confirmación enviado a ${contactEmail}`);
     } catch (error) {
         console.error('❌ Error enviando confirmation email:', error.message || error);
@@ -441,33 +524,44 @@ async function sendPaymentConfirmationEmail(contactEmail, customerName, requestI
         let trackingContent = '';
         if (trackingNumber) {
             trackingContent = `
-                <p><strong>Tu número de guía:</strong> ${trackingNumber}</p>
-                <p>Usa este número para rastrear tu paquete de devolución.</p>
+                <div style="margin:16px 0; padding:12px 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+                    <div><strong>Numero de guia:</strong> ${trackingNumber}</div>
+                    <div style="font-size:13px; color:#4b5563; margin-top:6px;">Usa este numero para rastrear tu paquete de devolucion.</div>
+                </div>
             `;
         }
 
-        const msg = {
+        const bodyHtml = `
+            <p>Hola ${customerName || 'Cliente'},</p>
+            <p>Tu pago fue aprobado y tu guia de devolucion esta lista.</p>
+            <p><strong>Solicitud #:</strong> ${requestId}</p>
+            ${trackingContent}
+            <p><strong>Pasos siguientes:</strong></p>
+            <ol style="margin:8px 0 0 18px; padding:0;">
+                <li>Descarga tu guia de devolucion</li>
+                <li>Empaca los articulos que devuelves</li>
+                <li>Pega la guia en el paquete</li>
+                <li>Entrega en el punto indicado</li>
+            </ol>
+            <p style="margin-top:16px;">Si necesitas ayuda, escribe a <strong>${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</strong>.</p>
+        `;
+        await sendGridMessage({
             to: contactEmail,
-            from: sendgridFrom,
-            subject: 'Pago confirmado y guía de devolución lista | MON|BLEU',
-            html: `
-                <h2>¡Gracias ${customerName || 'Cliente'}!</h2>
-                <p>Tu pago ha sido procesado correctamente y tu guía de devolución está lista.</p>
-                <p><strong>Solicitud #:</strong> ${requestId}</p>
-                ${trackingContent}
-                <p><strong>Pasos siguientes:</strong></p>
-                <ol>
-                    <li>Descarga tu guía de devolución</li>
-                    <li>Empaca los artículos que devuelves</li>
-                    <li>Pega la guía en el paquete</li>
-                    <li>Entrega en el punto de origen indicado</li>
-                </ol>
-                <p style="margin-top: 20px; font-size: 12px; color: #666;">
-                    Preguntas? Contáctanos: <strong>${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</strong>
-                </p>
-            `
-        };
-        await sgMail.send(msg);
+            subject: 'Pago confirmado y guia lista | MON|BLEU',
+            html: buildEmailHtml({
+                title: 'Pago confirmado y guia lista',
+                preheader: 'Tu pago fue aprobado y tu guia ya esta disponible.',
+                bodyHtml,
+                footerText: 'MON|BLEU | Servicio de Devoluciones'
+            }),
+            templateId: sendgridTemplatePayment,
+            dynamicTemplateData: {
+                customerName: customerName || 'Cliente',
+                requestId,
+                trackingNumber: trackingNumber || 'Por determinar',
+                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com'
+            }
+        });
         console.log(`✅ Email de pago confirmado enviado a ${contactEmail}`);
     } catch (error) {
         console.error('❌ Error enviando payment confirmation email:', error.message || error);
@@ -488,33 +582,44 @@ async function sendDecisionEmail(contactEmail, customerName, requestId, decision
             ? '¡Tu devolución fue aceptada! | MON|BLEU'
             : 'Referente a tu solicitud de devolución | MON|BLEU';
         
-        let content = isAccepted
+        const content = isAccepted
             ? `
-                <h2>¡Buenas noticias ${customerName || 'Cliente'}!</h2>
-                <p>Tu solicitud de devolución ha sido <strong>aceptada</strong>.</p>
+                <p>Hola ${customerName || 'Cliente'},</p>
+                <p>Tu solicitud de devolucion fue <strong>aceptada</strong>.</p>
                 <p><strong>Solicitud #:</strong> ${requestId}</p>
-                <p>Próximamente recibirás los artículos de reemplazo en la dirección que registraste.</p>
-                <p>Agradecemos tu paciencia y confianza en MON|BLEU.</p>
+                <p>Pronto recibiras los articulos de reemplazo en la direccion registrada.</p>
+                <p>Gracias por tu paciencia y confianza en MON|BLEU.</p>
               `
             : `
-                <h2>Hola ${customerName || 'Cliente'},</h2>
-                <p>Revisamos tu solicitud de devolución (Solicitud #${requestId}).</p>
+                <p>Hola ${customerName || 'Cliente'},</p>
+                <p>Revisamos tu solicitud de devolucion (Solicitud #${requestId}).</p>
                 <p><strong>Estado:</strong> No fue posible procesarla</p>
                 ${rejectionReason ? `<p><strong>Motivo:</strong> ${rejectionReason}</p>` : ''}
-                <p>Si tienes preguntas, responde a este correo o contáctanos a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</p>
+                <p>Si tienes preguntas, escribe a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}.</p>
               `;
 
-        const msg = {
+        const templateId = isAccepted
+            ? sendgridTemplateDecisionAccepted
+            : sendgridTemplateDecisionRejected;
+
+        await sendGridMessage({
             to: contactEmail,
-            from: sendgridFrom,
             subject,
-            html: content + `
-                <p style="margin-top: 20px; font-size: 12px; color: #666;">
-                    MON|BLEU | Servicio de Devoluciones
-                </p>
-            `
-        };
-        await sgMail.send(msg);
+            html: buildEmailHtml({
+                title: isAccepted ? 'Devolucion aceptada' : 'Actualizacion de tu solicitud',
+                preheader: isAccepted ? 'Tu solicitud fue aceptada.' : 'Te compartimos una actualizacion sobre tu solicitud.',
+                bodyHtml: content,
+                footerText: 'MON|BLEU | Servicio de Devoluciones'
+            }),
+            templateId,
+            dynamicTemplateData: {
+                customerName: customerName || 'Cliente',
+                requestId,
+                status: decision,
+                rejectionReason: rejectionReason || '',
+                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com'
+            }
+        });
         console.log(`✅ Email de decisión (${decision}) enviado a ${contactEmail}`);
     } catch (error) {
         console.error('❌ Error enviando decision email:', error.message || error);
@@ -530,23 +635,33 @@ async function sendShipmentEmail(contactEmail, customerName, requestId, tracking
         return;
     }
     try {
-        const msg = {
+        const bodyHtml = `
+            <p>Hola ${customerName || 'Cliente'},</p>
+            <p>Tu producto de reemplazo ya fue enviado.</p>
+            <p><strong>Solicitud #:</strong> ${requestId}</p>
+            <div style="margin:16px 0; padding:12px 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+                <div><strong>Numero de rastreo:</strong> ${trackingNumber || 'Por determinar'}</div>
+            </div>
+            <p>Puedes rastrear tu paquete con el numero anterior en el sitio del transportista.</p>
+            <p>Si necesitas ayuda, escribe a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}.</p>
+        `;
+        await sendGridMessage({
             to: contactEmail,
-            from: sendgridFrom,
-            subject: 'Tu producto de reemplazo está en camino | MON|BLEU',
-            html: `
-                <h2>¡Tu reemplazo está en camino ${customerName || 'Cliente'}!</h2>
-                <p>Hemos enviado tu producto de reemplazo.</p>
-                <p><strong>Solicitud #:</strong> ${requestId}</p>
-                <p><strong>Número de rastreo:</strong> ${trackingNumber || 'Por determinar'}</p>
-                <p>Puedes rastrear tu paquete usando el número anterior en el sitio del transportista.</p>
-                <p>Recibirás el producto en 5-8 días hábiles aproximadamente.</p>
-                <p style="margin-top: 20px; font-size: 12px; color: #666;">
-                    Preguntas? Contacta a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}
-                </p>
-            `
-        };
-        await sgMail.send(msg);
+            subject: 'Tu reemplazo esta en camino | MON|BLEU',
+            html: buildEmailHtml({
+                title: 'Reemplazo en camino',
+                preheader: 'Tu producto de reemplazo ya fue enviado.',
+                bodyHtml,
+                footerText: 'MON|BLEU | Servicio de Devoluciones'
+            }),
+            templateId: sendgridTemplateShipment,
+            dynamicTemplateData: {
+                customerName: customerName || 'Cliente',
+                requestId,
+                trackingNumber: trackingNumber || 'Por determinar',
+                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com'
+            }
+        });
         console.log(`✅ Email de envío enviado a ${contactEmail}`);
     } catch (error) {
         console.error('❌ Error enviando shipment email:', error.message || error);
@@ -562,22 +677,29 @@ async function sendCompletionEmail(contactEmail, customerName, requestId) {
         return;
     }
     try {
-        const msg = {
+        const bodyHtml = `
+            <p>Hola ${customerName || 'Cliente'},</p>
+            <p>Tu solicitud de devolucion ha sido <strong>completada</strong>.</p>
+            <p><strong>Solicitud #:</strong> ${requestId}</p>
+            <p>Todos los pasos han sido finalizados. Gracias por tu paciencia.</p>
+            <p>Si necesitas apoyo adicional, escribe a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}.</p>
+        `;
+        await sendGridMessage({
             to: contactEmail,
-            from: sendgridFrom,
-            subject: 'Tu devolución está completa | MON|BLEU',
-            html: `
-                <h2>¡Listo ${customerName || 'Cliente'}!</h2>
-                <p>Tu solicitud de devolución ha sido <strong>completada</strong>.</p>
-                <p><strong>Solicitud #:</strong> ${requestId}</p>
-                <p>Todos los pasos han sido finalizados. Gracias por tu paciencia.</p>
-                <p>Si tienes más preguntas o necesitas ayuda, no dudes en contactarnos.</p>
-                <p style="margin-top: 20px; font-size: 12px; color: #666;">
-                    Gracias por confiar en MON|BLEU 💙
-                </p>
-            `
-        };
-        await sgMail.send(msg);
+            subject: 'Tu devolucion esta completa | MON|BLEU',
+            html: buildEmailHtml({
+                title: 'Devolucion completada',
+                preheader: 'Tu solicitud fue completada exitosamente.',
+                bodyHtml,
+                footerText: 'MON|BLEU | Servicio de Devoluciones'
+            }),
+            templateId: sendgridTemplateCompletion,
+            dynamicTemplateData: {
+                customerName: customerName || 'Cliente',
+                requestId,
+                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com'
+            }
+        });
         console.log(`✅ Email de finalización enviado a ${contactEmail}`);
     } catch (error) {
         console.error('❌ Error enviando completion email:', error.message || error);
@@ -1997,20 +2119,34 @@ app.post('/api/admin/requests/:requestId/send-coupon', requireAdmin, async (req,
         }
 
         const formattedAmount = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(couponAmount);
-        const msg = {
+        const bodyHtml = `
+            <p>Hola ${customerName},</p>
+            <p>Tu cupon ha sido confirmado.</p>
+            <div style="margin:16px 0; padding:12px 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+                <div><strong>Codigo:</strong> ${couponCode}</div>
+                <div><strong>Monto:</strong> ${formattedAmount}</div>
+            </div>
+            <p>Usa este codigo en el checkout de MON|BLEU.</p>
+            <p>Si tienes dudas, responde a este correo o escribe a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}.</p>
+        `;
+        await sendGridMessage({
             to: contactEmail,
-            from: sendgridFrom,
-            subject: 'Tu cupón MON|BLEU está listo',
-            html: `
-                <p>Hola ${customerName},</p>
-                <p>Tu cupón ha sido confirmado.</p>
-                <p><strong>Código:</strong> ${couponCode}<br />
-                <strong>Monto:</strong> ${formattedAmount}</p>
-                <p>Instrucciones: usa este código en el checkout de MON|BLEU. Si tienes dudas, responde a este correo.</p>
-            `
-        };
-
-        await sgMail.send(msg);
+            subject: 'Tu cupon MON|BLEU esta listo',
+            html: buildEmailHtml({
+                title: 'Cupon listo para usar',
+                preheader: 'Tu cupon ha sido confirmado y ya puedes usarlo.',
+                bodyHtml,
+                footerText: 'MON|BLEU | Servicio de Devoluciones'
+            }),
+            templateId: sendgridTemplateCoupon,
+            dynamicTemplateData: {
+                customerName,
+                couponCode,
+                couponAmount,
+                formattedAmount,
+                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com'
+            }
+        });
 
         await executeQuery(
             `UPDATE returns_requests SET coupon_code = ?, coupon_amount = ?, coupon_sent_at = ? WHERE id = ?`,
