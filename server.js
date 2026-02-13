@@ -634,7 +634,7 @@ async function sendDecisionEmail(contactEmail, customerName, requestId, decision
 /**
  * Envía email cuando se envía un cambio (producto de reemplazo)
  */
-async function sendShipmentEmail(contactEmail, customerName, requestId, trackingNumber) {
+async function sendShipmentEmail(contactEmail, customerName, requestId, trackingNumber, labelBase64 = null, labelMime = null) {
     if (!sendgridApiKey || !sendgridFrom) {
         console.warn('⚠️ SendGrid no configurado para shipment email');
         return;
@@ -648,9 +648,11 @@ async function sendShipmentEmail(contactEmail, customerName, requestId, tracking
                 <div><strong>Numero de rastreo:</strong> ${trackingNumber || 'Por determinar'}</div>
             </div>
             <p>Puedes rastrear tu paquete con el numero anterior en el sitio del transportista.</p>
+            ${labelBase64 ? '<p><strong>Tu guía de envío está adjunta en este correo.</strong></p>' : ''}
             <p>Si necesitas ayuda, escribe a ${process.env.RETURN_EMAIL || 'returns@monbleu.com'}.</p>
         `;
-        await sendGridMessage({
+        
+        const messageData = {
             to: contactEmail,
             subject: 'Tu reemplazo esta en camino | MON|BLEU',
             html: buildEmailHtml({
@@ -664,10 +666,25 @@ async function sendShipmentEmail(contactEmail, customerName, requestId, tracking
                 customerName: customerName || 'Cliente',
                 requestId,
                 trackingNumber: trackingNumber || 'Por determinar',
-                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com'
+                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com',
+                hasLabel: !!labelBase64
             }
-        });
-        console.log(`✅ Email de envío enviado a ${contactEmail}`);
+        };
+        
+        // Adjuntar PDF de la guía si está disponible
+        if (labelBase64 && labelMime) {
+            messageData.attachments = [
+                {
+                    content: labelBase64,
+                    filename: `guia-envio-${requestId}.pdf`,
+                    type: labelMime,
+                    disposition: 'attachment'
+                }
+            ];
+        }
+        
+        await sendGridMessage(messageData);
+        console.log(`✅ Email de envío enviado a ${contactEmail}${labelBase64 ? ' con guía PDF adjunta' : ''}`);
     } catch (error) {
         console.error('❌ Error enviando shipment email:', error.message || error);
     }
@@ -1034,6 +1051,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                                 [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
                             );
                             console.log(`📦 Guía MyeShip generada (defecto): ${label.trackingNumber}`);
+                            
+                            // Enviar guía por correo con PDF adjunto
+                            sendShipmentEmail(contactEmail, customerName, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
                         }
                     }
                 } else {
@@ -1151,6 +1171,9 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
                     [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
                 );
                 console.log(`📦 Guía MyeShip generada: ${label.trackingNumber} (${label.provider} - ${label.serviceName})`);
+                
+                // Enviar guía por correo con PDF adjunto
+                sendShipmentEmail(contactEmail, customerName, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
             } else {
                 console.warn('⚠️ MyeShip respondió sin tracking');
             }
@@ -2099,8 +2122,16 @@ app.post('/api/admin/requests/:requestId/ship-change', requireAdmin, async (req,
             [trackingNumber, new Date().toISOString(), requestId]
         );
 
-        // Enviar email de envío (async, no esperar)
-        sendShipmentEmail(contactEmail, customerName, requestId, trackingNumber);
+        // Obtener el PDF de la guía para enviarlo por correo
+        const labelRows = await executeQuery(
+            `SELECT label_base64, label_mime FROM returns_requests WHERE id = ? LIMIT 1`,
+            [requestId]
+        );
+        const labelBase64 = labelRows?.[0]?.label_base64;
+        const labelMime = labelRows?.[0]?.label_mime;
+
+        // Enviar email de envío con PDF adjunto (async, no esperar)
+        sendShipmentEmail(contactEmail, customerName, requestId, trackingNumber, labelBase64, labelMime);
 
         res.json({ success: true, message: 'Cambio enviado', trackingNumber });
     } catch (err) {
@@ -2217,6 +2248,13 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
             `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
             [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
         );
+
+        // Enviar guía por correo con PDF adjunto
+        const contactEmail = request.contact_email;
+        const customerName = request.customer_name;
+        if (contactEmail) {
+            sendShipmentEmail(contactEmail, customerName, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
+        }
 
         res.json({
             success: true,
