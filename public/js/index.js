@@ -404,8 +404,19 @@ function validarSeleccion() {
             return;
         }
     }
-    nav(3);
-    renderChangeItems();
+    
+    // Verificar si hay cambios
+    const hasChanges = keys.some(k => seleccion[k]?.requestType === 'Cambio');
+    if (hasChanges) {
+        // Si hay cambios, ir al step 3 para seleccionar tallas
+        nav(3);
+        renderChangeItems();
+    } else {
+        // Si solo hay devoluciones/reembolsos, ir directo al resumen de pago (step 4)
+        tipoFinal = resolveTipoFinal();
+        irAPago(tipoFinal);
+        nav(4);
+    }
 }
 
 function renderChangeItems() {
