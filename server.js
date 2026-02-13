@@ -1090,12 +1090,19 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
 
 async function resolveOrderForLabel(orderId) {
     if (!orderId) return null;
-    let order = await shopifyClient.getOrderById(orderId);
+    const rawOrderId = String(orderId || '').trim();
+    const looksNumericId = /^\d+$/.test(rawOrderId);
+    let order = null;
+
+    if (looksNumericId) {
+        order = await shopifyClient.getOrderById(rawOrderId);
+    }
+
     if (!order) {
-        const rawOrderId = String(orderId || '').trim();
         const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
         order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
     }
+
     return order || null;
 }
 
