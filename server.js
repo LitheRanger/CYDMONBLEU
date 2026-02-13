@@ -458,7 +458,7 @@ function buildEmailHtml({ title, preheader, bodyHtml, footerText }) {
     `;
 }
 
-async function sendGridMessage({ to, subject, html, templateId, dynamicTemplateData }) {
+async function sendGridMessage({ to, subject, html, templateId, dynamicTemplateData, attachments }) {
     const msg = templateId
         ? {
             to,
@@ -472,6 +472,12 @@ async function sendGridMessage({ to, subject, html, templateId, dynamicTemplateD
             subject,
             html
         };
+    
+    // Agregar attachments si existen
+    if (attachments && Array.isArray(attachments)) {
+        msg.attachments = attachments;
+    }
+    
     await sgMail.send(msg);
 }
 
