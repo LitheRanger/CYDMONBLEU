@@ -51,6 +51,11 @@ if (sendgridApiKey) {
 const shopifyClient = require('./Shopifyclient.js');
 const myeshipClient = require('./myeshipClient.js');
 
+const missingMyeShipConfig = myeshipClient.getMissingConfigFields();
+if (missingMyeShipConfig.length > 0) {
+    console.warn(`⚠️ MyeShip config incompleto al iniciar. Faltan: ${missingMyeShipConfig.join(', ')}`);
+}
+
 const app = express();
 // Render/Cloudflare sends X-Forwarded-For; trust proxy so rate limit can read it
 app.set('trust proxy', 1);
@@ -915,6 +920,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         const files = req.files || []; // Array con las fotos subidas
 
         const isDefectRequest = items.length > 0 && items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
+        console.log(`> MyeShip: defecto=${isDefectRequest}`);
 
         // Lógica de Precio: TARIFA PLANA $150 (excepto cuando hay defecto)
         const amountToPay = isDefectRequest ? 0 : 150; 
@@ -1001,6 +1007,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         ]);
 
         const requestId = isPostgreSQL ? result[0]?.id : result.insertId;
+        if (!isDefectRequest) {
+            console.log(`ℹ️ MyeShip: guia se genera despues de pago aprobado (requestId=${requestId})`);
+        }
 
         if (isDefectRequest && requestId) {
             try {
