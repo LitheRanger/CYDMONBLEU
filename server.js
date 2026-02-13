@@ -1027,6 +1027,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                             console.log(`📦 Guía MyeShip generada (defecto): ${label.trackingNumber}`);
                         }
                     }
+                } else {
+                    const missing = myeshipClient.getMissingConfigFields();
+                    console.warn(`⚠️ MyeShip no configurado. Faltan: ${missing.join(', ') || 'N/A'}`);
                 }
             } catch (defectErr) {
                 console.error('❌ Error procesando defecto sin pago:', defectErr.message || defectErr);
@@ -1139,7 +1142,8 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
             console.error('❌ Error generando guía MyeShip:', labelErr.message || labelErr);
         }
     } else {
-        console.warn('ℹ️ MyeShip no configurado: no se generó guía');
+        const missing = myeshipClient.getMissingConfigFields();
+        console.warn(`⚠️ MyeShip no configurado. Faltan: ${missing.join(', ') || 'N/A'}`);
     }
 
     // Enviar email de pago confirmado (async, no esperar)

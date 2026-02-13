@@ -51,19 +51,28 @@ const MYESHIP_PKG_DIM_UNIT = process.env.MYESHIP_PKG_DIM_UNIT || 'cm';
 // Optional: Select cheapest service automatically
 const MYESHIP_AUTO_SELECT_CHEAPEST = process.env.MYESHIP_AUTO_SELECT_CHEAPEST === 'true';
 
+const REQUIRED_CONFIG = [
+  { key: 'MYESHIP_API_KEY', value: MYESHIP_API_KEY },
+  { key: 'RETURN_COMPANY_NAME', value: RETURN_COMPANY_NAME },
+  { key: 'RETURN_PHONE', value: RETURN_PHONE },
+  { key: 'RETURN_ADDRESS1', value: RETURN_ADDRESS1 },
+  { key: 'RETURN_CITY', value: RETURN_CITY },
+  { key: 'RETURN_STATE', value: RETURN_STATE },
+  { key: 'RETURN_POSTAL_CODE', value: RETURN_POSTAL_CODE }
+];
+
 /**
- * Verifica si MyeShip está correctamente configurado
+ * Verifica si MyeShip esta correctamente configurado
  */
 function isConfigured() {
-  return !!(
-    MYESHIP_API_KEY &&
-    RETURN_COMPANY_NAME &&
-    RETURN_PHONE &&
-    RETURN_ADDRESS1 &&
-    RETURN_CITY &&
-    RETURN_STATE &&
-    RETURN_POSTAL_CODE
-  );
+  return getMissingConfigFields().length === 0;
+}
+
+/**
+ * Devuelve lista de variables faltantes para MyeShip
+ */
+function getMissingConfigFields() {
+  return REQUIRED_CONFIG.filter(item => !item.value).map(item => item.key);
 }
 
 /**
@@ -329,6 +338,7 @@ async function cancelShipment(trackingNumber) {
 
 module.exports = {
   isConfigured,
+  getMissingConfigFields,
   createReturnLabel,
   getShipment,
   cancelShipment
