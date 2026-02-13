@@ -50,6 +50,8 @@ const MYESHIP_PKG_DIM_UNIT = process.env.MYESHIP_PKG_DIM_UNIT || 'cm';
 
 // Optional: Select cheapest service automatically
 const MYESHIP_AUTO_SELECT_CHEAPEST = process.env.MYESHIP_AUTO_SELECT_CHEAPEST === 'true';
+// Optional: Prefer specific provider (e.g., 'fedex', 'dhl', 'estafeta')
+const MYESHIP_PREFERRED_PROVIDER = (process.env.MYESHIP_PREFERRED_PROVIDER || '').toLowerCase();
 
 const REQUIRED_CONFIG = [
   { key: 'MYESHIP_API_KEY', value: MYESHIP_API_KEY },
@@ -218,6 +220,18 @@ async function getQuotation(payload) {
 function selectRate(quotation) {
   if (!quotation.rates || quotation.rates.length === 0) {
     throw new Error('No shipping rates available');
+  }
+
+  // If preferred provider is set, try to find it first
+  if (MYESHIP_PREFERRED_PROVIDER) {
+    const preferred = quotation.rates.find(r => 
+      (r.provider || '').toLowerCase().includes(MYESHIP_PREFERRED_PROVIDER)
+    );
+    if (preferred) {
+      console.log(`✅ MyeShip: Using preferred provider: ${preferred.provider}`);
+      return preferred;
+    }
+    console.log(`⚠️ MyeShip: Preferred provider '${MYESHIP_PREFERRED_PROVIDER}' not available, using fallback`);
   }
 
   // If auto-select cheapest is enabled, find it
