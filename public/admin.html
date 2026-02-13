@@ -1167,10 +1167,10 @@
                     requests = data.data || [];
                     // Excluir completadas de cambios y reembolsos
                     defectos = requests.filter(r => hasDefect(r));
-                    cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio'
+                    cambios = requests.filter(r => (normalizeType(r.return_type) === 'cambio' || hasChangeItem(r))
                         && String(r.admin_status || '').toLowerCase() !== 'completed'
                         && !hasDefect(r));
-                    reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso'
+                    reembolsos = requests.filter(r => (normalizeType(r.return_type) === 'reembolso' || hasRefundItem(r))
                         && String(r.admin_status || '').toLowerCase() !== 'completed'
                         && !hasDefect(r));
                     completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed'
