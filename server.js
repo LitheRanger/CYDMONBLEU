@@ -520,7 +520,7 @@ async function sendConfirmationEmail(contactEmail, customerName, requestId, orde
 /**
  * Envía un email cuando el pago es aprobado y la guía está lista
  */
-async function sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber) {
+async function sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber, labelBase64 = null, labelMime = null) {
     if (!sendgridApiKey || !sendgridFrom) {
         console.warn('⚠️ SendGrid no configurado para payment email');
         return;
@@ -541,16 +541,18 @@ async function sendPaymentConfirmationEmail(contactEmail, customerName, requestI
             <p>Tu pago fue aprobado y tu guia de devolucion esta lista.</p>
             <p><strong>Solicitud #:</strong> ${requestId}</p>
             ${trackingContent}
+            ${labelBase64 ? '<p><strong>Tu guía de devolución está adjunta en este correo.</strong></p>' : ''}
             <p><strong>Pasos siguientes:</strong></p>
             <ol style="margin:8px 0 0 18px; padding:0;">
-                <li>Descarga tu guia de devolucion</li>
+                <li>Descarga tu guia de devolucion (adjunta en este correo)</li>
                 <li>Empaca los articulos que devuelves</li>
                 <li>Pega la guia en el paquete</li>
                 <li>Entrega en el punto indicado</li>
             </ol>
             <p style="margin-top:16px;">Si necesitas ayuda, escribe a <strong>${process.env.RETURN_EMAIL || 'returns@monbleu.com'}</strong>.</p>
         `;
-        await sendGridMessage({
+        
+        const messageData = {
             to: contactEmail,
             subject: 'Pago confirmado y guia lista | MON|BLEU',
             html: buildEmailHtml({
@@ -564,10 +566,25 @@ async function sendPaymentConfirmationEmail(contactEmail, customerName, requestI
                 customerName: customerName || 'Cliente',
                 requestId,
                 trackingNumber: trackingNumber || 'Por determinar',
-                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com'
+                returnEmail: process.env.RETURN_EMAIL || 'returns@monbleu.com',
+                hasLabel: !!labelBase64
             }
-        });
-        console.log(`✅ Email de pago confirmado enviado a ${contactEmail}`);
+        };
+        
+        // Adjuntar PDF de la guía si está disponible
+        if (labelBase64 && labelMime) {
+            messageData.attachments = [
+                {
+                    content: labelBase64,
+                    filename: `guia-devolucion-${requestId}.pdf`,
+                    type: labelMime,
+                    disposition: 'attachment'
+                }
+            ];
+        }
+        
+        await sendGridMessage(messageData);
+        console.log(`✅ Email de pago confirmado enviado a ${contactEmail}${labelBase64 ? ' con guía PDF adjunta' : ''}`);
     } catch (error) {
         console.error('❌ Error enviando payment confirmation email:', error.message || error);
     }
@@ -1051,9 +1068,6 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                                 [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
                             );
                             console.log(`📦 Guía MyeShip generada (defecto): ${label.trackingNumber}`);
-                            
-                            // Enviar guía por correo con PDF adjunto
-                            sendShipmentEmail(contactEmail, customerName, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
                         }
                     }
                 } else {
@@ -1148,8 +1162,10 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
 
     if (rows && rows[0] && rows[0].tracking_number) {
         trackingNumber = rows[0].tracking_number;
-        // Enviar email de coincidencia de pago (async, no esperar)
-        sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
+        const labelBase64 = rows[0].label_base64;
+        const labelMime = rows[0].label_mime;
+        // Enviar email de coincidencia de pago con PDF (async, no esperar)
+        sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber, labelBase64, labelMime);
         return;
     }
 
@@ -1172,21 +1188,24 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
                 );
                 console.log(`📦 Guía MyeShip generada: ${label.trackingNumber} (${label.provider} - ${label.serviceName})`);
                 
-                // Enviar guía por correo con PDF adjunto
-                sendShipmentEmail(contactEmail, customerName, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
+                // Enviar email de pago confirmado con PDF adjunto (async, no esperar)
+                sendPaymentConfirmationEmail(contactEmail, customerName, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
             } else {
                 console.warn('⚠️ MyeShip respondió sin tracking');
+                // Enviar email sin PDF
+                sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
             }
         } catch (labelErr) {
             console.error('❌ Error generando guía MyeShip:', labelErr.message || labelErr);
+            // Enviar email sin PDF en caso de error
+            sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
         }
     } else {
         const missing = myeshipClient.getMissingConfigFields();
         console.warn(`⚠️ MyeShip no configurado. Faltan: ${missing.join(', ') || 'N/A'}`);
+        // Enviar email sin PDF si MyeShip no está configurado
+        sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
     }
-
-    // Enviar email de pago confirmado (async, no esperar)
-    sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
 }
 
 async function handleFailedPayment({ requestId, paymentId, paymentProvider = 'mercadopago' }) {
@@ -2248,13 +2267,6 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
             `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
             [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
         );
-
-        // Enviar guía por correo con PDF adjunto
-        const contactEmail = request.contact_email;
-        const customerName = request.customer_name;
-        if (contactEmail) {
-            sendShipmentEmail(contactEmail, customerName, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
-        }
 
         res.json({
             success: true,
