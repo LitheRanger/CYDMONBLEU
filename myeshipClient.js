@@ -136,7 +136,8 @@ function parseAddress(address) {
  * Construye el payload para crear una cotización (paso 1)
  */
 function buildQuotationPayload({ order, requestId }) {
-  const shipping = order?.shipping_address || order?.customer?.default_address || null;
+  // Preferimos la direccion de envio original de la orden para el remitente
+  const shipping = order?.shipping_address || order?.billing_address || null;
 
   if (!shipping) {
     throw new Error('Order does not have a usable address');
@@ -144,7 +145,7 @@ function buildQuotationPayload({ order, requestId }) {
 
   const shipperName = `${shipping.first_name || ''} ${shipping.last_name || ''}`.trim() || 'Customer';
   const shipperPhone = shipping.phone || process.env.DEFAULT_CUSTOMER_PHONE || '0000000000';
-  const shipperEmail = order.customer?.email || 'noreply@example.com';
+  const shipperEmail = order?.email || order?.customer?.email || 'noreply@example.com';
 
   const shipperAddress = parseAddress(shipping);
   const returnAddress = {
@@ -155,6 +156,19 @@ function buildQuotationPayload({ order, requestId }) {
     zip: RETURN_POSTAL_CODE.substring(0, 35),
     country: RETURN_COUNTRY_CODE
   };
+
+  console.log('📍 MyeShip remitente:', {
+    name: shipperName,
+    phone: shipperPhone,
+    email: shipperEmail,
+    address: shipperAddress
+  });
+  console.log('📦 MyeShip destino:', {
+    name: RETURN_CONTACT_NAME,
+    phone: RETURN_PHONE,
+    email: process.env.RETURN_EMAIL || 'noreply@monbleu.com',
+    address: returnAddress
+  });
 
   return {
     address_from: {
