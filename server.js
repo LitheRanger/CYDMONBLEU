@@ -2232,7 +2232,7 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
         }
 
         const request = rows[0];
-        const order = await shopifyClient.getOrderById(request.order_id);
+        const order = await resolveOrderForLabel(request.order_id);
 
         if (!order || !order.shipping_address) {
             return res.status(400).json({ success: false, message: 'No se pudo obtener dirección' });

@@ -124,7 +124,11 @@ class ShopifyTokenManager {
   // 1.1 Buscar Orden por ID (Para guías de paquetería)
   async getOrderById(orderId) {
     try {
-      const data = await this.makeRequest(`/admin/api/2024-01/orders/${orderId}.json`);
+      const rawId = String(orderId || '').trim();
+      if (!/^[0-9]+$/.test(rawId)) {
+        return null;
+      }
+      const data = await this.makeRequest(`/admin/api/2024-01/orders/${rawId}.json`);
       return data.order || null;
     } catch (e) {
       console.error(`Error buscando orden ${orderId}`);
