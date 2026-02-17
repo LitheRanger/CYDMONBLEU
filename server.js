@@ -1115,19 +1115,38 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
 async function resolveOrderForLabel(orderId) {
     if (!orderId) return null;
     const rawOrderId = String(orderId || '').trim();
-    const looksNumericId = /^\d+$/.test(rawOrderId);
-    let order = null;
+    const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
 
-    if (looksNumericId) {
-        order = await shopifyClient.getOrderById(rawOrderId);
+    // Buscar por ID y por nombre SIEMPRE
+    let orderById = null;
+    let orderByName = null;
+    if (/^\d+$/.test(rawOrderId)) {
+        orderById = await shopifyClient.getOrderById(rawOrderId);
     }
+    orderByName = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
 
-    if (!order) {
-        const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
-        order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
+    // Si ambos existen y coinciden en datos clave, usar uno
+    if (orderById && orderByName) {
+        // Compara dirección de envío y email
+        const addrId = orderById.shipping_address;
+        const addrName = orderByName.shipping_address;
+        const emailId = orderById.email || (orderById.customer && orderById.customer.email);
+        const emailName = orderByName.email || (orderByName.customer && orderByName.customer.email);
+        const sameAddress = addrId && addrName &&
+            addrId.address1 === addrName.address1 &&
+            addrId.zip === addrName.zip &&
+            addrId.city === addrName.city;
+        const sameEmail = emailId && emailName && emailId === emailName;
+        if (sameAddress || sameEmail) {
+            return orderById; // Son la misma orden
+        } else {
+            // Si no coinciden, loguea y retorna null
+            console.warn('⚠️ Orden encontrada por ID y por nombre pero los datos no coinciden:', {orderId, orderById, orderByName});
+            return null;
+        }
     }
-
-    return order || null;
+    // Si solo una existe, retorna esa
+    return orderById || orderByName || null;
 }
 
 async function handleApprovedPayment({ requestId, orderId, paymentId, paymentProvider = 'mercadopago' }) {
