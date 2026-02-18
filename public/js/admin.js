@@ -304,7 +304,7 @@ function applyFilter() {
 
     // Filtrar CAMBIOS
     filteredCambios = cambios.filter(r => {
-        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        const hay = `${r.order_id || ''} ${r.order_number || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
         if (!matchesPaymentFilter(r, status)) return false;
         if (label === 'yes' && !r.tracking_number) return false;
@@ -315,7 +315,7 @@ function applyFilter() {
 
     // Filtrar REEMBOLSOS
     filteredReembolsos = reembolsos.filter(r => {
-        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        const hay = `${r.order_id || ''} ${r.order_number || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
         if (!matchesPaymentFilter(r, status)) return false;
         if (label === 'yes' && !r.tracking_number) return false;
@@ -325,7 +325,7 @@ function applyFilter() {
 
     // Filtrar COMPLETADAS
     filteredCompletadas = completadas.filter(r => {
-        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        const hay = `${r.order_id || ''} ${r.order_number || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
         if (!matchesPaymentFilter(r, status)) return false;
         if (label === 'yes' && !r.tracking_number) return false;
@@ -336,7 +336,7 @@ function applyFilter() {
 
     // Filtrar DEFECTOS
     filteredDefectos = defectos.filter(r => {
-        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        const hay = `${r.order_id || ''} ${r.order_number || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
         if (!matchesPaymentFilter(r, status)) return false;
         if (label === 'yes' && !r.tracking_number) return false;
