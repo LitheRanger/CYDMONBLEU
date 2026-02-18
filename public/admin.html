@@ -1146,14 +1146,44 @@
             if (isCambio) actions.push(`<button class="btn" data-action="ship">Enviar</button>`);
             if (isReembolso) actions.push(`<button class="btn" data-action="coupon">Enviar cupon</button>`);
             if (isCambio) actions.push(`<button class="btn secondary" data-action="refund-status">Cambiar Estado</button>`);
+
             if (!isCompletada) {
                 actions.push(`<button class="btn" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`);
             }
+
+            // Botón eliminar
+            actions.push(`<button class="btn danger" data-action="delete">Eliminar</button>`);
 
             return actions.join('');
         }
 
         async function loadRequests() {
+                    // Delegar evento para eliminar orden
+                    document.body.addEventListener('click', async function (e) {
+                        const btn = e.target.closest('button[data-action="delete"]');
+                        if (!btn) return;
+                        const tr = btn.closest('tr');
+                        const orderId = tr && tr.getAttribute('data-request-id');
+                        if (!orderId) return;
+                        if (!confirm('¿Seguro que deseas eliminar esta orden? Esta acción no se puede deshacer.')) return;
+                        btn.disabled = true;
+                        btn.textContent = 'Eliminando...';
+                        try {
+                            const res = await fetch(`${API_BASE}/api/admin/requests/${orderId}`, { method: 'DELETE' });
+                            const data = await res.json();
+                            if (data.success) {
+                                tr.remove();
+                                alert('Orden eliminada correctamente.');
+                            } else {
+                                alert('Error eliminando orden: ' + (data.message || 'Error desconocido'));
+                            }
+                        } catch (err) {
+                            alert('Error eliminando orden: ' + (err.message || err));
+                        } finally {
+                            btn.disabled = false;
+                            btn.textContent = 'Eliminar';
+                        }
+                    }, false);
             try {
                 document.getElementById('btn-refresh').disabled = true;
                 const res = await fetch(`${API_BASE}/api/admin/requests`);
