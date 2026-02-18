@@ -898,6 +898,14 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
 // --- 3. ENDPOINT: PROCESAR SELECCIÓN ---
 // upload.any() permite recibir múltiples archivos con cualquier nombre de campo
 app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => {
+            // Validar que no exista ya una solicitud para este número de orden
+            const [existing] = await executeQuery(
+                'SELECT id FROM returns_requests WHERE order_id = ? LIMIT 1',
+                [orderIdForStorage]
+            );
+            if (existing && existing.length > 0) {
+                return res.status(400).json({ success: false, message: 'Ya existe una solicitud para este número de orden.' });
+            }
     try {
         console.log("📦 Recibiendo solicitud...");
 
@@ -919,9 +927,23 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         }
 
         const { orderId, orderNumber, contactEmail, returnType, customerName } = submitParsed.data;
-        // Guardar SIEMPRE el OrderId del formulario (número de orden Shopify)
+        // Validar que el OrderId existe en Shopify antes de guardar
         const orderIdForStorage = String(orderId || '').trim();
         const orderIdForLookup = String(orderId || '').trim();
+        let shopifyOrder = null;
+        try {
+            // Buscar por ID numérico y por nombre
+            shopifyOrder = await shopifyClient.getOrderById(orderIdForLookup);
+            if (!shopifyOrder) {
+                const orderName = orderIdForLookup.startsWith('#') ? orderIdForLookup : `#${orderIdForLookup}`;
+                shopifyOrder = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(orderIdForLookup);
+            }
+        } catch (e) {
+            console.warn('⚠️ Error buscando orden en Shopify:', e?.message || e);
+        }
+        if (!shopifyOrder) {
+            return res.status(400).json({ success: false, message: 'El número de orden no existe en Shopify. Verifica el dato.' });
+        }
         
         // Los items vienen como string JSON, hay que parsearlos
         let items = [];
