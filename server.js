@@ -48,35 +48,7 @@ const sendgridTemplateDecisionAccepted = process.env.SENDGRID_TEMPLATE_DECISION_
     // --- ADMIN API ---
 
 // ...existing code...
-// --- ADMIN DELETE ORDER ENDPOINT ---
-// Debe ir después de la inicialización de app y middlewares
-app.delete('/api/admin/requests/:orderId', requireAdmin, async (req, res) => {
-    try {
-        if (!dbPool) {
-            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
-        }
-        const orderId = req.params.orderId;
-        if (!orderId) {
-            return res.status(400).json({ success: false, message: 'OrderId requerido' });
-        }
-        // Verificar si existe la orden
-        const [rows] = await executeQuery(
-            `SELECT * FROM returns_requests WHERE order_id = ? LIMIT 1`,
-            [orderId]
-        );
-        if (!rows || !rows[0]) {
-            return res.status(404).json({ success: false, message: 'Orden no encontrada' });
-        }
-        await executeQuery(
-            `DELETE FROM returns_requests WHERE order_id = ?`,
-            [orderId]
-        );
-        return res.json({ success: true, message: 'Orden eliminada correctamente' });
-    } catch (err) {
-        console.error('Error eliminando orden:', err);
-        return res.status(500).json({ success: false, message: 'Error eliminando orden' });
-    }
-});
+
 
 const sendgridTemplateDecisionRejected = process.env.SENDGRID_TEMPLATE_DECISION_REJECTED || '';
 const sendgridTemplateShipment = process.env.SENDGRID_TEMPLATE_SHIPMENT || '';
