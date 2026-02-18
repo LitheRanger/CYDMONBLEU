@@ -258,16 +258,43 @@ async function loadRequests() {
         const data = await res.json();
         if (data.success) {
             requests = data.data || [];
-            // Excluir completadas de cambios y reembolsos
+            
+            // Filtrar por tipo de solitud
             defectos = requests.filter(r => hasDefect(r));
-            cambios = requests.filter(r => normalizeType(r.return_type) === 'cambio'
-                && String(r.admin_status || '').toLowerCase() !== 'completed'
-                && !hasDefect(r));
-            reembolsos = requests.filter(r => normalizeType(r.return_type) === 'reembolso'
-                && String(r.admin_status || '').toLowerCase() !== 'completed'
-                && !hasDefect(r));
+            
+            // Cambios: solo items de cambio, SIN reembolsos, SIN defectos
+            cambios = requests.filter(r => {
+                if (hasDefect(r)) return false; // excluir defectos
+                if (String(r.admin_status || '').toLowerCase() === 'completed') return false; // excluir completadas
+                // Incluir si es cambio por return_type O si tiene items de cambio pero no reembolsos
+                const returnType = normalizeType(r.return_type);
+                const hasChanges = hasChangeItem(r);
+                const hasRefunds = hasRefundItem(r);
+                // Si tiene cambios pero no reembolsos, incluir
+                // Si return_type es cambio pero no tiene items, confiar en return_type
+                if (hasChanges && !hasRefunds) return true;
+                if (returnType === 'cambio' && !hasRefunds) return true;
+                return false;
+            });
+            
+            // Reembolsos: solo items de reembolso, SIN cambios, SIN defectos
+            reembolsos = requests.filter(r => {
+                if (hasDefect(r)) return false; // excluir defectos
+                if (String(r.admin_status || '').toLowerCase() === 'completed') return false; // excluir completadas
+                // Incluir si es reembolso por return_type O si tiene items de reembolso pero no cambios
+                const returnType = normalizeType(r.return_type);
+                const hasChanges = hasChangeItem(r);
+                const hasRefunds = hasRefundItem(r);
+                // Si tiene reembolsos pero no cambios, incluir
+                // Si return_type es reembolso pero no tiene items, confiar en return_type
+                if (hasRefunds && !hasChanges) return true;
+                if (returnType === 'reembolso' && !hasChanges) return true;
+                return false;
+            });
+            
             completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed'
                 && !hasDefect(r));
+            
             updateStats();
             applyFilter();
         } else {
