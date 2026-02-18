@@ -1,3 +1,5 @@
+// ...existing code...
+// --- ADMIN API ---
 // Eliminar una orden y su historial por order_id (admin)
 app.delete('/api/admin/requests/:orderId', requireAdmin, async (req, res) => {
     try {
