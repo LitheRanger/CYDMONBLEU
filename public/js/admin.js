@@ -243,7 +243,6 @@ function renderRow(r, tabName, tbody) {
                 ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
                 <td>${paymentBadge(r)}</td>
                 <td>${adminBadge(r.admin_status)}</td>
-                <td>${formatCurrency(r.amount)}</td>
                 <td>${trackingText}</td>
                 <td>${labelBadge}</td>
                 <td class="muted">${formatDate(r.created_at)}</td>
