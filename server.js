@@ -1897,7 +1897,7 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
         }
 
         const [rows] = await executeQuery(
-                    `SELECT id, order_id, order_number, contact_email, customer_name, return_type, items_json, amount, payment_status, payment_reference,
+                    `SELECT order_id, order_number, contact_email, customer_name, return_type, items_json, amount, payment_status, payment_reference,
                     carrier, tracking_number, label_created_at, created_at, admin_status, refund_status,
                     coupon_code, coupon_amount, coupon_sent_at, change_sent_at
              FROM returns_requests
