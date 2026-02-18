@@ -634,7 +634,14 @@ async function changeRefundStatus(requestId) {
 }
 
 async function deleteRequest(requestId) {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
+    // Obtener información de la solicitud para mostrar en confirmación
+    const req = requests.find(r => r.order_id == requestId);
+    const orderNumber = req?.order_number || requestId;
+    const customerName = req?.customer_name || 'desconocido';
+    
+    const confirmMessage = `⚠️ ¿Eliminar la orden #${orderNumber}?\n\nCliente: ${customerName}\nEsta acción NO se puede deshacer.`;
+    
+    if (!confirm(confirmMessage)) return;
 
     try {
         const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/delete`, {
@@ -645,14 +652,15 @@ async function deleteRequest(requestId) {
         if (data.success) {
             document.getElementById('modal').classList.remove('show');
             loadRequests();
-            alert('Solicitud eliminada correctamente');
+            alert('✅ Solicitud eliminada correctamente');
         } else {
-            alert(`Error: ${data.message}`);
+            alert(`❌ Error: ${data.message}`);
         }
     } catch (e) {
         console.error('Error:', e);
-        alert('Error al eliminar la solicitud');
+        alert('❌ Error al eliminar la solicitud');
     }
+}
 }
 
 async function updateDecision(requestId, status) {
