@@ -201,7 +201,7 @@ function renderTab(tabName, data) {
 function renderRow(r, tabName, tbody) {
     const tr = document.createElement('tr');
     tr.classList.add('clickable-row');
-    tr.setAttribute('data-request-id', r.id);
+    tr.setAttribute('data-request-id', r.order_id);
     const labelBadge = r.tracking_number
         ? `<span class="badge success" style="background:#dcfce7;color:#16a34a;">${r.carrier || 'Generada'}</span>`
         : '<span class="badge no-label">Sin guia</span>';
@@ -211,20 +211,20 @@ function renderRow(r, tabName, tbody) {
     const isCompletadas = tabName === 'completadas' || tabName === 'defectos';
     const isReembolso = tabName === 'reembolsos';
     const actions = `
-                <button class="link-btn" data-id="${r.id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guia</button>
-                <button class="link-btn" data-id="${r.id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
-                <button class="link-btn" data-id="${r.id}" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>
-                <button class="link-btn" data-id="${r.id}" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>
-                ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="ship">Enviar</button>` : ''}
-                ${isReembolso ? `<button class="link-btn" data-id="${r.id}" data-action="coupon">Enviar cupon</button>` : ''}
-                ${isCambio ? `<button class="link-btn" data-id="${r.id}" data-action="refund-status">Cambiar Estado</button>` : ''}
-                ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
+                <button class="link-btn" data-id="${r.order_id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guia</button>
+                <button class="link-btn" data-id="${r.order_id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
+                <button class="link-btn" data-id="${r.order_id}" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>
+                <button class="link-btn" data-id="${r.order_id}" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>
+                ${isCambio ? `<button class="link-btn" data-id="${r.order_id}" data-action="ship">Enviar</button>` : ''}
+                ${isReembolso ? `<button class="link-btn" data-id="${r.order_id}" data-action="coupon">Enviar cupon</button>` : ''}
+                ${isCambio ? `<button class="link-btn" data-id="${r.order_id}" data-action="refund-status">Cambiar Estado</button>` : ''}
+                ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.order_id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
             `;
 
     const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
 
     tr.innerHTML = `
-                <td>${r.id}</td>
+                <td>${r.order_id}</td>
                 <td><strong>${r.order_id || '—'}</strong></td>
                 <td>${r.customer_name || '—'}</td>
                 <td class="muted">${r.contact_email || '—'}</td>
