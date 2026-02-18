@@ -525,7 +525,12 @@ async function viewDetail(requestId) {
             
             if (isCambio) actions.push(`<button class="btn" onclick="shipChange('${r.order_id}')">Enviar</button>`);
             if (isReembolso) actions.push(`<button class="btn" onclick="sendCoupon('${r.order_id}')">Enviar cupón</button>`);
-            if (isCambio) actions.push(`<button class="btn secondary" onclick="changeRefundStatus('${r.order_id}')">Cambiar Estado</button>`);
+            if (isCambio) {
+                const currentStatus = r.refund_status || 'pending_receipt';
+                const nextStatus = currentStatus === 'pending_receipt' ? 'Por Enviar' : 'Por Recibir';
+                const statusEmoji = currentStatus === 'pending_receipt' ? '📥' : '📦';
+                actions.push(`<button class="btn secondary" onclick="changeRefundStatus('${r.order_id}')" title="Cambiar de ${currentStatus === 'pending_receipt' ? 'Por Recibir' : 'Por Enviar'}">${statusEmoji} Cambiar a ${nextStatus}</button>`);
+            }
             
             if (!isCompletada) {
                 actions.push(`<button class="btn" onclick="completeRequest('${r.order_id}')" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`);
