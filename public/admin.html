@@ -1420,7 +1420,7 @@
                     const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
                     actions.push(`<button class="btn secondary" onclick="downloadLabel('${r.order_id}')" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>`);
                     const isSandbox = (typeof window !== 'undefined' && window.location.hostname === 'localhost') || (typeof API_BASE !== 'undefined' && API_BASE.includes('localhost')) || (typeof API_BASE !== 'undefined' && API_BASE.includes('sandbox'));
-                    actions.push(`<button class="btn secondary" onclick="retryLabel('${r.order_id}')" ${(isSandbox ? '' : (r.payment_status !== 'paid' ? 'disabled' : ''))}>Reintentar</button>`);
+                    actions.push(`<button class="btn secondary" onclick="retryLabel('${r.order_id}')" ${isSandbox ? '' : 'disabled'}>Reintentar</button>`);
                     if (isDefecto) {
                         actions.push(`<button class="btn" onclick="updateDecision('${r.order_id}', 'accepted')" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>`);
                         actions.push(`<button class="btn danger" onclick="updateDecision('${r.order_id}', 'rejected')" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>`);
