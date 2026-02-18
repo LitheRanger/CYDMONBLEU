@@ -237,7 +237,7 @@ function renderRow(r, tabName, tbody) {
     const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
 
     tr.innerHTML = `
-                <td><strong>#${r.order_number || r.order_id || '—'}</strong></td>
+                <td><strong>${r.order_id || '—'}</strong></td>
                 <td>${r.customer_name || '—'}</td>
                 <td class="muted">${r.contact_email || '—'}</td>
                 ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
@@ -303,7 +303,7 @@ function applyFilter() {
 
     // Filtrar CAMBIOS
     filteredCambios = cambios.filter(r => {
-        const hay = `${r.order_id || ''} ${r.order_number || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
         if (!matchesPaymentFilter(r, status)) return false;
         if (label === 'yes' && !r.tracking_number) return false;
@@ -314,7 +314,7 @@ function applyFilter() {
 
     // Filtrar REEMBOLSOS
     filteredReembolsos = reembolsos.filter(r => {
-        const hay = `${r.order_id || ''} ${r.order_number || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
         if (!matchesPaymentFilter(r, status)) return false;
         if (label === 'yes' && !r.tracking_number) return false;
@@ -324,7 +324,7 @@ function applyFilter() {
 
     // Filtrar COMPLETADAS
     filteredCompletadas = completadas.filter(r => {
-        const hay = `${r.order_id || ''} ${r.order_number || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
         if (!matchesPaymentFilter(r, status)) return false;
         if (label === 'yes' && !r.tracking_number) return false;
@@ -335,7 +335,7 @@ function applyFilter() {
 
     // Filtrar DEFECTOS
     filteredDefectos = defectos.filter(r => {
-        const hay = `${r.order_id || ''} ${r.order_number || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
         if (!matchesPaymentFilter(r, status)) return false;
         if (label === 'yes' && !r.tracking_number) return false;
@@ -634,14 +634,7 @@ async function changeRefundStatus(requestId) {
 }
 
 async function deleteRequest(requestId) {
-    // Obtener información de la solicitud para mostrar en confirmación
-    const req = requests.find(r => r.order_id == requestId);
-    const orderNumber = req?.order_number || requestId;
-    const customerName = req?.customer_name || 'desconocido';
-    
-    const confirmMessage = `⚠️ ¿Eliminar la orden #${orderNumber}?\n\nCliente: ${customerName}\nEsta acción NO se puede deshacer.`;
-    
-    if (!confirm(confirmMessage)) return;
+    if (!confirm('¿Estás seguro de que deseas eliminar esta solicitud? Esta acción NO se puede deshacer.')) return;
 
     try {
         const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/delete`, {
