@@ -1,3 +1,5 @@
+const express = require('express');
+const cors = require('cors');
 // Detectar si es PostgreSQL o MySQL
 const isPostgreSQL = (process.env.DATABASE_URL || '').includes('postgresql://');
 const db = isPostgreSQL ? require('pg').Pool : require('mysql2/promise');
