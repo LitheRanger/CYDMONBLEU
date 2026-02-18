@@ -2302,8 +2302,9 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
         }
 
         const requestId = req.params.requestId;
+        // Buscar por order_id en vez de id
         const [rows] = await executeQuery(
-            `SELECT * FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT * FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
 
@@ -2326,7 +2327,7 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
 
         const now = new Date().toISOString();
         await executeQuery(
-            `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
+            `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE order_id = ?`,
             [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
         );
 
