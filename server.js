@@ -920,14 +920,14 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
             const orderIdForStorage = String(orderId || '').trim();
             const orderIdForLookup = String(orderId || '').trim();
 
-            // Validar que no exista ya una solicitud para este número de orden
-            const [existing] = await executeQuery(
-                'SELECT order_id FROM returns_requests WHERE order_id = ? LIMIT 1',
-                [orderIdForStorage]
-            );
-            if (existing && existing.length > 0) {
-                return res.status(400).json({ success: false, message: 'Ya existe una solicitud para este número de orden.' });
-            }
+            // TEMPORAL: Se permite registrar varias solicitudes por el mismo número de orden
+            // const [existing] = await executeQuery(
+            //     'SELECT order_id FROM returns_requests WHERE order_id = ? LIMIT 1',
+            //     [orderIdForStorage]
+            // );
+            // if (existing && existing.length > 0) {
+            //     return res.status(400).json({ success: false, message: 'Ya existe una solicitud para este número de orden.' });
+            // }
     try {
         console.log("📦 Recibiendo solicitud...");
 
