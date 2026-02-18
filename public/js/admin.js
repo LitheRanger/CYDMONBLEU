@@ -237,7 +237,7 @@ function renderRow(r, tabName, tbody) {
     const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
 
     tr.innerHTML = `
-                <td><strong>${r.order_id || '—'}</strong></td>
+                <td><strong>#${r.order_number || r.order_id || '—'}</strong></td>
                 <td>${r.customer_name || '—'}</td>
                 <td class="muted">${r.contact_email || '—'}</td>
                 ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
