@@ -1052,16 +1052,17 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
             amountToPay
         ]);
 
-        const requestId = isPostgreSQL ? result[0]?.id : result.insertId;
+        // order_id es la clave primaria, úsalo como identificador
+        const requestOrderId = orderIdForStorage;
         if (!isDefectRequest) {
-            console.log(`ℹ️ MyeShip: guia se genera despues de pago aprobado (requestId=${requestId})`);
+            console.log(`ℹ️ MyeShip: guia se genera despues de pago aprobado (order_id=${requestOrderId})`);
         }
 
-        if (isDefectRequest && requestId) {
+        if (isDefectRequest && requestOrderId) {
             try {
                 await executeQuery(
-                    `UPDATE returns_requests SET payment_status = 'pending' WHERE id = ?`,
-                    [requestId]
+                    `UPDATE returns_requests SET payment_status = 'pending' WHERE order_id = ?`,
+                    [requestOrderId]
                 );
 
                 if (myeshipClient.isConfigured()) {
@@ -1072,33 +1073,29 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                         order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
                     }
                     if (order && order.shipping_address) {
-                        const label = await myeshipClient.createReturnLabel({ order, requestId });
+                        const label = await myeshipClient.createReturnLabel({ order, orderId: requestOrderId });
                         if (label && label.trackingNumber) {
                             const now = new Date().toISOString();
                             await executeQuery(
-                                `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
-                                [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
+                                `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE order_id = ?`,
+                                [label.trackingNumber, label.labelBase64, label.labelMime, now, requestOrderId]
                             );
-                            console.log(`📦 Guía MyeShip generada (defecto): ${label.trackingNumber}`);
                         }
                     }
-                } else {
-                    const missing = myeshipClient.getMissingConfigFields();
-                    console.warn(`⚠️ MyeShip no configurado. Faltan: ${missing.join(', ') || 'N/A'}`);
                 }
-            } catch (defectErr) {
-                console.error('❌ Error procesando defecto sin pago:', defectErr.message || defectErr);
+            } catch (e) {
+                console.error('Error generando guía para defecto:', e);
             }
         }
 
         // Enviar email de confirmación (async, no esperar)
-        sendConfirmationEmail(contactEmail, customerName, requestId, orderNumber);
+        sendConfirmationEmail(contactEmail, customerName, requestOrderId, orderNumber);
 
         // Respuesta al Frontend
         res.json({
             success: true,
             message: "Solicitud procesada",
-            requestId: requestId,
+            requestId: requestOrderId,
             nextStep: "PAYMENT",
             paymentDetails: {
                 amount: amountToPay,
