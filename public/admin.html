@@ -1123,7 +1123,7 @@
                 <td>${trackingText}</td>
                 <td>${labelBadge}</td>
                 <td class="muted">${formatDate(r.created_at)}</td>
-                <td>${buildActionButtons(r)}</td>
+                <td></td>
             `;
             tbody.appendChild(tr);
 
@@ -1136,8 +1136,7 @@
             const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
             const actions = [];
 
-            actions.push(`<button class="btn secondary" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guia</button>`);
-            actions.push(`<button class="btn secondary" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>`);
+            // Botones de acción solo en el modal, no en la tabla
 
             if (isDefecto) {
                 actions.push(`<button class="btn" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>`);
@@ -1467,6 +1466,16 @@
         async function retryLabel(requestId) {
             if (!confirm('¿Regenerar guía MyeShip?')) return;
             try {
+                // Permitir reintentar siempre en sandbox
+                const isSandbox = (typeof window !== 'undefined' && window.location.hostname === 'localhost') || (typeof API_BASE !== 'undefined' && API_BASE.includes('localhost')) || (typeof API_BASE !== 'undefined' && API_BASE.includes('sandbox'));
+                if (!isSandbox) {
+                    // Si no es sandbox, validar pago
+                    const req = requests.find(r => r.order_id == requestId);
+                    if (req && req.payment_status !== 'paid') {
+                        alert('La guía solo puede regenerarse si está pagada.');
+                        return;
+                    }
+                }
                 const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/retry-label`, { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
