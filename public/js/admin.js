@@ -98,22 +98,16 @@ function refundBadge(status) {
 
 function updateStats() {
     const total = requests.length;
-    const paid = requests.filter(r => r.payment_status === 'paid').length;
-    const pending = requests.filter(r => r.payment_status === 'pending' && !isNoPayment(r)).length;
-    const noPayment = requests.filter(r => isNoPayment(r)).length;
-    const labeled = requests.filter(r => r.tracking_number).length;
+    const pendingReceipt = requests.filter(r => String(r.refund_status || '').toLowerCase() === 'pending_receipt').length;
     const pendingShipment = requests.filter(r => String(r.refund_status || '').toLowerCase() === 'pending_shipment').length;
-    const todayCount = requests.filter(r => isSameDay(r.created_at, new Date())).length;
 
-    document.getElementById('total').textContent = total;
-    document.getElementById('paid-count').textContent = paid;
-    document.getElementById('pending-count').textContent = pending;
-    document.getElementById('no-payment-count').textContent = noPayment;
-    document.getElementById('labeled-count').textContent = labeled;
+    const totalEl = document.getElementById('total');
+    const pendingReceiptEl = document.getElementById('pending-receipt-count');
     const pendingShipmentEl = document.getElementById('pending-shipment-count');
-    const todayEl = document.getElementById('today-count');
+
+    if (totalEl) totalEl.textContent = total;
+    if (pendingReceiptEl) pendingReceiptEl.textContent = pendingReceipt;
     if (pendingShipmentEl) pendingShipmentEl.textContent = pendingShipment;
-    if (todayEl) todayEl.textContent = todayCount;
 }
 
 function updateSummaryTab(tabName, data) {
