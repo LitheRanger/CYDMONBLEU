@@ -765,6 +765,11 @@ app.use('/admin', requireAdmin, express.static(path.join(__dirname, 'public')));
 
 // Servir archivos estáticos públicos (HTML, CSS, JS desde la carpeta 'public')
 // IMPORTANTE: Esta línea va DESPUÉS de las rutas protegidas
+// Bloquear acceso directo a admin.html desde rutas públicas
+app.get(['/admin.html', '/public/admin.html'], (req, res) => {
+    return res.status(403).send('Acceso prohibido. Usa /admin');
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
     index: false // No servir index automáticamente para evitar conflictos
 }));
