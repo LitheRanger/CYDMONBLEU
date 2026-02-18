@@ -2070,14 +2070,14 @@ app.post('/api/admin/requests/:requestId/complete', requireAdmin, async (req, re
 
         // Obtener info del cliente para enviar email
         const [rows] = await executeQuery(
-            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
         const contactEmail = rows?.[0]?.contact_email;
         const customerName = rows?.[0]?.customer_name;
 
         await executeQuery(
-            `UPDATE returns_requests SET admin_status = 'completed' WHERE id = ?`,
+            `UPDATE returns_requests SET admin_status = 'completed' WHERE order_id = ?`,
             [requestId]
         );
 
@@ -2102,7 +2102,7 @@ app.post('/api/admin/requests/:requestId/refund-status', requireAdmin, async (re
 
         // Obtener solicitud actual para validar tipo
         const [rows] = await executeQuery(
-            `SELECT return_type FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT return_type FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
 
@@ -2129,7 +2129,7 @@ app.post('/api/admin/requests/:requestId/refund-status', requireAdmin, async (re
         }
 
         await executeQuery(
-            `UPDATE returns_requests SET refund_status = ? WHERE id = ?`,
+            `UPDATE returns_requests SET refund_status = ? WHERE order_id = ?`,
             [status, requestId]
         );
 
@@ -2160,14 +2160,14 @@ app.post('/api/admin/requests/:requestId/decision', requireAdmin, async (req, re
 
         // Obtener info del cliente para enviar email
         const [rows] = await executeQuery(
-            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
         const contactEmail = rows?.[0]?.contact_email;
         const customerName = rows?.[0]?.customer_name;
 
         await executeQuery(
-            `UPDATE returns_requests SET admin_status = ? WHERE id = ?`,
+            `UPDATE returns_requests SET admin_status = ? WHERE order_id = ?`,
             [status, requestId]
         );
 
@@ -2195,14 +2195,14 @@ app.post('/api/admin/requests/:requestId/ship-change', requireAdmin, async (req,
 
         // Obtener info del cliente para enviar email
         const [rows] = await executeQuery(
-            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
         const contactEmail = rows?.[0]?.contact_email;
         const customerName = rows?.[0]?.customer_name;
 
         await executeQuery(
-            `UPDATE returns_requests SET tracking_number = ?, change_sent_at = ?, admin_status = 'sent' WHERE id = ?`,
+            `UPDATE returns_requests SET tracking_number = ?, change_sent_at = ?, admin_status = 'sent' WHERE order_id = ?`,
             [trackingNumber, new Date().toISOString(), requestId]
         );
 
@@ -2231,7 +2231,7 @@ app.post('/api/admin/requests/:requestId/send-coupon', requireAdmin, async (req,
         }
 
         const [rows] = await executeQuery(
-            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
         const contactEmail = rows?.[0]?.contact_email;
@@ -2276,7 +2276,7 @@ app.post('/api/admin/requests/:requestId/send-coupon', requireAdmin, async (req,
         });
 
         await executeQuery(
-            `UPDATE returns_requests SET coupon_code = ?, coupon_amount = ?, coupon_sent_at = ? WHERE id = ?`,
+            `UPDATE returns_requests SET coupon_code = ?, coupon_amount = ?, coupon_sent_at = ? WHERE order_id = ?`,
             [couponCode, couponAmount, new Date().toISOString(), requestId]
         );
 
@@ -2450,12 +2450,12 @@ app.post('/api/admin/migrate-enrich-items', requireAdmin, async (req, res) => {
 
                 // Actualizar en BD
                 await executeQuery(
-                    `UPDATE returns_requests SET items_json = ? WHERE id = ?`,
-                    [JSON.stringify(enrichedItems), request.id]
+                    `UPDATE returns_requests SET items_json = ? WHERE order_id = ?`,
+                    [JSON.stringify(enrichedItems), request.order_id]
                 );
 
                 updated++;
-                console.log(`✓ Request ${request.id} actualizado`);
+                console.log(`✓ Request ${request.order_id} actualizado`);
 
             } catch (itemErr) {
                 console.error(`Error procesando request ${request.id}:`, itemErr?.message || itemErr);
@@ -2484,7 +2484,7 @@ app.get('/api/label/:requestId', async (req, res) => {
 
         const { requestId } = req.params;
         const [rows] = await executeQuery(
-            `SELECT carrier, tracking_number, label_base64, label_mime FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT carrier, tracking_number, label_base64, label_mime FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
 
