@@ -157,14 +157,15 @@ function buildQuotationPayload({ order, requestId }) {
     country: RETURN_COUNTRY_CODE
   };
 
-  console.log('📍 MyeShip remitente:', {
+  console.log('📍 MyeShip remitente (cliente que devuelve):', {
     name: shipperName,
     phone: shipperPhone,
     email: shipperEmail,
     address: shipperAddress
   });
-  console.log('📦 MyeShip destino:', {
+  console.log('📦 MyeShip destino (almacén de retorno):', {
     name: RETURN_CONTACT_NAME,
+    company: RETURN_COMPANY_NAME,
     phone: RETURN_PHONE,
     email: process.env.RETURN_EMAIL || 'noreply@monbleu.com',
     address: returnAddress
@@ -322,7 +323,15 @@ async function createReturnLabel({ order, requestId }) {
 
     // Paso 2: Seleccionar tarifa
     const selectedRate = selectRate(quotation);
-    console.log(`📦 MyeShip: Selected rate - ${selectedRate.provider} (${selectedRate.servicelevel.name}) - $${selectedRate.amount} ${selectedRate.currency}`);
+    console.log(`📦 MyeShip: Tarifa seleccionada - ${selectedRate.provider} (${selectedRate.servicelevel.name}) - $${selectedRate.amount} ${selectedRate.currency}`);
+    
+    // Mostrar detalles de origen/destino de la tarifa
+    if (selectedRate.origin_address) {
+      console.log('📫 MyeShip: Origen (remitente) de la tarifa:', selectedRate.origin_address);
+    }
+    if (selectedRate.destination_address) {
+      console.log('📬 MyeShip: Destino de la tarifa:', selectedRate.destination_address);
+    }
 
     // Paso 3: Crear envío y generar guía
     const shipment = await createShipment(selectedRate.rate_id, 'PDF');
