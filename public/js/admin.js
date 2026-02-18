@@ -413,7 +413,7 @@ async function viewDetail(requestId) {
                     `;
         }).join('') || '<div class="muted">Sin archivos</div>';
 
-        document.getElementById('detail-id').textContent = r.id;
+        document.getElementById('detail-id').textContent = r.order_id;
         document.getElementById('detail-body').innerHTML = `
                     <div class="detail-section">
                         <h3 class="detail-section-title">Cliente</h3>
@@ -491,6 +491,33 @@ async function viewDetail(requestId) {
                         <div class="files-grid">${filesHtml}</div>
                     </div>
                 `;
+        // Renderizar botones de acción en el modal
+        const actionsContainer = document.getElementById('detail-actions');
+        if (actionsContainer) {
+            let actions = [];
+            const isCambio = String(r.return_type || '').toLowerCase() === 'cambio';
+            const isReembolso = String(r.return_type || '').toLowerCase() === 'reembolso';
+            const isDefecto = Array.isArray(r.items) && r.items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
+            const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
+            
+            actions.push(`<button class="btn secondary" onclick="downloadLabel('${r.order_id}')" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>`);
+            actions.push(`<button class="btn secondary" onclick="retryLabel('${r.order_id}')">Reintentar</button>`);
+            
+            if (isDefecto) {
+                actions.push(`<button class="btn" onclick="updateDecision('${r.order_id}', 'accepted')" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>`);
+                actions.push(`<button class="btn danger" onclick="updateDecision('${r.order_id}', 'rejected')" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>`);
+            }
+            
+            if (isCambio) actions.push(`<button class="btn" onclick="shipChange('${r.order_id}')">Enviar</button>`);
+            if (isReembolso) actions.push(`<button class="btn" onclick="sendCoupon('${r.order_id}')">Enviar cupón</button>`);
+            if (isCambio) actions.push(`<button class="btn secondary" onclick="changeRefundStatus('${r.order_id}')">Cambiar Estado</button>`);
+            
+            if (!isCompletada) {
+                actions.push(`<button class="btn" onclick="completeRequest('${r.order_id}')" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`);
+            }
+            
+            actionsContainer.innerHTML = actions.join(' ');
+        }
         document.getElementById('modal').classList.add('show');
     } catch (e) {
         console.error('Error:', e);
