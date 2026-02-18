@@ -27,7 +27,7 @@ const mpWebhookLog = String(process.env.MP_WEBHOOK_LOG || '').toLowerCase() === 
 const stripe = process.env.STRIPE_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_SECRET_KEY)
     : null;
-const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+const stripeWebhookSecret = (process.env.STRIPE_WEBHOOK_SECRET || '').trim();
 
 const sgMail = require('@sendgrid/mail');
 const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
@@ -109,15 +109,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// JSON parser para todas las rutas excepto Stripe webhook (requiere body raw)
-app.use((req, res, next) => {
-    if (req.originalUrl === '/api/stripe-webhook') {
-        return next();
-    }
-    return express.json()(req, res, next);
-});
-
-// Stripe webhook: ANTES del middleware JSON parser, usar express.raw
+// ⚠️ STRIPE WEBHOOK FIRST - antes de cualquier middleware JSON
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
 
@@ -133,17 +125,27 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
     let event;
     try {
-        // Asegurar que req.body es un Buffer
-        const body = typeof req.body === 'string' ? Buffer.from(req.body) : req.body;
-        console.log('📨 Webhook body type:', typeof body, 'Length:', body.length);
+        // Convertir body a Buffer si es necesario
+        let body = req.body;
+        if (typeof body === 'string') {
+            body = Buffer.from(body);
+        } else if (typeof body === 'object' && !Buffer.isBuffer(body)) {
+            // Si es un object parseado, serializar a JSON
+            body = Buffer.from(JSON.stringify(body));
+            console.warn('⚠️ Body llegó como object, reconvirtiendo a JSON string');
+        }
+        
+        console.log('📨 Webhook body type:', typeof body, 'isBuffer:', Buffer.isBuffer(body), 'Length:', body.length || body.toString().length);
         console.log('📨 Signature from header:', sig ? sig.substring(0, 20) + '...' : 'missing');
+        console.log('📨 Secret configured:', stripeWebhookSecret ? stripeWebhookSecret.substring(0, 10) + '...' : 'NOT SET');
         
         event = stripe.webhooks.constructEvent(body, sig, stripeWebhookSecret);
         console.log('✅ Webhook verificado correctamente. Tipo:', event.type);
     } catch (err) {
         console.error('❌ Error verificando webhook Stripe:', err.message);
         console.error('   Status Code:', err.status);
-        console.error('   Headers:', req.headers);
+        console.error('   Secret empty:', !stripeWebhookSecret);
+        console.error('   Secret has whitespace:', /\s/.test(stripeWebhookSecret));
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
@@ -165,6 +167,8 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
     res.json({ received: true });
 });
+// JSON parser para todas las demás rutas (después del webhook)
+app.use(express.json());
 
 // --- ADMIN BASIC AUTH ---
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
