@@ -661,7 +661,6 @@ async function deleteRequest(requestId) {
         alert('❌ Error al eliminar la solicitud');
     }
 }
-}
 
 async function updateDecision(requestId, status) {
     try {
