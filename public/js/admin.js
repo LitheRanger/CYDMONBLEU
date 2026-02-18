@@ -202,7 +202,8 @@ function renderRow(r, tabName, tbody) {
     const tr = document.createElement('tr');
     tr.classList.add('clickable-row');
     tr.setAttribute('data-request-id', r.order_id);
-    const labelBadge = r.tracking_number
+    const hasLabel = r.tracking_number || r.label_created_at;
+    const labelBadge = hasLabel
         ? `<span class="badge success" style="background:#dcfce7;color:#16a34a;">${r.carrier || 'Generada'}</span>`
         : '<span class="badge no-label">Sin guia</span>';
     const trackingText = r.tracking_number || '—';
@@ -211,7 +212,7 @@ function renderRow(r, tabName, tbody) {
     const isCompletadas = tabName === 'completadas' || tabName === 'defectos';
     const isReembolso = tabName === 'reembolsos';
     const actions = `
-                <button class="link-btn" data-id="${r.order_id}" data-action="label" ${!r.tracking_number ? 'disabled' : ''}>Guia</button>
+                <button class="link-btn" data-id="${r.order_id}" data-action="label" ${!(r.tracking_number || r.label_created_at) ? 'disabled' : ''}>Guia</button>
                 <button class="link-btn" data-id="${r.order_id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
                 <button class="link-btn" data-id="${r.order_id}" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>
                 <button class="link-btn" data-id="${r.order_id}" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>
@@ -504,7 +505,7 @@ async function viewDetail(requestId) {
             const isDefecto = Array.isArray(r.items) && r.items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
             const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
             
-            actions.push(`<button class="btn secondary" onclick="downloadLabel('${r.order_id}')" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>`);
+            actions.push(`<button class="btn secondary" onclick="downloadLabel('${r.order_id}')" ${!(r.tracking_number || r.label_created_at) ? 'disabled' : ''}>Guía</button>`);
             actions.push(`<button class="btn secondary" onclick="retryLabel('${r.order_id}')">Reintentar</button>`);
             
             if (isDefecto) {
