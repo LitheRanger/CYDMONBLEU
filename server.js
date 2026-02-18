@@ -1,25 +1,4 @@
 // ...existing code...
-// --- ADMIN API ---
-// Eliminar una orden y su historial por order_id (admin)
-app.delete('/api/admin/requests/:orderId', requireAdmin, async (req, res) => {
-    try {
-        if (!dbPool) {
-            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
-        }
-        const orderId = req.params.orderId;
-        // Eliminar historial relacionado primero (ON DELETE CASCADE debería cubrirlo, pero por seguridad)
-        await executeQuery('DELETE FROM returns_request_historial WHERE order_id = ?', [orderId]);
-        // Eliminar la orden principal
-        const [result] = await executeQuery('DELETE FROM returns_requests WHERE order_id = ?', [orderId]);
-        if (result.affectedRows === 0 && result.rowCount === 0) {
-            return res.status(404).json({ success: false, message: 'Orden no encontrada' });
-        }
-        res.json({ success: true, message: 'Orden eliminada correctamente' });
-    } catch (err) {
-        console.error('Error eliminando orden:', err);
-        res.status(500).json({ success: false, message: 'Error eliminando orden' });
-    }
-});
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
