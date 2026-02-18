@@ -898,6 +898,28 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
 // --- 3. ENDPOINT: PROCESAR SELECCIÓN ---
 // upload.any() permite recibir múltiples archivos con cualquier nombre de campo
 app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => {
+            // Datos del formulario
+            const submitParsed = z.object({
+                orderId: z.string().trim().min(1).max(64),
+                orderNumber: z.string().trim().min(1).max(64).optional(),
+                contactEmail: z.string().trim().email().max(255),
+                returnType: z.string().trim().min(1).max(32),
+                customerName: z.string().trim().min(1).max(255).optional()
+            }).safeParse(req.body);
+
+            if (!submitParsed.success) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Datos inválidos',
+                    errors: submitParsed.error.flatten()
+                });
+            }
+
+            const { orderId, orderNumber, contactEmail, returnType, customerName } = submitParsed.data;
+            // Validar que el OrderId existe en Shopify antes de guardar
+            const orderIdForStorage = String(orderId || '').trim();
+            const orderIdForLookup = String(orderId || '').trim();
+
             // Validar que no exista ya una solicitud para este número de orden
             const [existing] = await executeQuery(
                 'SELECT id FROM returns_requests WHERE order_id = ? LIMIT 1',
