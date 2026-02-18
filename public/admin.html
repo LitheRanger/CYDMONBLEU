@@ -1123,6 +1123,7 @@
                 <td>${trackingText}</td>
                 <td>${labelBadge}</td>
                 <td class="muted">${formatDate(r.created_at)}</td>
+                <td>${buildActionButtons(r)}</td>
             `;
             tbody.appendChild(tr);
 
@@ -1435,8 +1436,31 @@
                 `;
                 const actionsContainer = document.getElementById('detail-actions');
                 if (actionsContainer) {
-                    actionsContainer.dataset.requestId = r.id;
-                    actionsContainer.innerHTML = buildActionButtons(r);
+                    actionsContainer.innerHTML = `
+                        <button class="btn danger" id="btn-delete-order">Eliminar orden</button>
+                    `;
+                    const btnDelete = document.getElementById('btn-delete-order');
+                    btnDelete.onclick = async function() {
+                        if (!confirm('¿Seguro que deseas eliminar esta orden? Esta acción no se puede deshacer.')) return;
+                        btnDelete.disabled = true;
+                        btnDelete.textContent = 'Eliminando...';
+                        try {
+                            const res = await fetch(`${API_BASE}/api/admin/requests/${r.order_id}`, { method: 'DELETE' });
+                            const data = await res.json();
+                            if (data.success) {
+                                alert('Orden eliminada correctamente.');
+                                document.getElementById('modal').classList.remove('show');
+                                loadRequests();
+                            } else {
+                                alert('Error eliminando orden: ' + (data.message || 'Error desconocido'));
+                            }
+                        } catch (err) {
+                            alert('Error eliminando orden: ' + (err.message || err));
+                        } finally {
+                            btnDelete.disabled = false;
+                            btnDelete.textContent = 'Eliminar orden';
+                        }
+                    };
                 }
                 document.getElementById('modal').classList.add('show');
             } catch (e) {
