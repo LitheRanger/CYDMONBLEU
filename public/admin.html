@@ -494,11 +494,19 @@
         }
 
         .tab-content {
-            display: none;
+              display: none;
+              border-radius: 16px;
+              border: 2px solid var(--border-light);
+              background: var(--bg-lighter);
+              margin-top: 0;
+              box-shadow: var(--shadow-sm);
         }
 
         .tab-content.active {
-            display: block;
+              display: block;
+              border: 2px solid var(--primary);
+              background: #fff;
+              box-shadow: var(--shadow-md);
         }
 
 
@@ -1896,8 +1904,7 @@
         });
 
         // Inicializar tabs y cargar datos
-        initTabs();
-        loadRequests();
-    </script>
+        // (Eliminado: el JS ahora está en js/admin.js)
 </body>
+<script src="js/admin.js"></script>
 </html>
