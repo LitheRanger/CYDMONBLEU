@@ -1476,16 +1476,34 @@
                         return;
                     }
                 }
-                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/retry-label`, { method: 'POST' });
+                // Pedir credenciales si no están presentes
+                let headers = {};
+                if (!isSandbox) {
+                    let auth = localStorage.getItem('adminAuth');
+                    if (!auth) {
+                        const user = prompt('Usuario admin:');
+                        const pass = prompt('Contraseña admin:');
+                        if (!user || !pass) return alert('Credenciales requeridas');
+                        auth = 'Basic ' + btoa(user + ':' + pass);
+                        localStorage.setItem('adminAuth', auth);
+                    }
+                    headers['Authorization'] = auth;
+                }
+                const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/retry-label`, { method: 'POST', headers });
                 const data = await res.json();
                 if (data.success) {
                     alert(`Guía regenerada: ${data.trackingNumber}`);
                     loadRequests();
                 } else {
+                    if (data.message && data.message.toLowerCase().includes('autenticación')) {
+                        localStorage.removeItem('adminAuth');
+                    }
                     alert(`Error: ${data.message}`);
                 }
             } catch (e) {
+                localStorage.removeItem('adminAuth');
                 console.error('Error:', e);
+                alert('Error al intentar regenerar la guía.');
             }
         }
 
