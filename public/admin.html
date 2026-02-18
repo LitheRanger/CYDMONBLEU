@@ -420,6 +420,20 @@
             color: var(--text-secondary);
         }
 
+        .section-group {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            margin: 16px 0 12px 0;
+            padding: 8px 0;
+            border-bottom: 2px solid var(--primary);
+            color: var(--primary);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
         .loading {
             padding: 16px;
             text-align: center;
@@ -780,23 +794,53 @@
         <div class="tab-content active" id="tab-cambios">
             <div id="loading-cambios" class="loading">Cargando cambios…</div>
             <div id="summary-cambios" class="summary"></div>
-            <div class="table-wrap">
-                <table class="table" id="table-cambios">
-                    <thead>
-                        <tr>
-                            <th>Orden</th>
-                            <th>Cliente</th>
-                            <th>Contacto</th>
-                            <th>Pago</th>
-                            <th>Solicitud</th>
-                            <th>Tracking</th>
-                            <th>Guía</th>
-                            <th>Fecha</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbody-cambios"></tbody>
-                </table>
+            
+            <!-- POR RECIBIR -->
+            <div class="section-group">
+                <h3 class="section-title">📥 Por Recibir</h3>
+                <div class="table-wrap">
+                    <table class="table" id="table-cambios-pending">
+                        <thead>
+                            <tr>
+                                <th>Orden</th>
+                                <th>Cliente</th>
+                                <th>Contacto</th>
+                                <th>Pago</th>
+                                <th>Solicitud</th>
+                                <th>Tracking</th>
+                                <th>Guía</th>
+                                <th>Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-cambios-pending"></tbody>
+                    </table>
+                </div>
+                <div id="empty-cambios-pending" class="empty" style="display:none;">Sin cambios por recibir</div>
             </div>
+
+            <!-- POR ENVIAR -->
+            <div class="section-group">
+                <h3 class="section-title">📦 Por Enviar</h3>
+                <div class="table-wrap">
+                    <table class="table" id="table-cambios-sent">
+                        <thead>
+                            <tr>
+                                <th>Orden</th>
+                                <th>Cliente</th>
+                                <th>Contacto</th>
+                                <th>Pago</th>
+                                <th>Solicitud</th>
+                                <th>Tracking</th>
+                                <th>Guía</th>
+                                <th>Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-cambios-sent"></tbody>
+                    </table>
+                </div>
+                <div id="empty-cambios-sent" class="empty" style="display:none;">Sin cambios por enviar</div>
+            </div>
+
             <div id="empty-cambios" class="empty" style="display:none;">Sin cambios registrados</div>
             <div class="pagination" id="pagination-cambios" style="display:none;">
                 <button class="pager-btn" id="prev-cambios">◀ Anterior</button>

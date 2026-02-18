@@ -140,23 +140,30 @@ function updatePaginationTab(tabName, data) {
 }
 
 function renderTab(tabName, data) {
-    const tbody = document.getElementById(`tbody-${tabName}`);
-    const empty = document.getElementById(`empty-${tabName}`);
-
-    if (!tbody || !empty) {
-        console.error(`No encontrados elementos para tab: ${tabName}`);
-        return;
-    }
-
-    tbody.innerHTML = '';
-
     if (!data || !data.length) {
-        empty.style.display = 'block';
+        if (tabName === 'cambios') {
+            // Para cambios, limpiar ambos tbody
+            const tbodyPending = document.getElementById('tbody-cambios-pending');
+            const tbodySent = document.getElementById('tbody-cambios-sent');
+            const emptyPending = document.getElementById('empty-cambios-pending');
+            const emptySent = document.getElementById('empty-cambios-sent');
+            const emptyOverall = document.getElementById('empty-cambios');
+            
+            if (tbodyPending) tbodyPending.innerHTML = '';
+            if (tbodySent) tbodySent.innerHTML = '';
+            if (emptyPending) emptyPending.style.display = 'block';
+            if (emptySent) emptySent.style.display = 'block';
+            if (emptyOverall) emptyOverall.style.display = 'block';
+        } else {
+            const tbody = document.getElementById(`tbody-${tabName}`);
+            const empty = document.getElementById(`empty-${tabName}`);
+            if (tbody) tbody.innerHTML = '';
+            if (empty) empty.style.display = 'block';
+        }
         updateSummaryTab(tabName, []);
         updatePaginationTab(tabName, []);
         return;
     }
-    empty.style.display = 'none';
 
     const currentPage = tabName === 'cambios'
         ? currentTabCambios
@@ -164,34 +171,49 @@ function renderTab(tabName, data) {
     const start = (currentPage - 1) * pageSize;
     const pageData = data.slice(start, start + pageSize);
 
-    // Si es cambios, agrupar por refund_status
+    // Si es cambios, separar por refund_status
     if (tabName === 'cambios') {
-        const grouped = {
-            pending_receipt: pageData.filter(r => r.refund_status === 'pending_receipt'),
-            pending_shipment: pageData.filter(r => r.refund_status === 'pending_shipment')
-        };
+        const tbodyPending = document.getElementById('tbody-cambios-pending');
+        const tbodySent = document.getElementById('tbody-cambios-sent');
+        const emptyPending = document.getElementById('empty-cambios-pending');
+        const emptySent = document.getElementById('empty-cambios-sent');
+        const emptyOverall = document.getElementById('empty-cambios');
 
-        // Renderizar grupos con encabezados
-        ['pending_receipt', 'pending_shipment'].forEach(status => {
-            const items = grouped[status];
-            if (items.length > 0) {
-                // Encabezado de grupo
-                const headerTr = document.createElement('tr');
-                headerTr.className = 'group-header';
-                headerTr.innerHTML = `
-                    <td colspan="8" style="padding:10px;border:none;color:#666;font-size:12px;">
-                        ${status === 'pending_receipt' ? '📥 Por Recibir' : '📦 Por Enviar'}
-                    </td>
-                `;
-                tbody.appendChild(headerTr);
+        if (!tbodyPending || !tbodySent) return;
 
-                // Filas de items
-                items.forEach(r => renderRow(r, tabName, tbody));
-            }
-        });
+        tbodyPending.innerHTML = '';
+        tbodySent.innerHTML = '';
+
+        const pending = pageData.filter(r => r.refund_status === 'pending_receipt');
+        const sent = pageData.filter(r => r.refund_status === 'pending_shipment');
+
+        if (pending.length === 0 && sent.length === 0) {
+            emptyOverall.style.display = 'block';
+            if (emptyPending) emptyPending.style.display = 'block';
+            if (emptySent) emptySent.style.display = 'block';
+        } else {
+            emptyOverall.style.display = 'none';
+            if (emptyPending) emptyPending.style.display = pending.length === 0 ? 'block' : 'none';
+            if (emptySent) emptySent.style.display = sent.length === 0 ? 'block' : 'none';
+
+            pending.forEach(r => renderRow(r, tabName, tbodyPending));
+            sent.forEach(r => renderRow(r, tabName, tbodySent));
+        }
     } else {
-        // Otros tabs: renderizar sin agrupar
-        pageData.forEach(r => renderRow(r, tabName, tbody));
+        // Otros tabs: una sola tabla
+        const tbody = document.getElementById(`tbody-${tabName}`);
+        const empty = document.getElementById(`empty-${tabName}`);
+
+        if (!tbody || !empty) return;
+
+        tbody.innerHTML = '';
+
+        if (pageData.length === 0) {
+            empty.style.display = 'block';
+        } else {
+            empty.style.display = 'none';
+            pageData.forEach(r => renderRow(r, tabName, tbody));
+        }
     }
 
     updateSummaryTab(tabName, data);
@@ -560,7 +582,7 @@ async function retryLabel(requestId) {
 
 async function changeRefundStatus(requestId) {
     // Obtener solicitud para saber estado actual
-    const req = requests.find(r => r.id == requestId);
+    const req = requests.find(r => r.order_id == requestId);
     if (!req) return;
 
     const currentStatus = req.refund_status || 'pending_receipt';
@@ -577,8 +599,11 @@ async function changeRefundStatus(requestId) {
         });
         const data = await res.json();
         if (data.success) {
-            alert('Estado actualizado correctamente');
+            // Cerrar modal
+            document.getElementById('modal').classList.remove('show');
+            // Recargar cambios para actualizar secciones
             loadRequests();
+            alert('Estado actualizado correctamente');
         } else {
             alert(`Error: ${data.message}`);
         }
@@ -907,7 +932,14 @@ document.getElementById('filter-status').addEventListener('change', applyFilter)
 document.getElementById('filter-label').addEventListener('change', applyFilter);
 document.getElementById('filter-refund').addEventListener('change', applyFilter);
 document.getElementById('close-modal').addEventListener('click', () => document.getElementById('modal').classList.remove('show'));
-document.getElementById('tbody-cambios').addEventListener('click', (e) => {
+document.getElementById('tbody-cambios-pending').addEventListener('click', (e) => {
+    const row = e.target.closest('tr[data-request-id]');
+    if (!row) return;
+    const id = row.getAttribute('data-request-id');
+    if (id) viewDetail(id);
+});
+
+document.getElementById('tbody-cambios-sent').addEventListener('click', (e) => {
     const row = e.target.closest('tr[data-request-id]');
     if (!row) return;
     const id = row.getAttribute('data-request-id');
