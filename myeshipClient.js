@@ -236,7 +236,17 @@ function selectRate(quotation) {
     throw new Error('No shipping rates available');
   }
 
-  // If preferred provider is set, try to find it first
+  // Siempre elegir FedEx Express Saver si está disponible
+  const expressSaver = quotation.rates.find(r =>
+    (r.provider || '').toLowerCase().includes('fedex') &&
+    r.servicelevel && r.servicelevel.name && r.servicelevel.name.toLowerCase() === 'express saver'
+  );
+  if (expressSaver) {
+    console.log('✅ MyeShip: Usando FedEx Express Saver');
+    return expressSaver;
+  }
+
+  // Si no está disponible, seguir lógica anterior
   if (MYESHIP_PREFERRED_PROVIDER) {
     const preferred = quotation.rates.find(r => 
       (r.provider || '').toLowerCase().includes(MYESHIP_PREFERRED_PROVIDER)
@@ -248,7 +258,6 @@ function selectRate(quotation) {
     console.log(`⚠️ MyeShip: Preferred provider '${MYESHIP_PREFERRED_PROVIDER}' not available, using fallback`);
   }
 
-  // If auto-select cheapest is enabled, find it
   if (MYESHIP_AUTO_SELECT_CHEAPEST) {
     const cheapest = quotation.rates.reduce((prev, current) => {
       return parseFloat(current.amount) < parseFloat(prev.amount) ? current : prev;
@@ -256,7 +265,6 @@ function selectRate(quotation) {
     return cheapest;
   }
 
-  // Otherwise return the first (or best value) rate
   const bestValue = quotation.rates.find(r => r.tags && r.tags.includes('BESTVALUE'));
   return bestValue || quotation.rates[0];
 }
