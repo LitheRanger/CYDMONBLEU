@@ -47,7 +47,9 @@ const sendgridTemplateDecisionAccepted = process.env.SENDGRID_TEMPLATE_DECISION_
 
     // --- ADMIN API ---
 
+// ...existing code...
 // --- ADMIN DELETE ORDER ENDPOINT ---
+// Debe ir después de la inicialización de app y middlewares
 app.delete('/api/admin/requests/:orderId', requireAdmin, async (req, res) => {
     try {
         if (!dbPool) {
