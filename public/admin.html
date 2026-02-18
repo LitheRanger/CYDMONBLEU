@@ -1107,24 +1107,34 @@
                 ? `<span class="badge success" style="background:#dcfce7;color:#16a34a;">${r.carrier || 'Generada'}</span>`
                 : '<span class="badge no-label">Sin guía</span>';
             const trackingText = r.tracking_number || '—';
-
-            const isCambio = tabName === 'cambios';
             const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
-
             const orderDisplay = r.order_number || r.order_id || '—';
-
-            tr.innerHTML = `
-                <td><strong>${orderDisplay}</strong></td>
-                <td>${r.customer_name || '—'}</td>
-                <td class="muted">${r.contact_email || '—'}</td>
-                ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
-                <td>${paymentBadge(r)}</td>
-                <td>${adminBadge(r.admin_status)}</td>
-                <td>${trackingText}</td>
-                <td>${labelBadge}</td>
-                <td class="muted">${formatDate(r.created_at)}</td>
-                <td></td>
-            `;
+            let rowHtml = '';
+            if (tabName === 'cambios' || tabName === 'reembolsos') {
+                rowHtml = `
+                    <td><strong>${orderDisplay}</strong></td>
+                    <td>${r.customer_name || '—'}</td>
+                    <td class="muted">${r.contact_email || '—'}</td>
+                    <td>${paymentBadge(r)}</td>
+                    <td>${adminBadge(r.admin_status)}</td>
+                    <td>${trackingText}</td>
+                    <td>${labelBadge}</td>
+                    <td class="muted">${formatDate(r.created_at)}</td>
+                `;
+            } else if (tabName === 'defectos' || tabName === 'completadas') {
+                rowHtml = `
+                    <td><strong>${orderDisplay}</strong></td>
+                    <td>${r.customer_name || '—'}</td>
+                    <td class="muted">${r.contact_email || '—'}</td>
+                    <td>${rowType}</td>
+                    <td>${paymentBadge(r)}</td>
+                    <td>${adminBadge(r.admin_status)}</td>
+                    <td>${trackingText}</td>
+                    <td>${labelBadge}</td>
+                    <td class="muted">${formatDate(r.created_at)}</td>
+                `;
+            }
+            tr.innerHTML = rowHtml;
             tbody.appendChild(tr);
 
         }
@@ -1404,14 +1414,9 @@
                         <h3 class="detail-section-title">Evidencia</h3>
                         <div class="files-grid">${filesHtml}</div>
                     </div>
-                    <div class="detail-section">
-                        <h3 class="detail-section-title">Acciones</h3>
-                        <div id="detail-actions-modal" class="actions-modal"></div>
-                    </div>
                 `;
-
-                // Renderizar botones de acción en el modal
-                const actionsContainer = document.getElementById('detail-actions-modal');
+                // Renderizar botones de acción en el modal (en el contenedor correcto)
+                const actionsContainer = document.getElementById('detail-actions');
                 if (actionsContainer) {
                     let actions = [];
                     const isCambio = String(r.return_type || '').toLowerCase() === 'cambio' || (Array.isArray(r.items) && r.items.some(i => String(i.requestType || '').toLowerCase() === 'cambio'));
@@ -1419,7 +1424,6 @@
                     const isDefecto = Array.isArray(r.items) && r.items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
                     const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
                     actions.push(`<button class="btn secondary" onclick="downloadLabel('${r.order_id}')" ${!r.tracking_number ? 'disabled' : ''}>Guía</button>`);
-                    const isSandbox = (typeof window !== 'undefined' && window.location.hostname === 'localhost') || (typeof API_BASE !== 'undefined' && API_BASE.includes('localhost')) || (typeof API_BASE !== 'undefined' && API_BASE.includes('sandbox'));
                     actions.push(`<button class="btn secondary" onclick="retryLabel('${r.order_id}')">Reintentar</button>`);
                     if (isDefecto) {
                         actions.push(`<button class="btn" onclick="updateDecision('${r.order_id}', 'accepted')" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>`);
@@ -1433,7 +1437,6 @@
                     }
                     actionsContainer.innerHTML = actions.join(' ');
                 }
-                // Eliminar acciones de eliminar orden
                 document.getElementById('modal').classList.add('show');
             } catch (e) {
                 console.error('Error:', e);
