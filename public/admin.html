@@ -918,35 +918,6 @@
 </body>
 </html>
 
-        }
-
-        function buildActionButtons(r) {
-            const isCambio = normalizeType(r.return_type) === 'cambio' || hasChangeItem(r);
-            const isReembolso = normalizeType(r.return_type) === 'reembolso' || hasRefundItem(r);
-            const isDefecto = hasDefect(r);
-            const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
-            const actions = [];
-
-            // Botones de acción solo en el modal, no en la tabla
-
-            if (isDefecto) {
-                actions.push(`<button class="btn" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>`);
-                actions.push(`<button class="btn danger" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>`);
-            }
-
-            if (isCambio) actions.push(`<button class="btn" data-action="ship">Enviar</button>`);
-            if (isReembolso) actions.push(`<button class="btn" data-action="coupon">Enviar cupon</button>`);
-            if (isCambio) actions.push(`<button class="btn secondary" data-action="refund-status">Cambiar Estado</button>`);
-
-            if (!isCompletada) {
-                actions.push(`<button class="btn" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`);
-            }
-
-
-            return actions.join('');
-        }
-
-        async function loadRequests() {
             try {
                 document.getElementById('btn-refresh').disabled = true;
                 const res = await fetch(`${API_BASE}/api/admin/requests`);
@@ -1674,6 +1645,7 @@
             if (!row) return;
             const id = row.getAttribute('data-request-id');
             if (id) viewDetail(id);
+        });
     </script>
 </body>
 </html>
