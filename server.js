@@ -59,6 +59,14 @@ const sendgridFrom = process.env.SENDGRID_FROM || '';
 const sendgridTemplateConfirmation = process.env.SENDGRID_TEMPLATE_CONFIRMATION || '';
 const sendgridTemplatePayment = process.env.SENDGRID_TEMPLATE_PAYMENT || '';
 const sendgridTemplateDecisionAccepted = process.env.SENDGRID_TEMPLATE_DECISION_ACCEPTED || '';
+    // Eliminar una orden y su historial por order_id (admin)
+    // (debe ir después de la inicialización de app)
+
+    // ...existing code...
+
+    // --- ADMIN API ---
+    // (colocar aquí el endpoint DELETE)
+
 const sendgridTemplateDecisionRejected = process.env.SENDGRID_TEMPLATE_DECISION_REJECTED || '';
 const sendgridTemplateShipment = process.env.SENDGRID_TEMPLATE_SHIPMENT || '';
 const sendgridTemplateCoupon = process.env.SENDGRID_TEMPLATE_COUPON || '';
