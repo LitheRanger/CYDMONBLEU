@@ -454,7 +454,8 @@
             cursor: pointer;
             font-size: 12px;
             transition: all 0.15s ease;
-        /* corregido: línea inválida eliminada */
+        }
+
         .pager-btn:hover { background: #f3f4f6; }
 
         .pager-btn:disabled {
@@ -891,8 +892,8 @@
                 <div class="muted" id="page-info-completadas">Página 1</div>
                 <button class="pager-btn" id="next-completadas">Siguiente ▶</button>
             </div>
-            </main>
         </div>
+            </main>
     </div>
 
     <div class="modal" id="modal">
@@ -906,244 +907,16 @@
         </div>
     </div>
 
+    <script src="js/admin.js"></script>
     <script>
-        const API_BASE = (function() {
-            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            return isDev ? 'http://localhost:3000' : window.location.origin;
-        })();
-
-        let requests = [];
-        let cambios = [];
-        let reembolsos = [];
-        let defectos = [];
-        let completadas = [];
-        let filteredCambios = [];
-        let filteredReembolsos = [];
-        let filteredDefectos = [];
-        let filteredCompletadas = [];
-        let currentTabCambios = 1;
-        let currentTabReembolsos = 1;
-        let currentTabDefectos = 1;
-        let currentTabCompletadas = 1;
-        let activeTab = 'cambios';
-        const pageSize = 50;
-
-        function formatDate(value) {
-            if (!value) return '';
-            const d = new Date(value);
-            return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
-        }
-
-        function isSameDay(value, ref) {
-            if (!value) return false;
-            const d = new Date(value);
-            if (Number.isNaN(d.getTime())) return false;
-            return d.toDateString() === ref.toDateString();
-        }
-
-        function formatCurrency(value) {
-            const n = Number(value || 0);
-            return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
-        }
-
-        function normalizeType(value) {
-            return String(value || '').trim().toLowerCase();
-        }
-
-        function hasDefect(r) {
-            const items = Array.isArray(r.items) ? r.items : [];
-            return items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
-        }
-
-        function hasChangeItem(r) {
-            const items = Array.isArray(r.items) ? r.items : [];
-            return items.some(i => String(i.requestType || '').toLowerCase() === 'cambio');
-        }
-
-        function hasRefundItem(r) {
-            const items = Array.isArray(r.items) ? r.items : [];
-            return items.some(i => String(i.requestType || '').toLowerCase() === 'reembolso');
-        }
-
-        function isNoPayment(r) {
-            const amount = Number(r?.amount || 0);
-            return amount <= 0 || hasDefect(r);
-        }
-
-        function badge(status) {
-            const s = String(status || 'pending').toLowerCase();
-            if (s === 'paid') return '<span class="badge paid">Pagado</span>';
-            if (s === 'failed') return '<span class="badge failed">Fallido</span>';
-            return '<span class="badge pending">Pendiente</span>';
-        }
-
-        function paymentBadge(r) {
-            if (isNoPayment(r)) return '<span class="badge info">Sin cobro</span>';
-            return badge(r.payment_status);
-        }
-
-        function matchesPaymentFilter(r, status) {
-            if (!status) return true;
-            if (status === 'nopay') return isNoPayment(r);
-            if (status === 'pending') return r.payment_status === 'pending' && !isNoPayment(r);
-            return r.payment_status === status;
-        }
-
-        function adminBadge(status) {
-            const s = String(status || 'open').toLowerCase();
-            if (s === 'completed') return '<span class="badge paid">Completada</span>';
-            if (s === 'accepted') return '<span class="badge paid">Aceptada</span>';
-            if (s === 'rejected') return '<span class="badge failed">Rechazada</span>';
-            if (s === 'sent') return '<span class="badge warning">Enviada</span>';
-            return '<span class="badge pending">Abierta</span>';
-        }
-
-        function refundBadge(status) {
-            const s = String(status || 'pending_receipt').toLowerCase();
-            if (s === 'pending_receipt') return '<span class="badge pending">Por Recibir</span>';
-            if (s === 'pending_shipment') return '<span class="badge warning">Por Enviar</span>';
-            return '<span class="badge pending">Por Recibir</span>';
-        }
-
-        function updateStats() {
-            const total = requests.length;
-            const pendingReceipt = requests.filter(r => String(r.refund_status || '').toLowerCase() === 'pending_receipt').length;
-            const pendingShipment = requests.filter(r => String(r.refund_status || '').toLowerCase() === 'pending_shipment').length;
-
-            const totalEl = document.getElementById('total');
-            const pendingReceiptEl = document.getElementById('pending-receipt-count');
-            const pendingShipmentEl = document.getElementById('pending-shipment-count');
-
-            if (totalEl) totalEl.textContent = total;
-            if (pendingReceiptEl) pendingReceiptEl.textContent = pendingReceipt;
-            if (pendingShipmentEl) pendingShipmentEl.textContent = pendingShipment;
-        }
-
-        function updateSummaryTab(tabName, data) {
-            const summary = document.getElementById(`summary-${tabName}`);
-            if (!summary) return;
-            let total = 0;
-            if (tabName === 'cambios') total = cambios.length;
-            else if (tabName === 'reembolsos') total = reembolsos.length;
-            else if (tabName === 'defectos') total = defectos.length;
-            else if (tabName === 'completadas') total = completadas.length;
-            summary.textContent = `Mostrando ${data.length} de ${total} solicitudes`;
-        }
-
-        function updatePaginationTab(tabName, data) {
-            const currentPage = tabName === 'cambios'
-                ? currentTabCambios
-                : (tabName === 'reembolsos' ? currentTabReembolsos : (tabName === 'defectos' ? currentTabDefectos : currentTabCompletadas));
-            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-            const newPage = currentPage > totalPages ? totalPages : currentPage;
-            
-            if (tabName === 'cambios') currentTabCambios = newPage;
-            else if (tabName === 'reembolsos') currentTabReembolsos = newPage;
-            else if (tabName === 'defectos') currentTabDefectos = newPage;
-            else currentTabCompletadas = newPage;
-
-            document.getElementById(`page-info-${tabName}`).textContent = `Página ${newPage} de ${totalPages}`;
-            document.getElementById(`prev-${tabName}`).disabled = newPage <= 1;
-            document.getElementById(`next-${tabName}`).disabled = newPage >= totalPages;
-            document.getElementById(`pagination-${tabName}`).style.display = data.length > pageSize ? 'flex' : 'none';
-        }
-
-        function renderTab(tabName, data) {
-            const tbody = document.getElementById(`tbody-${tabName}`);
-            const empty = document.getElementById(`empty-${tabName}`);
-            
-            if (!tbody || !empty) {
-                console.error(`No encontrados elementos para tab: ${tabName}`);
-                return;
-            }
-            
-            tbody.innerHTML = '';
-
-            if (!data || !data.length) {
-                empty.style.display = 'block';
-                updateSummaryTab(tabName, []);
-                updatePaginationTab(tabName, []);
-                return;
-            }
-            empty.style.display = 'none';
-
-            const currentPage = tabName === 'cambios'
-                ? currentTabCambios
-                : (tabName === 'reembolsos' ? currentTabReembolsos : (tabName === 'defectos' ? currentTabDefectos : currentTabCompletadas));
-            const start = (currentPage - 1) * pageSize;
-            const pageData = data.slice(start, start + pageSize);
-
-            // Si es cambios, agrupar por refund_status
-            if (tabName === 'cambios') {
-                const grouped = {
-                    pending_receipt: pageData.filter(r => r.refund_status === 'pending_receipt'),
-                    pending_shipment: pageData.filter(r => r.refund_status === 'pending_shipment')
-                };
-
-                // Renderizar grupos con encabezados
-                ['pending_receipt', 'pending_shipment'].forEach(status => {
-                    const items = grouped[status];
-                    if (items.length > 0) {
-                    // Encabezado de grupo
-                        const headerTr = document.createElement('tr');
-                        headerTr.className = 'group-header';
-                        headerTr.innerHTML = `
-                            <td colspan="9" style="padding:10px;border:none;color:#666;font-size:12px;">
-                                ${status === 'pending_receipt' ? '📥 Por Recibir' : '📦 Por Enviar'}
-                            </td>
-                        `;
-                        tbody.appendChild(headerTr);
-
-                        // Filas de items
-                        items.forEach(r => renderRow(r, tabName, tbody));
-                    }
-                });
-            } else {
-                // Otros tabs: renderizar sin agrupar
-                pageData.forEach(r => renderRow(r, tabName, tbody));
-            }
-
-            updateSummaryTab(tabName, data);
-            updatePaginationTab(tabName, data);
-        }
-
-        function renderRow(r, tabName, tbody) {
-            const tr = document.createElement('tr');
-            tr.classList.add('clickable-row');
-            tr.setAttribute('data-request-id', r.order_id);
-            const labelBadge = r.tracking_number
-                ? `<span class="badge success" style="background:#dcfce7;color:#16a34a;">${r.carrier || 'Generada'}</span>`
-                : '<span class="badge no-label">Sin guía</span>';
-            const trackingText = r.tracking_number || '—';
-            const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
-            const orderDisplay = r.order_number || r.order_id || '—';
-            let rowHtml = '';
-            if (tabName === 'cambios' || tabName === 'reembolsos') {
-                rowHtml = `
-                    <td><strong>${orderDisplay}</strong></td>
-                    <td>${r.customer_name || '—'}</td>
-                    <td class="muted">${r.contact_email || '—'}</td>
-                    <td>${paymentBadge(r)}</td>
-                    <td>${adminBadge(r.admin_status)}</td>
-                    <td>${trackingText}</td>
-                    <td>${labelBadge}</td>
-                    <td class="muted">${formatDate(r.created_at)}</td>
-                `;
-            } else if (tabName === 'defectos' || tabName === 'completadas') {
-                rowHtml = `
-                    <td><strong>${orderDisplay}</strong></td>
-                    <td>${r.customer_name || '—'}</td>
-                    <td class="muted">${r.contact_email || '—'}</td>
-                    <td>${rowType}</td>
-                    <td>${paymentBadge(r)}</td>
-                    <td>${adminBadge(r.admin_status)}</td>
-                    <td>${trackingText}</td>
-                    <td>${labelBadge}</td>
-                    <td class="muted">${formatDate(r.created_at)}</td>
-                `;
-            }
-            tr.innerHTML = rowHtml;
-            tbody.appendChild(tr);
+        // Inicializar tabs y cargar datos cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            initTabs();
+            loadRequests();
+        });
+    </script>
+</body>
+</html>
 
         }
 
@@ -1901,10 +1674,6 @@
             if (!row) return;
             const id = row.getAttribute('data-request-id');
             if (id) viewDetail(id);
-        });
-
-        // Inicializar tabs y cargar datos
-        // (Eliminado: el JS ahora está en js/admin.js)
+    </script>
 </body>
-
 </html>

@@ -181,14 +181,11 @@ function renderTab(tabName, data) {
         ['pending_receipt', 'pending_shipment'].forEach(status => {
             const items = grouped[status];
             if (items.length > 0) {
-                // Encabezado de grupo
-                const headerTr = document.createElement('tr');
-                headerTr.className = 'group-header';
-                headerTr.innerHTML = `
-                            <td colspan="12" style="padding:10px;border:none;color:#666;font-size:12px;">
-                                ${status === 'pending_receipt' ? '📥 Por Recibir' : '📦 Por Enviar'}
-                            </td>
-                        `;
+                        // Encabezado de grupo
+                        const headerTr = document.createElement('tr');
+                        headerTr.className = 'group-header';
+                        headerTr.innerHTML = `
+                            <td colspan="8" style="padding:10px;border:none;color:#666;font-size:12px;">
                 tbody.appendChild(headerTr);
 
                 // Filas de items
