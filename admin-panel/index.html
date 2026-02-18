@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Admin - MON|BLEU</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="login-container" id="login-container">
+    <form id="login-form">
+      <h2>Iniciar sesión</h2>
+      <input type="text" id="username" placeholder="Usuario" required />
+      <input type="password" id="password" placeholder="Contraseña" required />
+      <button type="submit">Entrar</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+  <div class="admin-shell" id="admin-shell" style="display:none;">
+    <header>
+      <h1>Panel Admin - Devoluciones</h1>
+      <button id="logout-btn">Cerrar sesión</button>
+    </header>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="cambios">📦 Cambios</button>
+      <button class="tab-btn" data-tab="reembolsos">💵 Reembolsos</button>
+      <button class="tab-btn" data-tab="defectos">🛠️ Defectos</button>
+      <button class="tab-btn" data-tab="completadas">✅ Completadas</button>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Buscar por orden, cliente o correo..." />
+      <select id="filter-tab">
+        <option value="">Todos</option>
+        <option value="cambios">Cambios</option>
+        <option value="reembolsos">Reembolsos</option>
+        <option value="defectos">Defectos</option>
+        <option value="completadas">Completadas</option>
+      </select>
+      <button id="export-csv">Exportar CSV</button>
+    </div>
+    <div class="tab-content active" id="tab-cambios">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Orden</th><th>Cliente</th><th>Contacto</th><th>Pago</th><th>Solicitud</th><th>Tracking</th><th>Guía</th><th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-cambios"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-reembolsos">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Orden</th><th>Cliente</th><th>Contacto</th><th>Pago</th><th>Solicitud</th><th>Tracking</th><th>Guía</th><th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-reembolsos"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-defectos">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Orden</th><th>Cliente</th><th>Contacto</th><th>Tipo</th><th>Pago</th><th>Solicitud</th><th>Tracking</th><th>Guía</th><th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-defectos"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-completadas">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Orden</th><th>Cliente</th><th>Contacto</th><th>Tipo</th><th>Pago</th><th>Solicitud</th><th>Tracking</th><th>Guía</th><th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-completadas"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal" id="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Detalle Solicitud <span id="detail-id">—</span></h2>
+          <button class="close-btn" id="close-modal">×</button>
+        </div>
+        <div id="detail-body"></div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

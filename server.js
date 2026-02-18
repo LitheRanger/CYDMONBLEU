@@ -1,19 +1,3 @@
-// ...existing code...
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const https = require('https');
-const cloudinary = require('cloudinary').v2;
-const crypto = require('crypto');
-const pino = require('pino');
-const pinoHttp = require('pino-http');
-const rateLimit = require('express-rate-limit');
-const { z } = require('zod');
-const sgMail = require('@sendgrid/mail');
-
 // Detectar si es PostgreSQL o MySQL
 const isPostgreSQL = (process.env.DATABASE_URL || '').includes('postgresql://');
 const db = isPostgreSQL ? require('pg').Pool : require('mysql2/promise');
@@ -40,16 +24,6 @@ const sendgridFrom = process.env.SENDGRID_FROM || '';
 const sendgridTemplateConfirmation = process.env.SENDGRID_TEMPLATE_CONFIRMATION || '';
 const sendgridTemplatePayment = process.env.SENDGRID_TEMPLATE_PAYMENT || '';
 const sendgridTemplateDecisionAccepted = process.env.SENDGRID_TEMPLATE_DECISION_ACCEPTED || '';
-    // Eliminar una orden y su historial por order_id (admin)
-    // (debe ir después de la inicialización de app)
-
-    // ...existing code...
-
-    // --- ADMIN API ---
-
-// ...existing code...
-
-
 const sendgridTemplateDecisionRejected = process.env.SENDGRID_TEMPLATE_DECISION_REJECTED || '';
 const sendgridTemplateShipment = process.env.SENDGRID_TEMPLATE_SHIPMENT || '';
 const sendgridTemplateCoupon = process.env.SENDGRID_TEMPLATE_COUPON || '';
@@ -70,7 +44,24 @@ if (missingMyeShipConfig.length > 0) {
 const app = express();
 // Render/Cloudflare sends X-Forwarded-For; trust proxy so rate limit can read it
 app.set('trust proxy', 1);
-app.use(cors());
+// CORS personalizado para soportar 'null' y orígenes específicos
+const allowedOrigins = [
+    'http://localhost:5500',
+    'http://127.0.0.1',
+    'https://cambios.monbleu.mx',
+    'null'
+];
+app.use(cors({
+    origin: function(origin, callback) {
+        // Permitir requests locales (file://) y 'null' (abrir HTML local)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, origin);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
 
 const cloudinaryConfigured = !!(
     process.env.CLOUDINARY_CLOUD_NAME &&
@@ -2065,7 +2056,7 @@ app.post('/api/admin/requests/:requestId/complete', requireAdmin, async (req, re
 
         // Obtener info del cliente para enviar email
         const [rows] = await executeQuery(
-            `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
+            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
             [requestId]
         );
         const contactEmail = rows?.[0]?.contact_email;

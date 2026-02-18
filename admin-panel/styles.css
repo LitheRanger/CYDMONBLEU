@@ -1,0 +1,203 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background: #f9f9f9;
+  color: #222;
+  margin: 0;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  background: #fff;
+  border-bottom: 2px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.admin-shell {
+  max-width: 1200px;
+  margin: 32px auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding: 24px;
+}
+.tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #666;
+  border-bottom: 3px solid transparent;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.tab-btn.active {
+  color: #000;
+  border-bottom-color: #000;
+}
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
+.table-wrap {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  overflow-x: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  margin-bottom: 24px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: left;
+  font-size: 13px;
+}
+th {
+  background: #000;
+  color: #fff;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+tr:nth-child(even) {
+  background: #fafafa;
+}
+tr:hover {
+  background: #f3f3f3;
+}
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #f9f9f9;
+}
+#login-form {
+  background: #fff;
+  padding: 32px 28px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 320px;
+}
+#login-form input {
+  padding: 10px 14px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 15px;
+}
+#login-form button {
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#login-form button:hover {
+  background: #333;
+}
+.login-error {
+  color: #d32f2f;
+  font-size: 13px;
+  min-height: 18px;
+}
+.modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.4);
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal.show {
+  display: flex;
+}
+.modal-content {
+  background: #fff;
+  padding: 28px;
+  border-radius: 16px;
+  max-width: 600px;
+  width: 92%;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+  align-items: center;
+}
+.toolbar input, .toolbar select {
+  padding: 8px 12px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.toolbar button {
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toolbar button:hover {
+  background: #333;
+}
+.pagination {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+}
+.pagination button {
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (max-width: 800px) {
+  .admin-shell { padding: 8px; }
+  #login-form { min-width: 90vw; }
+}
