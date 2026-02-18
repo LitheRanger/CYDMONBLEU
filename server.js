@@ -188,53 +188,53 @@ async function initDb() {
         if (isPostgreSQL) {
             // PostgreSQL - verificar que las tablas existan
             const result = await dbPool.query(
-                `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='returns_requests')`
+                `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='return_requests')`
             );
             if (result.rows[0].exists) {
                 // Agregar columna admin_status si no existe
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS admin_status VARCHAR(32) DEFAULT 'open'`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS admin_status VARCHAR(32) DEFAULT 'open'`
                 );
                 // Agregar columna refund_status si no existe
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS refund_status VARCHAR(32) DEFAULT 'pending_receipt'`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS refund_status VARCHAR(32) DEFAULT 'pending_receipt'`
                 );
                 // Agregar columnas de pago si no existen
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS payment_provider VARCHAR(32) DEFAULT 'mercadopago'`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS payment_provider VARCHAR(32) DEFAULT 'mercadopago'`
                 );
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255) NULL`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255) NULL`
                 );
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255) NULL`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255) NULL`
                 );
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS order_number VARCHAR(64) NULL`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS order_number VARCHAR(64) NULL`
                 );
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(64) NULL`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(64) NULL`
                 );
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS coupon_amount DECIMAL(10,2) NULL`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS coupon_amount DECIMAL(10,2) NULL`
                 );
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS coupon_sent_at TIMESTAMP NULL`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS coupon_sent_at TIMESTAMP NULL`
                 );
                 await dbPool.query(
-                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS change_sent_at TIMESTAMP NULL`
+                    `ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS change_sent_at TIMESTAMP NULL`
                 );
                 await dbPool.query(
-                    `ALTER TABLE returns_requests DROP COLUMN IF EXISTS stripe_session_id`
+                    `ALTER TABLE return_requests DROP COLUMN IF EXISTS stripe_session_id`
                 );
-                console.log('✅ DB lista: tabla returns_requests verificada (PostgreSQL)');
+                console.log('✅ DB lista: tabla return_requests verificada (PostgreSQL)');
             } else {
-                console.warn('⚠️ Tabla returns_requests no existe en PostgreSQL - ejecuta migración en Neon');
+                console.warn('⚠️ Tabla return_requests no existe en PostgreSQL - ejecuta migración en Neon');
             }
         } else {
             // MySQL
             const createTableSQL = `
-                CREATE TABLE IF NOT EXISTS returns_requests (
+                CREATE TABLE IF NOT EXISTS return_requests (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     order_id VARCHAR(64) NOT NULL,
                     order_number VARCHAR(64) NULL,
@@ -253,7 +253,7 @@ async function initDb() {
                     change_sent_at TIMESTAMP NULL,
                     carrier VARCHAR(32) NULL,
                     tracking_number VARCHAR(64) NULL,
-                    label_base64 MEDIUMTEXT NULL,
+                    label_base64 TEXT NULL,
                     label_mime VARCHAR(64) NULL,
                     label_created_at TIMESTAMP NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -263,7 +263,7 @@ async function initDb() {
             // Agregar columna admin_status si no existe
             const [cols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'admin_status']
+                [process.env.DB_NAME, 'return_requests', 'admin_status']
             );
             if (cols && cols[0] && cols[0].cnt === 0) {
                 await dbPool.execute(
@@ -273,7 +273,7 @@ async function initDb() {
             // Agregar columna refund_status si no existe
             const [refundCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'refund_status']
+                [process.env.DB_NAME, 'return_requests', 'refund_status']
             );
             if (refundCols && refundCols[0] && refundCols[0].cnt === 0) {
                 await dbPool.execute(
@@ -283,7 +283,7 @@ async function initDb() {
             // Agregar columnas payment_provider y payment_reference si no existen
             const [payProviderCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'payment_provider']
+                [process.env.DB_NAME, 'return_requests', 'payment_provider']
             );
             if (payProviderCols && payProviderCols[0] && payProviderCols[0].cnt === 0) {
                 await dbPool.execute(
@@ -292,7 +292,7 @@ async function initDb() {
             }
             const [payRefCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'payment_reference']
+                [process.env.DB_NAME, 'return_requests', 'payment_reference']
             );
             if (payRefCols && payRefCols[0] && payRefCols[0].cnt === 0) {
                 await dbPool.execute(
@@ -301,7 +301,7 @@ async function initDb() {
             }
             const [customerCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'customer_name']
+                [process.env.DB_NAME, 'return_requests', 'customer_name']
             );
             if (customerCols && customerCols[0] && customerCols[0].cnt === 0) {
                 await dbPool.execute(
@@ -310,7 +310,7 @@ async function initDb() {
             }
             const [orderNumberCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'order_number']
+                [process.env.DB_NAME, 'return_requests', 'order_number']
             );
             if (orderNumberCols && orderNumberCols[0] && orderNumberCols[0].cnt === 0) {
                 await dbPool.execute(
@@ -319,7 +319,7 @@ async function initDb() {
             }
             const [stripeCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'stripe_session_id']
+                [process.env.DB_NAME, 'return_requests', 'stripe_session_id']
             );
             if (stripeCols && stripeCols[0] && stripeCols[0].cnt > 0) {
                 await dbPool.execute(
@@ -328,7 +328,7 @@ async function initDb() {
             }
             const [couponCodeCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'coupon_code']
+                [process.env.DB_NAME, 'return_requests', 'coupon_code']
             );
             if (couponCodeCols && couponCodeCols[0] && couponCodeCols[0].cnt === 0) {
                 await dbPool.execute(
@@ -337,7 +337,7 @@ async function initDb() {
             }
             const [couponAmountCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'coupon_amount']
+                [process.env.DB_NAME, 'return_requests', 'coupon_amount']
             );
             if (couponAmountCols && couponAmountCols[0] && couponAmountCols[0].cnt === 0) {
                 await dbPool.execute(
@@ -346,7 +346,7 @@ async function initDb() {
             }
             const [couponSentCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'coupon_sent_at']
+                [process.env.DB_NAME, 'return_requests', 'coupon_sent_at']
             );
             if (couponSentCols && couponSentCols[0] && couponSentCols[0].cnt === 0) {
                 await dbPool.execute(
@@ -355,14 +355,14 @@ async function initDb() {
             }
             const [changeSentCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'change_sent_at']
+                [process.env.DB_NAME, 'return_requests', 'change_sent_at']
             );
             if (changeSentCols && changeSentCols[0] && changeSentCols[0].cnt === 0) {
                 await dbPool.execute(
                     `ALTER TABLE returns_requests ADD COLUMN change_sent_at TIMESTAMP NULL`
                 );
             }
-            console.log('✅ DB lista: tabla returns_requests verificada (MySQL)');
+            console.log('✅ DB lista: tabla return_requests verificada (MySQL)');
         }
     } catch (err) {
         console.error('❌ Error inicializando DB:', err.message);
@@ -947,7 +947,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
 
             // TEMPORAL: Se permite registrar varias solicitudes por el mismo número de orden
             // const [existing] = await executeQuery(
-            //     'SELECT order_id FROM returns_requests WHERE order_id = ? LIMIT 1',
+            //     'SELECT order_id FROM return_requests WHERE order_id = ? LIMIT 1',
             //     [orderIdForStorage]
             // );
             // if (existing && existing.length > 0) {
@@ -1084,9 +1084,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         }));
 
           const insertSQL = isPostgreSQL 
-                ? `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
+                ? `INSERT INTO return_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
                     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING order_id`
-                : `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
+                : `INSERT INTO return_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
                     VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
         const [result] = await executeQuery(insertSQL, [
@@ -1108,7 +1108,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         if (isDefectRequest && requestOrderId) {
             try {
                 await executeQuery(
-                    `UPDATE returns_requests SET payment_status = 'pending' WHERE order_id = ?`,
+                    `UPDATE return_requests SET payment_status = 'pending' WHERE order_id = ?`,
                     [requestOrderId]
                 );
 
@@ -1124,7 +1124,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                         if (label && label.trackingNumber) {
                             const now = new Date().toISOString();
                             await executeQuery(
-                                `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE order_id = ?`,
+                                `UPDATE return_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE order_id = ?`,
                                 [label.trackingNumber, label.labelBase64, label.labelMime, now, requestOrderId]
                             );
                         }
