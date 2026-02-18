@@ -19,6 +19,7 @@ const stripe = process.env.STRIPE_SECRET_KEY
     : null;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
+const sgMail = require('@sendgrid/mail');
 const sendgridApiKey = process.env.SENDGRID_API_KEY || '';
 const sendgridFrom = process.env.SENDGRID_FROM || '';
 const sendgridTemplateConfirmation = process.env.SENDGRID_TEMPLATE_CONFIRMATION || '';
