@@ -1060,7 +1060,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
 
           const insertSQL = isPostgreSQL 
                 ? `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
-                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING order_id`
                 : `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
                     VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
