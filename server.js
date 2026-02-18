@@ -919,8 +919,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         }
 
         const { orderId, orderNumber, contactEmail, returnType, customerName } = submitParsed.data;
-        const orderIdForStorage = String(orderNumber || orderId || '').trim();
-        const orderIdForLookup = String(orderId || orderNumber || '').trim();
+        // Guardar SIEMPRE el OrderId del formulario (número de orden Shopify)
+        const orderIdForStorage = String(orderId || '').trim();
+        const orderIdForLookup = String(orderId || '').trim();
         
         // Los items vienen como string JSON, hay que parsearlos
         let items = [];
@@ -1014,16 +1015,15 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         }));
 
           const insertSQL = isPostgreSQL 
-                ? `INSERT INTO returns_requests (order_id, order_number, contact_email, customer_name, return_type, items_json, files_json, amount)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
-                : `INSERT INTO returns_requests (order_id, order_number, contact_email, customer_name, return_type, items_json, files_json, amount)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-        
+                ? `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`
+                : `INSERT INTO returns_requests (order_id, contact_email, customer_name, return_type, items_json, files_json, amount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
         const [result] = await executeQuery(insertSQL, [
             String(orderIdForStorage || ''),
-            String(orderNumber || ''),
             String(contactEmail || ''),
-                String(customerName || ''),
+            String(customerName || ''),
             String(returnType || ''),
             JSON.stringify(items),
             JSON.stringify(filesMeta),
