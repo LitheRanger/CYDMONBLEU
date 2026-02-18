@@ -1,4 +1,5 @@
 const express = require('express');
+const cloudinary = require('cloudinary').v2;
 const cors = require('cors');
 // Detectar si es PostgreSQL o MySQL
 const isPostgreSQL = (process.env.DATABASE_URL || '').includes('postgresql://');
