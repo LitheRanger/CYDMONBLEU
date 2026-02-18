@@ -1237,39 +1237,30 @@ async function resolveOrderForLabel(orderId) {
     if (!orderId) return null;
     const rawOrderId = String(orderId || '').trim();
     
-    console.log(`🔍 resolveOrderForLabel: Buscando orden con ID/nombre: "${rawOrderId}"`);
+    console.log(`🔍 resolveOrderForLabel: Buscando orden con ID: "${rawOrderId}"`);
     
-    // Estrategia 1: Si es un número puro, buscar por ID directo en Shopify
+    // Estrategia ÚNICA: Si es numérico, buscar por ID directo SOLAMENTE
     if (/^\d+$/.test(rawOrderId)) {
-        console.log(`  → Buscando por ID numérico: ${rawOrderId}`);
+        console.log(`  → Intentando ID numérico directo en Shopify: ${rawOrderId}`);
         const orderById = await shopifyClient.getOrderById(rawOrderId);
         if (orderById) {
-            console.log(`  ✅ Orden encontrada por ID: #${orderById.order_number} (ID: ${orderById.id})`);
+            console.log(`  ✅ Orden encontrada: #${orderById.order_number} (ID: ${orderById.id})`);
             console.log(`     Dirección: ${orderById.shipping_address?.zip || 'N/A'}`);
             return orderById;
         }
-        console.log(`  ⚠️ No se encontró orden con ID ${rawOrderId}`);
+        console.log(`  ❌ No existe orden con ID Shopify: ${rawOrderId}`);
+        console.error(`  💥 ERROR CRÍTICO: El order_id guardado (${rawOrderId}) NO es un ID válido de Shopify`);
+        return null;
     }
     
-    // Estrategia 2: Si es nombre (empieza con # o es texto), buscar por nombre
-    const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
-    console.log(`  → Buscando por nombre: ${orderName}`);
-    const orderByName = await shopifyClient.getOrder(orderName);
-    if (orderByName) {
-        console.log(`  ✅ Orden encontrada por nombre: #${orderByName.order_number} (ID: ${orderByName.id})`);
-        console.log(`     Dirección: ${orderByName.shipping_address?.zip || 'N/A'}`);
-        
-        // Validar que el nombre coincida exactamente
-        if (String(orderByName.order_number) === rawOrderId.replace('#', '')) {
-            return orderByName;
-        } else {
-            console.warn(`  ⚠️ Advertencia: La orden encontrada (#${orderByName.order_number}) no coincide exactamente con el parámetro (${rawOrderId})`);
-            // Aún así retornarla si no hay mejor opción
-            return orderByName;
-        }
+    // Si viene con #, removerlo y reintentar
+    if (rawOrderId.startsWith('#')) {
+        const numericId = rawOrderId.substring(1);
+        console.log(`  → Removiendo # y reintentando: ${numericId}`);
+        return await resolveOrderForLabel(numericId);
     }
     
-    console.log(`  ❌ No se encontró orden: "${rawOrderId}"`);
+    console.log(`  ❌ No se pudo resolver: "${rawOrderId}"`);
     return null;
 }
 
