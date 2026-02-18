@@ -1782,8 +1782,6 @@ app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
     }
 });
 
-});
-
 // --- 4F. VERIFICAR SESIÓN STRIPE ---
 app.get('/api/verify-payment/:sessionId', async (req, res) => {
     try {
