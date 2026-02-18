@@ -2338,6 +2338,30 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
     }
 });
 
+app.post('/api/admin/requests/:requestId/delete', requireAdmin, async (req, res) => {
+    try {
+        if (!dbPool) {
+            return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
+        }
+
+        const requestId = req.params.requestId;
+        if (!requestId) {
+            return res.status(400).json({ success: false, message: 'ID de solicitud requerido' });
+        }
+
+        const result = await executeQuery('DELETE FROM returns_requests WHERE order_id = ?', [requestId]);
+        
+        if (result && result.affectedRows > 0) {
+            res.json({ success: true, message: 'Solicitud eliminada correctamente' });
+        } else {
+            res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+        }
+    } catch (err) {
+        console.error('Error eliminando solicitud:', err);
+        res.status(500).json({ success: false, message: 'Error eliminando solicitud' });
+    }
+});
+
 app.post('/api/admin/requests/delete-all', requireAdmin, async (req, res) => {
     try {
         if (!dbPool) {

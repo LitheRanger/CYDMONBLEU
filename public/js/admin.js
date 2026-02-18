@@ -550,6 +550,8 @@ async function viewDetail(requestId) {
                 actions.push(`<button class="btn" onclick="completeRequest('${r.order_id}')" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`);
             }
             
+            actions.push(`<button class="btn danger" onclick="deleteRequest('${r.order_id}')">Eliminar</button>`);
+            
             actionsContainer.innerHTML = actions.join(' ');
         }
         document.getElementById('modal').classList.add('show');
@@ -628,6 +630,28 @@ async function changeRefundStatus(requestId) {
         }
     } catch (e) {
         console.error('Error:', e);
+    }
+}
+
+async function deleteRequest(requestId) {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('modal').classList.remove('show');
+            loadRequests();
+            alert('Solicitud eliminada correctamente');
+        } else {
+            alert(`Error: ${data.message}`);
+        }
+    } catch (e) {
+        console.error('Error:', e);
+        alert('Error al eliminar la solicitud');
     }
 }
 
