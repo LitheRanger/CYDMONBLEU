@@ -4,6 +4,7 @@ const pino = require('pino');
 const pinoHttp = require('pino-http');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { z } = require('zod');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
