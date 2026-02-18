@@ -117,6 +117,55 @@ app.use((req, res, next) => {
     return express.json()(req, res, next);
 });
 
+// Stripe webhook: ANTES del middleware JSON parser, usar express.raw
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+
+    if (!stripe) {
+        console.warn('⚠️ Stripe no configurado');
+        return res.status(400).send('Stripe no configurado');
+    }
+
+    if (!stripeWebhookSecret) {
+        console.warn('⚠️ STRIPE_WEBHOOK_SECRET no configurado');
+        return res.status(400).send('Webhook secret no configurado');
+    }
+
+    let event;
+    try {
+        // Asegurar que req.body es un Buffer
+        const body = typeof req.body === 'string' ? Buffer.from(req.body) : req.body;
+        console.log('📨 Webhook body type:', typeof body, 'Length:', body.length);
+        console.log('📨 Signature from header:', sig ? sig.substring(0, 20) + '...' : 'missing');
+        
+        event = stripe.webhooks.constructEvent(body, sig, stripeWebhookSecret);
+        console.log('✅ Webhook verificado correctamente. Tipo:', event.type);
+    } catch (err) {
+        console.error('❌ Error verificando webhook Stripe:', err.message);
+        console.error('   Status Code:', err.status);
+        console.error('   Headers:', req.headers);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        const metadata = session.metadata || {};
+        const requestId = metadata.requestId;
+        const orderId = metadata.orderId;
+
+        if (requestId) {
+            await handleApprovedPayment({
+                requestId,
+                orderId,
+                paymentId: session.id,
+                paymentProvider: 'stripe'
+            });
+        }
+    }
+
+    res.json({ received: true });
+});
+
 // --- ADMIN BASIC AUTH ---
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123456';
@@ -1733,45 +1782,6 @@ app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
     }
 });
 
-// --- 4E. STRIPE WEBHOOK (Confirmar pagos) ---
-app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-    const sig = req.headers['stripe-signature'];
-
-    if (!stripe) {
-        console.warn('⚠️ Stripe no configurado');
-        return res.status(400).send('Stripe no configurado');
-    }
-
-    if (!stripeWebhookSecret) {
-        console.warn('⚠️ STRIPE_WEBHOOK_SECRET no configurado');
-        return res.status(400).send('Webhook secret no configurado');
-    }
-
-    let event;
-    try {
-        event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
-    } catch (err) {
-        console.error('❌ Error verificando webhook Stripe:', err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-        const metadata = session.metadata || {};
-        const requestId = metadata.requestId;
-        const orderId = metadata.orderId;
-
-        if (requestId) {
-            await handleApprovedPayment({
-                requestId,
-                orderId,
-                paymentId: session.id,
-                paymentProvider: 'stripe'
-            });
-        }
-    }
-
-    res.json({ received: true });
 });
 
 // --- 4F. VERIFICAR SESIÓN STRIPE ---
