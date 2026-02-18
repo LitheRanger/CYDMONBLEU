@@ -775,7 +775,6 @@
                 <table class="table" id="table-cambios">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Orden</th>
                             <th>Cliente</th>
                             <th>Contacto</th>
@@ -805,7 +804,6 @@
                 <table class="table" id="table-reembolsos">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Orden</th>
                             <th>Cliente</th>
                             <th>Contacto</th>
@@ -835,7 +833,6 @@
                 <table class="table" id="table-defectos">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Orden</th>
                             <th>Cliente</th>
                             <th>Contacto</th>
@@ -866,7 +863,6 @@
                 <table class="table" id="table-completadas">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Orden</th>
                             <th>Cliente</th>
                             <th>Contacto</th>
@@ -1106,7 +1102,7 @@
         function renderRow(r, tabName, tbody) {
             const tr = document.createElement('tr');
             tr.classList.add('clickable-row');
-            tr.setAttribute('data-request-id', r.id);
+            tr.setAttribute('data-request-id', r.order_id);
             const labelBadge = r.tracking_number
                 ? `<span class="badge success" style="background:#dcfce7;color:#16a34a;">${r.carrier || 'Generada'}</span>`
                 : '<span class="badge no-label">Sin guía</span>';
@@ -1118,7 +1114,6 @@
             const orderDisplay = r.order_number || r.order_id || '—';
 
             tr.innerHTML = `
-                <td>${r.id}</td>
                 <td><strong>${orderDisplay}</strong></td>
                 <td>${r.customer_name || '—'}</td>
                 <td class="muted">${r.contact_email || '—'}</td>
@@ -1330,7 +1325,7 @@
                     `;
                 }).join('') || '<div class="muted">Sin archivos</div>';
 
-                document.getElementById('detail-id').textContent = r.id;
+                document.getElementById('detail-id').textContent = r.order_id;
                 document.getElementById('detail-body').innerHTML = `
                     <div class="detail-section">
                         <h3 class="detail-section-title">Cliente</h3>
