@@ -211,16 +211,6 @@ function renderRow(r, tabName, tbody) {
     const isCambio = tabName === 'cambios';
     const isCompletadas = tabName === 'completadas' || tabName === 'defectos';
     const isReembolso = tabName === 'reembolsos';
-    const actions = `
-                <button class="link-btn" data-id="${r.order_id}" data-action="label" ${!(r.tracking_number || r.label_created_at) ? 'disabled' : ''}>Guia</button>
-                <button class="link-btn" data-id="${r.order_id}" data-action="retry" ${r.payment_status !== 'paid' ? 'disabled' : ''}>Reintentar</button>
-                <button class="link-btn" data-id="${r.order_id}" data-action="accept" ${String(r.admin_status || '').toLowerCase() === 'accepted' ? 'disabled' : ''}>Aceptar</button>
-                <button class="link-btn" data-id="${r.order_id}" data-action="reject" ${String(r.admin_status || '').toLowerCase() === 'rejected' ? 'disabled' : ''}>Rechazar</button>
-                ${isCambio ? `<button class="link-btn" data-id="${r.order_id}" data-action="ship">Enviar</button>` : ''}
-                ${isReembolso ? `<button class="link-btn" data-id="${r.order_id}" data-action="coupon">Enviar cupon</button>` : ''}
-                ${isCambio ? `<button class="link-btn" data-id="${r.order_id}" data-action="refund-status">Cambiar Estado</button>` : ''}
-                ${isCompletadas ? '' : `<button class="link-btn" data-id="${r.order_id}" data-action="complete" ${String(r.admin_status || 'open').toLowerCase() === 'completed' ? 'disabled' : ''}>Completar</button>`}
-            `;
 
     const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
 
@@ -236,7 +226,6 @@ function renderRow(r, tabName, tbody) {
                 <td>${trackingText}</td>
                 <td>${labelBadge}</td>
                 <td class="muted">${formatDate(r.created_at)}</td>
-                <td><div class="actions">${actions}</div></td>
             `;
     tbody.appendChild(tr);
 }
@@ -920,20 +909,6 @@ document.getElementById('filter-label').addEventListener('change', applyFilter);
 document.getElementById('filter-refund').addEventListener('change', applyFilter);
 document.getElementById('close-modal').addEventListener('click', () => document.getElementById('modal').classList.remove('show'));
 document.getElementById('tbody-cambios').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]');
-    if (btn) {
-        const id = btn.getAttribute('data-id');
-        const action = btn.getAttribute('data-action');
-        if (action === 'label') downloadLabel(id);
-        else if (action === 'retry') retryLabel(id);
-        else if (action === 'complete') completeRequest(id);
-        else if (action === 'refund-status') changeRefundStatus(id);
-        else if (action === 'accept') updateDecision(id, 'accepted');
-        else if (action === 'reject') updateDecision(id, 'rejected');
-        else if (action === 'ship') shipChange(id);
-        else if (action === 'coupon') sendCoupon(id);
-        return;
-    }
     const row = e.target.closest('tr[data-request-id]');
     if (!row) return;
     const id = row.getAttribute('data-request-id');
@@ -941,20 +916,6 @@ document.getElementById('tbody-cambios').addEventListener('click', (e) => {
 });
 
 document.getElementById('tbody-reembolsos').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]');
-    if (btn) {
-        const id = btn.getAttribute('data-id');
-        const action = btn.getAttribute('data-action');
-        if (action === 'label') downloadLabel(id);
-        else if (action === 'retry') retryLabel(id);
-        else if (action === 'complete') completeRequest(id);
-        else if (action === 'refund-status') changeRefundStatus(id);
-        else if (action === 'accept') updateDecision(id, 'accepted');
-        else if (action === 'reject') updateDecision(id, 'rejected');
-        else if (action === 'ship') shipChange(id);
-        else if (action === 'coupon') sendCoupon(id);
-        return;
-    }
     const row = e.target.closest('tr[data-request-id]');
     if (!row) return;
     const id = row.getAttribute('data-request-id');
@@ -962,20 +923,6 @@ document.getElementById('tbody-reembolsos').addEventListener('click', (e) => {
 });
 
 document.getElementById('tbody-defectos').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]');
-    if (btn) {
-        const id = btn.getAttribute('data-id');
-        const action = btn.getAttribute('data-action');
-        if (action === 'label') downloadLabel(id);
-        else if (action === 'retry') retryLabel(id);
-        else if (action === 'complete') completeRequest(id);
-        else if (action === 'refund-status') changeRefundStatus(id);
-        else if (action === 'accept') updateDecision(id, 'accepted');
-        else if (action === 'reject') updateDecision(id, 'rejected');
-        else if (action === 'ship') shipChange(id);
-        else if (action === 'coupon') sendCoupon(id);
-        return;
-    }
     const row = e.target.closest('tr[data-request-id]');
     if (!row) return;
     const id = row.getAttribute('data-request-id');
@@ -983,20 +930,6 @@ document.getElementById('tbody-defectos').addEventListener('click', (e) => {
 });
 
 document.getElementById('tbody-completadas').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]');
-    if (btn) {
-        const id = btn.getAttribute('data-id');
-        const action = btn.getAttribute('data-action');
-        if (action === 'label') downloadLabel(id);
-        else if (action === 'retry') retryLabel(id);
-        else if (action === 'complete') completeRequest(id);
-        else if (action === 'refund-status') changeRefundStatus(id);
-        else if (action === 'accept') updateDecision(id, 'accepted');
-        else if (action === 'reject') updateDecision(id, 'rejected');
-        else if (action === 'ship') shipChange(id);
-        else if (action === 'coupon') sendCoupon(id);
-        return;
-    }
     const row = e.target.closest('tr[data-request-id]');
     if (!row) return;
     const id = row.getAttribute('data-request-id');
