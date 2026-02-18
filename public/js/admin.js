@@ -332,10 +332,15 @@ function applyFilter() {
 
 async function viewDetail(requestId) {
     try {
+        console.log(`🔍 Fetching detail para requestId: "${requestId}"`);
         const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}`);
+        console.log(`📡 Response status: ${res.status}`);
         const data = await res.json();
+        console.log('📨 Response data:', data);
+        
         if (!data.success) {
-            console.error('Error fetching detail:', data);
+            console.error('❌ Error fetching detail:', data);
+            document.getElementById('detail-body').innerHTML = `<div class="muted">Error: ${data.message || 'No se pudo cargar'}</div>`;
             return;
         }
 
@@ -520,7 +525,9 @@ async function viewDetail(requestId) {
         }
         document.getElementById('modal').classList.add('show');
     } catch (e) {
-        console.error('Error:', e);
+        console.error('❌ Error in viewDetail:', e);
+        document.getElementById('detail-body').innerHTML = `<div class="muted">Error en el servidor: ${e.message}</div>`;
+        document.getElementById('modal').classList.add('show');
     }
 }
 

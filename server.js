@@ -1941,16 +1941,20 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
             return res.status(503).json({ success: false, message: 'Base de datos no disponible' });
         }
 
+        console.log(`🔍 Buscando request con order_id: "${req.params.requestId}"`);
         const [rows] = await executeQuery(
             `SELECT * FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [req.params.requestId]
         );
 
+        console.log(`📊 Resultado de búsqueda:`, rows ? rows.length : 'sin rows');
         if (!rows || !rows[0]) {
+            console.log(`❌ No encontrada: ${req.params.requestId}`);
             return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
         }
 
         const row = rows[0];
+        console.log(`✅ Encontrada solicitud:`, { order_id: row.order_id, return_type: row.return_type });
         const parsedItems = (() => {
             try { return JSON.parse(row.items_json || '[]'); } catch { return []; }
         })();
