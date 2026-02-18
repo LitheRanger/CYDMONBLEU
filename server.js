@@ -922,7 +922,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
 
             // Validar que no exista ya una solicitud para este número de orden
             const [existing] = await executeQuery(
-                'SELECT id FROM returns_requests WHERE order_id = ? LIMIT 1',
+                'SELECT order_id FROM returns_requests WHERE order_id = ? LIMIT 1',
                 [orderIdForStorage]
             );
             if (existing && existing.length > 0) {
@@ -1194,7 +1194,7 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
     if (!dbPool || !requestId) return;
 
     const [rows] = await executeQuery(
-        `SELECT order_id, tracking_number, contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+        `SELECT order_id, tracking_number, contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
         [requestId]
     );
     
@@ -1204,7 +1204,7 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
     const customerName = rows && rows[0] ? rows[0].customer_name : null;
 
     await executeQuery(
-        `UPDATE returns_requests SET payment_status = 'paid', payment_provider = ?, payment_reference = ? WHERE id = ?`,
+        `UPDATE returns_requests SET payment_status = 'paid', payment_provider = ?, payment_reference = ? WHERE order_id = ?`,
         [String(paymentProvider || 'mercadopago'), String(paymentId || ''), requestId]
     );
 
@@ -1233,7 +1233,7 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
                 trackingNumber = label.trackingNumber;
                 const now = new Date().toISOString();
                 await executeQuery(
-                    `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE id = ?`,
+                    `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE order_id = ?`,
                     [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
                 );
                 console.log(`📦 Guía MyeShip generada: ${label.trackingNumber} (${label.provider} - ${label.serviceName})`);
@@ -1261,7 +1261,7 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
 async function handleFailedPayment({ requestId, paymentId, paymentProvider = 'mercadopago' }) {
     if (!dbPool || !requestId) return;
     await executeQuery(
-        `UPDATE returns_requests SET payment_status = 'failed', payment_provider = ?, payment_reference = ? WHERE id = ?`,
+        `UPDATE returns_requests SET payment_status = 'failed', payment_provider = ?, payment_reference = ? WHERE order_id = ?`,
         [String(paymentProvider || 'mercadopago'), String(paymentId || ''), requestId]
     );
 }
@@ -1415,7 +1415,7 @@ async function resolvePaymentIdFromWebhook(req) {
 async function getExpectedAmount(requestId) {
     if (!dbPool || !requestId) return null;
     const [rows] = await executeQuery(
-        `SELECT amount FROM returns_requests WHERE id = ? LIMIT 1`,
+        `SELECT amount FROM returns_requests WHERE order_id = ? LIMIT 1`,
         [requestId]
     );
     if (!rows || !rows[0]) return null;
@@ -1520,7 +1520,7 @@ app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
 
         if (dbPool && requestId) {
             await executeQuery(
-                `UPDATE returns_requests SET payment_provider = 'mercadopago', payment_reference = ? WHERE id = ?`,
+                `UPDATE returns_requests SET payment_provider = 'mercadopago', payment_reference = ? WHERE order_id = ?`,
                 [String(prefId || ''), requestId]
             );
         }
@@ -1617,7 +1617,7 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
 
         if (dbPool && requestId) {
             await executeQuery(
-                `UPDATE returns_requests SET payment_provider = 'stripe', payment_reference = ? WHERE id = ?`,
+                `UPDATE returns_requests SET payment_provider = 'stripe', payment_reference = ? WHERE order_id = ?`,
                 [String(session.id || ''), requestId]
             );
         }
@@ -1702,7 +1702,7 @@ app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
 
         if (dbPool && requestId) {
             await executeQuery(
-                `UPDATE returns_requests SET payment_provider = 'stripe', payment_reference = ? WHERE id = ?`,
+                `UPDATE returns_requests SET payment_provider = 'stripe', payment_reference = ? WHERE order_id = ?`,
                 [String(session.id || ''), requestId]
             );
         }
@@ -1931,7 +1931,7 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
         }
 
         const [rows] = await executeQuery(
-            `SELECT * FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT * FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [req.params.requestId]
         );
 
@@ -2055,7 +2055,7 @@ app.post('/api/admin/requests/:requestId/complete', requireAdmin, async (req, re
 
         // Obtener info del cliente para enviar email
         const [rows] = await executeQuery(
-            `SELECT contact_email, customer_name FROM returns_requests WHERE id = ? LIMIT 1`,
+            `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
         const contactEmail = rows?.[0]?.contact_email;
