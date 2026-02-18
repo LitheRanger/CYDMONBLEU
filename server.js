@@ -1236,23 +1236,41 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
 async function resolveOrderForLabel(orderId) {
     if (!orderId) return null;
     const rawOrderId = String(orderId || '').trim();
-    const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
-
-    // Buscar por ID y por nombre SIEMPRE
-    let orderById = null;
-    let orderByName = null;
+    
+    console.log(`🔍 resolveOrderForLabel: Buscando orden con ID/nombre: "${rawOrderId}"`);
+    
+    // Estrategia 1: Si es un número puro, buscar por ID directo en Shopify
     if (/^\d+$/.test(rawOrderId)) {
-        orderById = await shopifyClient.getOrderById(rawOrderId);
+        console.log(`  → Buscando por ID numérico: ${rawOrderId}`);
+        const orderById = await shopifyClient.getOrderById(rawOrderId);
+        if (orderById) {
+            console.log(`  ✅ Orden encontrada por ID: #${orderById.order_number} (ID: ${orderById.id})`);
+            console.log(`     Dirección: ${orderById.shipping_address?.zip || 'N/A'}`);
+            return orderById;
+        }
+        console.log(`  ⚠️ No se encontró orden con ID ${rawOrderId}`);
     }
-    orderByName = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
-
-    // Si ambos existen y coinciden en datos clave, usar uno
-    if (orderById && orderByName) {
-        // Temporalmente, usar siempre la orden por ID si existe
-        return orderById;
+    
+    // Estrategia 2: Si es nombre (empieza con # o es texto), buscar por nombre
+    const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
+    console.log(`  → Buscando por nombre: ${orderName}`);
+    const orderByName = await shopifyClient.getOrder(orderName);
+    if (orderByName) {
+        console.log(`  ✅ Orden encontrada por nombre: #${orderByName.order_number} (ID: ${orderByName.id})`);
+        console.log(`     Dirección: ${orderByName.shipping_address?.zip || 'N/A'}`);
+        
+        // Validar que el nombre coincida exactamente
+        if (String(orderByName.order_number) === rawOrderId.replace('#', '')) {
+            return orderByName;
+        } else {
+            console.warn(`  ⚠️ Advertencia: La orden encontrada (#${orderByName.order_number}) no coincide exactamente con el parámetro (${rawOrderId})`);
+            // Aún así retornarla si no hay mejor opción
+            return orderByName;
+        }
     }
-    // Si solo una existe, retorna esa
-    return orderById || orderByName || null;
+    
+    console.log(`  ❌ No se encontró orden: "${rawOrderId}"`);
+    return null;
 }
 
 async function handleApprovedPayment({ requestId, orderId, paymentId, paymentProvider = 'mercadopago' }) {

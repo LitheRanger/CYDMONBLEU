@@ -117,21 +117,40 @@ class ShopifyTokenManager {
   // 1. Buscar Orden (Para validación)
   async getOrder(orderName) {
     // Buscamos la orden por nombre (#1001)
-    const data = await this.makeRequest(`/admin/api/2024-01/orders.json?name=${orderName}&status=any&limit=1`);
-    return data.orders ? data.orders[0] : null;
+    console.log(`🔍 Shopify: Buscando orden por nombre: ${orderName}`);
+    try {
+      const data = await this.makeRequest(`/admin/api/2024-01/orders.json?name=${orderName}&status=any&limit=1`);
+      if (data.orders && data.orders.length > 0) {
+        const order = data.orders[0];
+        console.log(`   ✅ Encontrada: #${order.order_number} (ID: ${order.id})`);
+        return order;
+      }
+      console.log(`   ❌ No encontrada`);
+      return null;
+    } catch (e) {
+      console.error(`❌ Error buscando orden ${orderName}:`, e.message);
+      return null;
+    }
   }
 
   // 1.1 Buscar Orden por ID (Para guías de paquetería)
   async getOrderById(orderId) {
     try {
       const rawId = String(orderId || '').trim();
+      console.log(`🔍 Shopify: Buscando orden por ID: ${rawId}`);
       if (!/^[0-9]+$/.test(rawId)) {
+        console.log(`   ❌ ID inválido (no es numérico)`);
         return null;
       }
       const data = await this.makeRequest(`/admin/api/2024-01/orders/${rawId}.json`);
-      return data.order || null;
+      if (data.order) {
+        console.log(`   ✅ Encontrada: #${data.order.order_number} (ID: ${data.order.id})`);
+        return data.order;
+      }
+      console.log(`   ❌ No encontrada`);
+      return null;
     } catch (e) {
-      console.error(`Error buscando orden ${orderId}`);
+      console.error(`❌ Error buscando orden ${orderId}:`, e.message);
       return null;
     }
   }
