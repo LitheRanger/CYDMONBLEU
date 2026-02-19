@@ -869,12 +869,12 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
     }
 
     try {
-        // A. Buscar la orden por número exacto (sin fallback para evitar órdenes equivocadas)
-        let order = null;
-        const cleanInput = String(orderNumber || '').replace(/^#/, '').trim();
+        // A. Buscar la orden por NOMBRE (lo que el usuario ve: #160670)
+        // NO por número exacto (order_number)
+        const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
         
-        console.log(`🔍 /api/validate-order: Input: "${orderNumber}" → Limpio: "${cleanInput}"`);
-        order = await shopifyClient.getOrderByNumber(cleanInput);
+        console.log(`🔍 /api/validate-order: Input: "${orderNumber}" → Buscando por nombre: "${orderNameForSearch}"`);
+        const order = await shopifyClient.getOrder(orderNameForSearch);
         
         if (order) {
             console.log(`✅ Orden encontrada: #${order.order_number} (ID: ${order.id})`);
