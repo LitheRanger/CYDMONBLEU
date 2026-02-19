@@ -7,13 +7,13 @@ const MYESHIP_BASE_URL = MYESHIP_ENV === 'production'
   : 'https://apiqa.myeship.co/rest';
 
 const MYESHIP_API_KEY = process.env.MYESHIP_API_KEY;
-const MYESHIP_TIMEOUT_MS = Number(process.env.MYESHIP_TIMEOUT_MS || 10000);
+const MYESHIP_TIMEOUT_MS = Number(process.env.MYESHIP_TIMEOUT_MS || 30000);
 
 const http = axios.create({ timeout: MYESHIP_TIMEOUT_MS });
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function requestWithRetry(fn, retries = 2) {
+async function requestWithRetry(fn, retries = 3) {
   let lastError;
   for (let i = 0; i <= retries; i++) {
     try {
@@ -21,9 +21,12 @@ async function requestWithRetry(fn, retries = 2) {
     } catch (error) {
       lastError = error;
       const status = error?.response?.status || 0;
-      const retryable = status === 429 || status >= 500;
+      const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout');
+      const retryable = status === 429 || status >= 500 || isTimeout;
       if (!retryable || i === retries) break;
-      await sleep(500 * (i + 1));
+      const delay = 1000 * (i + 1) + Math.random() * 500; // Exponential backoff with jitter
+      console.log(`⏳ Retry ${i + 1}/${retries} after ${Math.round(delay)}ms...`);
+      await sleep(delay);
     }
   }
   throw lastError;
