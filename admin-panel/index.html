@@ -25,6 +25,7 @@
       <button class="tab-btn active" data-tab="cambios">📦 Cambios</button>
       <button class="tab-btn" data-tab="reembolsos">💵 Reembolsos</button>
       <button class="tab-btn" data-tab="defectos">🛠️ Defectos</button>
+      <button class="tab-btn" data-tab="mixtas">🔀 Mixtas</button>
       <button class="tab-btn" data-tab="completadas">✅ Completadas</button>
     </div>
     <div class="toolbar">
@@ -34,6 +35,7 @@
         <option value="cambios">Cambios</option>
         <option value="reembolsos">Reembolsos</option>
         <option value="defectos">Defectos</option>
+        <option value="mixtas">Mixtas</option>
         <option value="completadas">Completadas</option>
       </select>
       <button id="export-csv">Exportar CSV</button>
@@ -71,6 +73,18 @@
             </tr>
           </thead>
           <tbody id="tbody-defectos"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-mixtas">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Orden</th><th>Cliente</th><th>Contacto</th><th>Tipo</th><th>Pago</th><th>Solicitud</th><th>Tracking</th><th>Guía</th><th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-mixtas"></tbody>
         </table>
       </div>
     </div>

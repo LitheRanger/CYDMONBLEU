@@ -143,6 +143,7 @@ function renderTable(tab, data) {
     cambios: 'tbody-cambios',
     reembolsos: 'tbody-reembolsos',
     defectos: 'tbody-defectos',
+    mixtas: 'tbody-mixtas',
     completadas: 'tbody-completadas'
   };
   const tbody = document.getElementById(tbodyMap[tab]);
@@ -299,6 +300,8 @@ tabBtns.forEach(btn => {
     tabContents.forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    currentPage = 1;
+    updateView();
   });
 });
 
@@ -330,14 +333,30 @@ async function fetchRequests() {
 }
 
 function groupRequests(data) {
-  const grupos = { cambios: [], reembolsos: [], defectos: [], completadas: [] };
+  const grupos = { cambios: [], reembolsos: [], defectos: [], mixtas: [], completadas: [] };
   data.forEach(r => {
     if (r.admin_status === 'completed' || r.admin_status === 'completada') grupos.completadas.push(r);
+    else if (isMixedRequest(r)) grupos.mixtas.push(r);
     else if (r.return_type === 'defecto' || r.return_type === 'defectos') grupos.defectos.push(r);
     else if (r.return_type === 'reembolso' || r.return_type === 'reembolsos') grupos.reembolsos.push(r);
     else grupos.cambios.push(r);
   });
   return grupos;
+}
+
+function isMixedRequest(request) {
+  let items = request.items_json;
+  if (typeof items === 'string') {
+    try {
+      items = JSON.parse(items);
+    } catch (e) {
+      return false;
+    }
+  }
+  if (!Array.isArray(items) || items.length === 0) return false;
+  
+  const types = new Set(items.map(i => i.requestType || ''));
+  return types.size > 1; // Mixed if multiple different types
 }
 
 async function loadAndRender() {
@@ -347,9 +366,11 @@ async function loadAndRender() {
   // Clasificar pedidos en grupos usando return_type y admin_status, sin duplicados
   window.completadasData = allData.filter(r => r.admin_status === 'completed' || r.admin_status === 'completada');
   const completadasIds = new Set(window.completadasData.map(r => r.id));
-  window.cambiosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('cambio') && !completadasIds.has(r.id));
-  window.reembolsosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('reembolso') && !completadasIds.has(r.id));
-  window.defectosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('defecto') && !completadasIds.has(r.id));
+  window.mixtasData = allData.filter(r => isMixedRequest(r) && !completadasIds.has(r.id));
+  const mixtasIds = new Set(window.mixtasData.map(r => r.id));
+  window.cambiosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('cambio') && !completadasIds.has(r.id) && !mixtasIds.has(r.id));
+  window.reembolsosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('reembolso') && !completadasIds.has(r.id) && !mixtasIds.has(r.id));
+  window.defectosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('defecto') && !completadasIds.has(r.id) && !mixtasIds.has(r.id));
   updateView();
 }
 
@@ -376,6 +397,7 @@ function filterData() {
 
 function groupType(r) {
   if (r.admin_status === 'completed' || r.admin_status === 'completada') return 'completadas';
+  if (isMixedRequest(r)) return 'mixtas';
   if (r.return_type === 'defecto' || r.return_type === 'defectos') return 'defectos';
   if (r.return_type === 'reembolso' || r.return_type === 'reembolsos') return 'reembolsos';
   return 'cambios';
@@ -466,6 +488,7 @@ function updateView() {
   if (tab === 'cambios') data = window.cambiosData || [];
   else if (tab === 'reembolsos') data = window.reembolsosData || [];
   else if (tab === 'defectos') data = window.defectosData || [];
+  else if (tab === 'mixtas') data = window.mixtasData || [];
   else if (tab === 'completadas') data = window.completadasData || [];
   // Aplicar filtros de búsqueda
   const search = document.getElementById('search').value.toLowerCase();
