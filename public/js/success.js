@@ -136,24 +136,17 @@ async function renderSuccess(requestId, noPayment) {
                     `).join('')}
                 </div>
 
-                <!-- Total -->
-                <div style="background: var(--bg-light); padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid var(--border-light);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <span style="font-weight: 600; font-size: 14px;">Total de la Orden:</span>
-                        <span style="font-size: 18px; font-weight: 700; color: var(--primary);">$${parseFloat(orderData.orderTotal || 0).toFixed(2)} ${orderData.orderCurrency || 'MXN'}</span>
-                    </div>
-                    ${orderData.coupon ? `
-                        <div style="border-top: 1px solid var(--border-light); padding-top: 12px; margin-top: 12px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(56, 142, 60, 0.08); padding: 10px; border-radius: 6px;">
-                                <span style="font-weight: 600; font-size: 13px; color: var(--success-color);">🎁 Cupón de Tienda:</span>
-                                <span style="font-size: 16px; font-weight: 700; color: var(--success-color);">$${parseFloat(orderData.coupon).toFixed(2)} ${orderData.orderCurrency || 'MXN'}</span>
-                            </div>
-                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; text-align: center;">
-                                Recibirás este cupón después de confirmar tu devolución
-                            </div>
+                ${orderData.coupon ? `
+                    <div style="background: var(--bg-light); padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid var(--border-light);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(56, 142, 60, 0.08); padding: 10px; border-radius: 6px;">
+                            <span style="font-weight: 600; font-size: 13px; color: var(--success-color);">🎁 Cupón de Tienda:</span>
+                            <span style="font-size: 16px; font-weight: 700; color: var(--success-color);">$${parseFloat(orderData.coupon).toFixed(2)} ${orderData.orderCurrency || 'MXN'}</span>
                         </div>
-                    ` : ''}
-                </div>
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; text-align: center;">
+                            Recibirás este cupón después de confirmar tu devolución
+                        </div>
+                    </div>
+                ` : ''}
 
                 <!-- Email -->
                 <div style="background: rgba(56, 142, 60, 0.08); padding: 12px; border-radius: 8px; margin-top: 16px; border-left: 3px solid var(--success-color); font-size: 12px;">
@@ -262,24 +255,17 @@ async function renderStripeSuccess(requestId) {
                     `).join('')}
                 </div>
 
-                <!-- Total -->
-                <div style="background: var(--bg-light); padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid var(--border-light);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <span style="font-weight: 600; font-size: 14px;">Total de la Orden:</span>
-                        <span style="font-size: 18px; font-weight: 700; color: var(--primary);">$${parseFloat(orderData.orderTotal || 0).toFixed(2)} ${orderData.orderCurrency || 'MXN'}</span>
-                    </div>
-                    ${orderData.coupon ? `
-                        <div style="border-top: 1px solid var(--border-light); padding-top: 12px; margin-top: 12px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(56, 142, 60, 0.08); padding: 10px; border-radius: 6px;">
-                                <span style="font-weight: 600; font-size: 13px; color: var(--success-color);">🎁 Cupón de Tienda:</span>
-                                <span style="font-size: 16px; font-weight: 700; color: var(--success-color);">$${parseFloat(orderData.coupon).toFixed(2)} ${orderData.orderCurrency || 'MXN'}</span>
-                            </div>
-                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; text-align: center;">
-                                Recibirás este cupón después de confirmar tu devolución
-                            </div>
+                ${orderData.coupon ? `
+                    <div style="background: var(--bg-light); padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid var(--border-light);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(56, 142, 60, 0.08); padding: 10px; border-radius: 6px;">
+                            <span style="font-weight: 600; font-size: 13px; color: var(--success-color);">🎁 Cupón de Tienda:</span>
+                            <span style="font-size: 16px; font-weight: 700; color: var(--success-color);">$${parseFloat(orderData.coupon).toFixed(2)} ${orderData.orderCurrency || 'MXN'}</span>
                         </div>
-                    ` : ''}
-                </div>
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; text-align: center;">
+                            Recibirás este cupón después de confirmar tu devolución
+                        </div>
+                    </div>
+                ` : ''}
 
                 <!-- Email -->
                 <div style="background: rgba(56, 142, 60, 0.08); padding: 12px; border-radius: 8px; margin-top: 16px; border-left: 3px solid var(--success-color); font-size: 12px;">
