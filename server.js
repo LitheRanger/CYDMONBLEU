@@ -873,8 +873,12 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
         let order = null;
         const cleanInput = String(orderNumber || '').replace(/^#/, '').trim();
         
-        console.log(`🔍 /api/validate-order: Buscando orden #${cleanInput}`);
+        console.log(`🔍 /api/validate-order: Input: "${orderNumber}" → Limpio: "${cleanInput}"`);
         order = await shopifyClient.getOrderByNumber(cleanInput);
+        
+        if (order) {
+            console.log(`✅ Orden encontrada: #${order.order_number} (ID: ${order.id})`);
+        }
 
         if (!order) {
             return res.status(404).json({ valid: false, message: 'Orden no encontrada.' });
@@ -885,13 +889,17 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
         const orderEmail = (order.email || '').toLowerCase();
         const orderPhone = (order.phone || '').replace(/\D/g, ''); 
         const inputCleanPhone = email.replace(/\D/g, '');
+        
+        console.log(`📧 Email comparison: input="${inputEmail}" vs order="${orderEmail}"`);
 
         let match = (inputEmail === orderEmail);
         if (!match && inputCleanPhone.length > 6) {
              match = (orderPhone.includes(inputCleanPhone));
+             if (match) console.log(`✅ Email coincidió por teléfono`);
         }
 
         if (!match) {
+            console.log(`❌ Email NO coincide`);
             return res.status(401).json({ valid: false, message: 'El correo/teléfono no coincide.' });
         }
 
@@ -971,6 +979,8 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
             orderCurrency: order.currency || order.presentment_currency || 'MXN',
             items: itemsWithVariants // Enviamos los items enriquecidos
         });
+        
+        console.log(`📦 /api/validate-order: Respondiendo orderId=${order.id}, orderNumber=${order.name}`);
 
     } catch (error) {
         console.error("Error validando orden:", error);
@@ -1005,14 +1015,23 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         const { orderId, orderNumber, contactEmail, returnType, customerName } = submitParsed.data;
         const orderIdForLookup = String(orderId || '').trim();
         
+        console.log(`🔍 /api/submit-return: Recibido orderId="${orderId}" (tipo: ${typeof orderId}), orderNumber="${orderNumber}"`);
+        
         // Validar que el OrderId existe en Shopify antes de guardar
         let shopifyOrder = null;
         try {
             // Buscar por ID numérico y por nombre
+            console.log(`🔍 /api/submit-return: Intentando getOrderById(${orderIdForLookup})...`);
             shopifyOrder = await shopifyClient.getOrderById(orderIdForLookup);
             if (!shopifyOrder) {
                 const orderName = orderIdForLookup.startsWith('#') ? orderIdForLookup : `#${orderIdForLookup}`;
+                console.log(`⚠️ /api/submit-return: getOrderById falló, intentando getOrder(${orderName})...`);
                 shopifyOrder = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(orderIdForLookup);
+                if (shopifyOrder) {
+                    console.log(`✅ /api/submit-return: Encontrada por fallback: #${shopifyOrder.order_number}`);
+                }
+            } else {
+                console.log(`✅ /api/submit-return: Encontrada por ID: #${shopifyOrder.order_number}`);
             }
         } catch (e) {
             console.warn('⚠️ Error buscando orden en Shopify:', e?.message || e);
@@ -1023,6 +1042,7 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         
         // Usar el ID de Shopify (numérico) como identificador principal, no el que vino del cliente
         const orderIdForStorage = String(shopifyOrder.id || '').trim();
+        console.log(`💾 /api/submit-return: Guardando order_id="${orderIdForStorage}"`);
         
         // Los items vienen como string JSON, hay que parsearlos
         let items = [];
