@@ -157,6 +157,7 @@ class ShopifyTokenManager {
 
   // 1.2 Buscar Orden por Número (order_number)
   // Busca UNA orden específica por su número (más exacto que por nombre)
+  // Busca en todas las órdenes sin límite (múltiples requests paginados)
   async getOrderByNumber(orderNumber) {
     try {
       const cleanNumber = String(orderNumber || '').replace(/^#/, '').trim();
@@ -167,25 +168,21 @@ class ShopifyTokenManager {
         return null;
       }
 
-      // Buscar todas las órdenes (aumentar límite a 5000 para cubrir órdenes más antiguas)
-      // Shopify limita a 250 por request, así que hacemos múltiples requests
-      let allOrders = [];
+      // Buscar en TODAS las órdenes sin límite usando paginación
       let hasMore = true;
       let cursor = null;
       let attempts = 0;
-      const maxAttempts = 20; // 20 * 250 = 5000 órdenes
+      const maxAttempts = 100; // 100 * 250 = 25000 órdenes (máximo posible)
 
       while (hasMore && attempts < maxAttempts) {
         try {
-          let url = `/admin/api/2024-01/orders.json?status=any&limit=250`;
-          if (cursor) url += `&fields=id,order_number,customer,email&after=${cursor}`;
+          let url = `/admin/api/2024-01/orders.json?status=any&limit=250&fields=id,order_number`;
+          if (cursor) url += `&after=${cursor}`;
           
           const data = await this.makeRequest(url);
           
           if (data.orders && Array.isArray(data.orders)) {
-            allOrders = allOrders.concat(data.orders);
-            
-            // Verificar si la orden ya está en los resultados
+            // Verificar si la orden está en este batch
             const found = data.orders.find(order => 
               String(order.order_number || '').trim() === cleanNumber
             );
@@ -213,7 +210,7 @@ class ShopifyTokenManager {
         attempts++;
       }
       
-      console.log(`   ❌ No encontrada (búsqueda en ~${allOrders.length} órdenes)`);
+      console.log(`   ❌ No encontrada (búsqueda completa en ~${attempts * 250} órdenes)`);
       return null;
     } catch (e) {
       console.error(`❌ Error buscando orden #${orderNumber}:`, e.message);
