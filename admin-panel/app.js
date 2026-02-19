@@ -69,19 +69,26 @@ function showDetailsModal(id) {
               <tr style="background:#f3f3f3;">
                 <th style="padding:6px 8px;text-align:left;">Nombre</th>
                 <th style="padding:6px 8px;text-align:left;">Razón</th>
-                <th style="padding:6px 8px;text-align:left;">Talla</th>
-                <th style="padding:6px 8px;text-align:left;">Cantidad</th>
+                <th style="padding:6px 8px;text-align:left;">Tipo</th>
+                <th style="padding:6px 8px;text-align:left;">Detalle</th>
+                <th style="padding:6px 8px;text-align:left;">Qty</th>
               </tr>
             </thead>
             <tbody>
               ${Array.isArray(items) && items.length ? items.map(item => `
                 <tr>
-                  <td style="padding:6px 8px;">${item.name || '-'}</td>
+                  <td style="padding:6px 8px;"><strong>${item.name || '-'}</strong></td>
                   <td style="padding:6px 8px;">${item.reason || '-'}</td>
-                  <td style="padding:6px 8px;">${item.current_variant_title || item.replacementTitle || '-'}</td>
+                  <td style="padding:6px 8px;"><span style="background:${item.requestType === 'Cambio' ? '#e3f2fd' : '#f3e5f5'};padding:2px 6px;border-radius:3px;font-size:12px;font-weight:600;color:${item.requestType === 'Cambio' ? '#1565c0' : '#6a1b9a'};}">${item.requestType || '-'}</span></td>
+                  <td style="padding:6px 8px;font-size:12px;">
+                    ${item.requestType === 'Cambio' 
+                      ? `Nueva: ${item.replacementTitle || '-'} ${item.replacementColor ? '(Color: ' + item.replacementColor + ')' : ''} ${item.replacementSize ? '(Talla: ' + item.replacementSize + ')' : ''}`
+                      : `${item.current_variant_title || '-'}`
+                    }
+                  </td>
                   <td style="padding:6px 8px;">${item.quantity || 1}</td>
                 </tr>
-              `).join('') : '<tr><td colspan="4" style="padding:6px 8px;">Sin artículos</td></tr>'}
+              `).join('') : '<tr><td colspan="5" style="padding:6px 8px;">Sin artículos</td></tr>'}
             </tbody>
           </table>
         </div>
