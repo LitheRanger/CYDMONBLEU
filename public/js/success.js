@@ -69,24 +69,87 @@ async function verifyPayment() {
 async function renderSuccess(requestId, noPayment) {
     const container = document.getElementById('content');
     const orderData = JSON.parse(localStorage.getItem('mon_order_data') || '{}');
+    const contactEmail = localStorage.getItem('mon_contact_email') || '';
     const trackingNumber = '—';
 
     let summaryHtml = '';
     if (orderData.items && Array.isArray(orderData.items)) {
         summaryHtml = `
-                    <div style="background: var(--bg-lighter); padding: 20px; border-radius: 12px; margin: 20px 0; text-align: left; border: 1px solid var(--border-light);">
-                        <h3 style="font-family: 'HelveticaNeueLTProHv', sans-serif; font-size: 18px; margin-bottom: 16px; color: var(--primary);">Resumen</h3>
-                        ${orderData.items.map(item => `
-                            <div style="padding: 12px 0; border-bottom: 1px solid var(--border-light); last-child:border-bottom: none;">
-                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">${item.name}</div>
-                                <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-                                    Razon: ${item.reason}
-                                    ${item.replacementColor || item.replacementSize ? `<br>Nueva prenda: ${[item.replacementColor ? `Color: ${item.replacementColor}` : '', item.replacementSize ? `Talla: ${item.replacementSize}` : ''].filter(Boolean).join(' • ')}` : (item.replacementTitle ? `<br>Nueva prenda: ${item.replacementTitle}` : '')}
+            <div style="background: var(--bg-lighter); padding: 24px; border-radius: 12px; margin: 24px 0; text-align: left; border: 1px solid var(--border-light);">
+                <h3 style="font-family: 'HelveticaNeueLTProHv', sans-serif; font-size: 18px; margin-bottom: 20px; color: var(--primary);">📋 Resumen de tu Solicitud</h3>
+                
+                <!-- Información de la orden -->
+                <div style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid var(--primary);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13px; line-height: 1.6;">
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Número de Orden</div>
+                            <div style="font-size: 16px; font-weight: 700; color: var(--primary);">${orderData.orderNumber || '—'}</div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Cliente</div>
+                            <div style="font-size: 14px; font-weight: 600;">${orderData.customer || '—'}</div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Tipo de Solicitud</div>
+                            <div style="font-size: 14px; font-weight: 600;">${orderData.tipo || '—'}</div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Fecha</div>
+                            <div style="font-size: 14px; font-weight: 600;">${orderData.fecha || '—'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items -->
+                <div style="margin-top: 20px;">
+                    <div style="font-weight: 700; color: var(--primary); margin-bottom: 12px; font-size: 14px;">Productos Seleccionados (${orderData.items.length})</div>
+                    ${orderData.items.map((item, idx) => `
+                        <div style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 12px; border-left: 3px solid var(--text-primary);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${item.name}</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">
+                                        ${item.quantity ? `Cantidad: ${item.quantity} •` : ''} Precio: $${parseFloat(item.price || 0).toFixed(2)}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Tipo de Solicitud</div>
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--primary);">${item.requestType || '—'}</div>
                                 </div>
                             </div>
-                        `).join('')}
+                            <div style="padding-top: 12px; border-top: 1px solid var(--border-light);">
+                                <div style="font-size: 12px; margin-bottom: 8px; line-height: 1.6;">
+                                    <strong>Motivo:</strong> ${item.reason || '—'}
+                                </div>
+                                ${item.requestType === 'Cambio' && (item.replacementColor || item.replacementSize || item.replacementTitle) ? `
+                                    <div style="font-size: 12px; color: var(--text-secondary); background: rgba(0,0,0,0.02); padding: 8px; border-radius: 6px;">
+                                        <strong>🔄 Nueva Prenda:</strong> 
+                                        ${[
+                                            item.replacementTitle ? item.replacementTitle : '',
+                                            item.replacementColor ? `Color: ${item.replacementColor}` : '',
+                                            item.replacementSize ? `Talla: ${item.replacementSize}` : ''
+                                        ].filter(Boolean).join(' • ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Total -->
+                <div style="background: var(--bg-light); padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid var(--border-light);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; font-size: 14px;">Total de la Orden:</span>
+                        <span style="font-size: 18px; font-weight: 700; color: var(--primary);">$${parseFloat(orderData.orderTotal || 0).toFixed(2)} ${orderData.orderCurrency || 'MXN'}</span>
                     </div>
-                `;
+                </div>
+
+                <!-- Email -->
+                <div style="background: rgba(56, 142, 60, 0.08); padding: 12px; border-radius: 8px; margin-top: 16px; border-left: 3px solid var(--success-color); font-size: 12px;">
+                    <strong>📧 Confirmación enviada a:</strong> ${contactEmail}
+                </div>
+            </div>
+        `;
     }
 
     container.innerHTML = `
@@ -121,24 +184,87 @@ async function renderSuccess(requestId, noPayment) {
 async function renderStripeSuccess(requestId) {
     const container = document.getElementById('content');
     const orderData = JSON.parse(localStorage.getItem('mon_order_data') || '{}');
+    const contactEmail = localStorage.getItem('mon_contact_email') || '';
     const trackingNumber = '—';
 
     let summaryHtml = '';
     if (orderData.items && Array.isArray(orderData.items)) {
         summaryHtml = `
-                    <div class="summary">
-                        <h3>Resumen</h3>
-                        ${orderData.items.map(item => `
-                            <div class="summary-item">
-                                <div style="font-weight:600;">${item.name}</div>
-                                <div style="font-size:12px;color:var(--text-secondary);">
-                                    Razon: ${item.reason}
-                                    ${item.replacementColor || item.replacementSize ? `<br>Nueva prenda: ${[item.replacementColor ? `Color: ${item.replacementColor}` : '', item.replacementSize ? `Talla: ${item.replacementSize}` : ''].filter(Boolean).join(' • ')}` : (item.replacementTitle ? `<br>Nueva prenda: ${item.replacementTitle}` : '')}
+            <div style="background: var(--bg-lighter); padding: 24px; border-radius: 12px; margin: 24px 0; text-align: left; border: 1px solid var(--border-light);">
+                <h3 style="font-family: 'HelveticaNeueLTProHv', sans-serif; font-size: 18px; margin-bottom: 20px; color: var(--primary);">📋 Resumen de tu Solicitud</h3>
+                
+                <!-- Información de la orden -->
+                <div style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid var(--primary);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13px; line-height: 1.6;">
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Número de Orden</div>
+                            <div style="font-size: 16px; font-weight: 700; color: var(--primary);">${orderData.orderNumber || '—'}</div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Cliente</div>
+                            <div style="font-size: 14px; font-weight: 600;">${orderData.customer || '—'}</div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Tipo de Solicitud</div>
+                            <div style="font-size: 14px; font-weight: 600;">${orderData.tipo || '—'}</div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Fecha</div>
+                            <div style="font-size: 14px; font-weight: 600;">${orderData.fecha || '—'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items -->
+                <div style="margin-top: 20px;">
+                    <div style="font-weight: 700; color: var(--primary); margin-bottom: 12px; font-size: 14px;">Productos Seleccionados (${orderData.items.length})</div>
+                    ${orderData.items.map((item, idx) => `
+                        <div style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 12px; border-left: 3px solid var(--text-primary);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${item.name}</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">
+                                        ${item.quantity ? `Cantidad: ${item.quantity} •` : ''} Precio: $${parseFloat(item.price || 0).toFixed(2)}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">Tipo de Solicitud</div>
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--primary);">${item.requestType || '—'}</div>
                                 </div>
                             </div>
-                        `).join('')}
+                            <div style="padding-top: 12px; border-top: 1px solid var(--border-light);">
+                                <div style="font-size: 12px; margin-bottom: 8px; line-height: 1.6;">
+                                    <strong>Motivo:</strong> ${item.reason || '—'}
+                                </div>
+                                ${item.requestType === 'Cambio' && (item.replacementColor || item.replacementSize || item.replacementTitle) ? `
+                                    <div style="font-size: 12px; color: var(--text-secondary); background: rgba(0,0,0,0.02); padding: 8px; border-radius: 6px;">
+                                        <strong>🔄 Nueva Prenda:</strong> 
+                                        ${[
+                                            item.replacementTitle ? item.replacementTitle : '',
+                                            item.replacementColor ? `Color: ${item.replacementColor}` : '',
+                                            item.replacementSize ? `Talla: ${item.replacementSize}` : ''
+                                        ].filter(Boolean).join(' • ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Total -->
+                <div style="background: var(--bg-light); padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid var(--border-light);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; font-size: 14px;">Total de la Orden:</span>
+                        <span style="font-size: 18px; font-weight: 700; color: var(--primary);">$${parseFloat(orderData.orderTotal || 0).toFixed(2)} ${orderData.orderCurrency || 'MXN'}</span>
                     </div>
-                `;
+                </div>
+
+                <!-- Email -->
+                <div style="background: rgba(56, 142, 60, 0.08); padding: 12px; border-radius: 8px; margin-top: 16px; border-left: 3px solid var(--success-color); font-size: 12px;">
+                    <strong>📧 Confirmación enviada a:</strong> ${contactEmail}
+                </div>
+            </div>
+        `;
     }
 
     container.innerHTML = `

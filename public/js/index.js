@@ -836,15 +836,22 @@ async function procesarPago() {
                 localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
                 localStorage.setItem('mon_order_data', JSON.stringify({
                     orderId: orderData.orderId,
+                    orderNumber: orderData.orderNumber,
+                    customer: orderData.customer,
+                    orderTotal: orderData.orderTotal,
+                    orderCurrency: orderData.orderCurrency,
                     items: Object.keys(seleccion).map(idx => ({
                         name: orderData.items[idx].name,
+                        price: orderData.items[idx].price,
+                        quantity: orderData.items[idx].quantity,
                         reason: seleccion[idx].reason,
                         requestType: seleccion[idx].requestType,
                         replacementTitle: seleccion[idx].replacementTitle,
                         replacementColor: seleccion[idx].replacementColor,
                         replacementSize: seleccion[idx].replacementSize
                     })),
-                    tipo: tipoFinal
+                    tipo: tipoFinal,
+                    fecha: new Date().toLocaleDateString('es-MX')
                 }));
 
                 showSuccessToast("✓ Solicitud guardada. Generando guia...");
@@ -879,15 +886,22 @@ async function procesarPago() {
                 localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
                 localStorage.setItem('mon_order_data', JSON.stringify({
                     orderId: orderData.orderId,
+                    orderNumber: orderData.orderNumber,
+                    customer: orderData.customer,
+                    orderTotal: orderData.orderTotal,
+                    orderCurrency: orderData.orderCurrency,
                     items: Object.keys(seleccion).map(idx => ({
                         name: orderData.items[idx].name,
+                        price: orderData.items[idx].price,
+                        quantity: orderData.items[idx].quantity,
                         reason: seleccion[idx].reason,
                         requestType: seleccion[idx].requestType,
                         replacementTitle: seleccion[idx].replacementTitle,
                         replacementColor: seleccion[idx].replacementColor,
                         replacementSize: seleccion[idx].replacementSize
                     })),
-                    tipo: tipoFinal
+                    tipo: tipoFinal,
+                    fecha: new Date().toLocaleDateString('es-MX')
                 }));
 
                 showSuccessToast("✓ Redirigiendo a pago...");
