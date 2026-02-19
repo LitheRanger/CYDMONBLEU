@@ -1141,12 +1141,8 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                 );
 
                 if (myeshipClient.isConfigured()) {
-                    let order = await shopifyClient.getOrderById(orderIdForLookup);
-                    if (!order) {
-                        const rawOrderId = String(orderIdForLookup || '').trim();
-                        const orderName = rawOrderId.startsWith('#') ? rawOrderId : `#${rawOrderId}`;
-                        order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
-                    }
+                    // Usar el mismo flujo inteligente que el botón "Reintentar guía"
+                    const order = await resolveOrderForLabel(requestOrderId);
                     if (order && order.shipping_address) {
                         const label = await myeshipClient.createReturnLabel({ order, orderId: requestOrderId });
                         if (label && label.trackingNumber) {

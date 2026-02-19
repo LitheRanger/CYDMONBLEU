@@ -111,29 +111,39 @@ async function findOrderByOrderNumber(orderIdValue) {
 
 async function findOrderByCustomer(customerName, contactEmail) {
     try {
-        console.log(`    🔍 Buscando orden por cliente: "${customerName}" / ${contactEmail}`);
+        if (!customerName) return null;
         
-        // Intenta buscar por nombre si empieza con #
-        if (customerName && customerName.startsWith('#')) {
-            const order = await shopifyClient.getOrder(customerName);
+        console.log(`    🔍 Intentando con: "${customerName}"`);
+        
+        // Si parece un número de orden (empieza con # o es todo dígitos), buscar como orden
+        if (customerName.startsWith('#') || /^\d+$/.test(customerName)) {
+            const orderName = customerName.startsWith('#') ? customerName : `#${customerName}`;
+            const order = await shopifyClient.getOrder(orderName);
             if (order) {
                 console.log(`    ✅ Encontrada por nombre: #${order.order_number} (ID: ${order.id})`);
                 return order;
             }
         }
         
-        // Si el nombre no funciona, devuelve null (no podemos buscar por email en Shopify API)
-        console.log(`    ❌ No se encontró orden por nombre`);
+        // Si es un nombre de cliente, no podemos buscarlo en Shopify (no hay endpoint para eso)
+        // Pero intentamos de todas formas
+        const order = await shopifyClient.getOrder(customerName);
+        if (order) {
+            console.log(`    ✅ Encontrada: #${order.order_number} (ID: ${order.id})`);
+            return order;
+        }
+        
+        console.log(`    ❌ No encontrada con ningún criterio`);
         return null;
     } catch (e) {
-        console.log(`    ⚠️ Error buscando orden: ${e?.message}`);
+        console.log(`    ⚠️ Error: ${e?.message}`);
         return null;
     }
 }
 
 async function processLegacyRequest(request) {
-    const { order_id, contact_email } = request;
-    console.log(`\n📋 Procesando solicitud: order_id="${order_id}"`);
+    const { order_id, contact_email, customer_name } = request;
+    console.log(`\n📋 Procesando: order_id="${order_id}", cliente="${customer_name}"`);
     
     // Primero validar si el order_id actual es válido (es un ID numérico de Shopify)
     console.log(`  ✔️ Validando order_id actual...`);
@@ -146,31 +156,43 @@ async function processLegacyRequest(request) {
     
     console.log(`  ❌ El order_id ${order_id} NO ES UN ID VÁLIDO de Shopify`);
     
-    // Estrategia: Interpretar el order_id como número de orden (#XXXX) y buscar en Shopify
-    console.log(`  🔄 Intentando extraer ID del número de orden...`);
+    // Estrategia 1: Interpretar como número de orden (#XXXX)
+    console.log(`  🔄 Estrategia 1: Buscando como número de orden...`);
     let correctOrder = await findOrderByOrderNumber(order_id);
     
     if (correctOrder) {
         console.log(`  🎯 ¡ENCONTRADA! order_number=#${correctOrder.order_number}, ID=${correctOrder.id}`);
-        console.log(`  🔄 Actualizando order_id: ${order_id} → ${correctOrder.id}`);
+        return await updateOrderId(order_id, correctOrder.id);
+    }
+    
+    // Estrategia 2: Buscar por customer_name
+    if (customer_name) {
+        console.log(`  🔄 Estrategia 2: Buscando por nombre del cliente "${customer_name}"...`);
+        correctOrder = await findOrderByCustomer(customer_name, contact_email);
         
-        // Actualizar en database (usar order_id como WHERE clause)
-        const updateSQL = isPostgreSQL
-            ? `UPDATE returns_requests SET order_id = $1 WHERE order_id = $2`
-            : `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`;
-        
-        try {
-            await executeQuery(updateSQL, [String(correctOrder.id), order_id]);
-            console.log(`  ✅ Actualizado correctamente`);
-            return { status: 'fixed', oldId: order_id, newId: correctOrder.id };
-        } catch (e) {
-            console.error(`  ❌ Error actualizando: ${e?.message}`);
-            return { status: 'error', orderId: order_id, error: e?.message };
+        if (correctOrder) {
+            console.log(`  🎯 ¡ENCONTRADA! order_number=#${correctOrder.order_number}, ID=${correctOrder.id}`);
+            return await updateOrderId(order_id, correctOrder.id);
         }
     }
     
-    console.log(`  ❌ No se pudo encontrar la orden con el número de orden`);
-    return { status: 'unfixable', orderId: order_id, reason: 'No se encontró en Shopify' };
+    console.log(`  ❌ No se pudo encontrar la orden con ninguna estrategia`);
+    return { status: 'unfixable', orderId: order_id, reason: 'No se encontró en Shopify', customer_name };
+}
+
+async function updateOrderId(oldId, newId) {
+    const updateSQL = isPostgreSQL
+        ? `UPDATE returns_requests SET order_id = $1 WHERE order_id = $2`
+        : `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`;
+    
+    try {
+        await executeQuery(updateSQL, [String(newId), oldId]);
+        console.log(`  ✅ Actualizado: ${oldId} → ${newId}`);
+        return { status: 'fixed', oldId, newId };
+    } catch (e) {
+        console.error(`  ❌ Error actualizando: ${e?.message}`);
+        return { status: 'error', orderId: oldId, error: e?.message };
+    }
 }
 
 async function runRecovery() {
@@ -183,7 +205,7 @@ async function runRecovery() {
         
         // Obtener todos los requests
         // Nota: PostgreSQL usa order_id como identificador único, no tiene columna 'id'
-        const selectSQL = `SELECT order_id, contact_email FROM returns_requests ORDER BY created_at DESC`;
+        const selectSQL = `SELECT order_id, contact_email, customer_name FROM returns_requests ORDER BY created_at DESC`;
         const [requests] = await executeQuery(selectSQL);
         
         console.log(`\n📊 Total de pedidos a revisar: ${requests.length}\n`);
@@ -224,7 +246,8 @@ async function runRecovery() {
         if (results.unfixable.length > 0) {
             console.log('\n⚠️  Pedidos que requieren revisión manual:');
             results.unfixable.forEach(r => {
-                console.log(`  - order_id: ${r.orderId} (${r.reason || 'no se encontró'})`);
+                const extra = r.customer_name ? ` (${r.customer_name})` : '';
+                console.log(`  - order_id: ${r.orderId}${extra} - ${r.reason}`);
             });
         }
         
