@@ -869,9 +869,8 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
     }
 
     try {
-        // A. Buscar la orden usando búsqueda inteligente
-        // El método intenta: número exacto → nombre
-        // Esto asegura encontrar la orden correcta y el ID verdadero
+        // A. Buscar la orden por NOMBRE (lo que el usuario ingresa)
+        // Extrae el número de orden real y el ID verdadero
         console.log(`🔍 /api/validate-order: Input del cliente: "${orderNumber}"`);
         const order = await shopifyClient.getOrderByInput(orderNumber);
 
@@ -879,7 +878,7 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
             return res.status(404).json({ valid: false, message: 'Orden no encontrada.' });
         }
         
-        console.log(`✅ Orden encontrada correctamente: #${order.order_number} (ID: ${order.id})`);
+        console.log(`✅ Orden encontrada por nombre: #${order.order_number} (ID: ${order.id})`);
 
         // B. Validación de Email/Teléfono (Normalización básica)
         const inputEmail = email.toLowerCase().trim();
