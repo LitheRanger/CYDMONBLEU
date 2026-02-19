@@ -167,23 +167,53 @@ class ShopifyTokenManager {
         return null;
       }
 
-      // Buscar todas las órdenes y filtrar por número exacto
-      // (Nota: Shopify API no tiene parámetro directo para order_number en query)
-      // Intentamos buscar con limit alto y filtramos en memoria
-      const data = await this.makeRequest(`/admin/api/2024-01/orders.json?status=any&limit=250`);
-      
-      if (data.orders && Array.isArray(data.orders)) {
-        const found = data.orders.find(order => 
-          String(order.order_number || '').trim() === cleanNumber
-        );
-        
-        if (found) {
-          console.log(`   ✅ Encontrada: #${found.order_number} (ID: ${found.id})`);
-          return found;
+      // Buscar todas las órdenes (aumentar límite a 5000 para cubrir órdenes más antiguas)
+      // Shopify limita a 250 por request, así que hacemos múltiples requests
+      let allOrders = [];
+      let hasMore = true;
+      let cursor = null;
+      let attempts = 0;
+      const maxAttempts = 20; // 20 * 250 = 5000 órdenes
+
+      while (hasMore && attempts < maxAttempts) {
+        try {
+          let url = `/admin/api/2024-01/orders.json?status=any&limit=250`;
+          if (cursor) url += `&fields=id,order_number,customer,email&after=${cursor}`;
+          
+          const data = await this.makeRequest(url);
+          
+          if (data.orders && Array.isArray(data.orders)) {
+            allOrders = allOrders.concat(data.orders);
+            
+            // Verificar si la orden ya está en los resultados
+            const found = data.orders.find(order => 
+              String(order.order_number || '').trim() === cleanNumber
+            );
+            
+            if (found) {
+              console.log(`   ✅ Encontrada: #${found.order_number} (ID: ${found.id})`);
+              return found;
+            }
+            
+            // Preparar para siguiente página
+            if (data.orders.length < 250) {
+              hasMore = false;
+            } else {
+              // Usar el último ID como cursor para siguiente página
+              cursor = data.orders[data.orders.length - 1].id;
+            }
+          } else {
+            hasMore = false;
+          }
+        } catch (pageError) {
+          console.warn(`⚠️ Error en página ${attempts + 1}:`, pageError.message);
+          hasMore = false;
         }
+        
+        attempts++;
       }
       
-      console.log(`   ❌ No encontrada`);
+      console.log(`   ❌ No encontrada (búsqueda en ~${allOrders.length} órdenes)`);
       return null;
     } catch (e) {
       console.error(`❌ Error buscando orden #${orderNumber}:`, e.message);
