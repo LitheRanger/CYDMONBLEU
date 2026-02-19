@@ -247,6 +247,9 @@ logoutBtn.addEventListener('click', function() {
   clearAuth();
 });
 
+// --- URL DE API ---
+const API_URL = 'https://cambios.monbleu.mx/api/admin/requests';
+
 // --- USAR CREDENCIALES GUARDADAS EN CADA PETICIÓN ---
 async function fetchRequests() {
   const auth = getSavedAuth();
@@ -304,33 +307,6 @@ tabBtns.forEach(btn => {
     updateView();
   });
 });
-
-// Mock API data
-const API_URL = 'https://cambios.monbleu.mx/api/admin/requests';
-
-async function fetchRequests() {
-  const auth = getSavedAuth();
-  try {
-    const res = await fetch(API_URL, {
-      headers: auth ? { 'Authorization': getAuthHeader(auth.user, auth.pass) } : {},
-      credentials: 'include'
-    });
-    if (res.status === 401) throw new Error('No autorizado');
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || 'Error de API');
-    return json.data;
-  } catch (e) {
-    if (e.message === 'No autorizado') {
-      clearAuth();
-      adminShell.style.display = 'none';
-      loginContainer.style.display = 'flex';
-      loginError.textContent = 'Sesión expirada. Inicia sesión de nuevo.';
-    } else {
-      alert('Error cargando solicitudes: ' + e.message);
-    }
-    return [];
-  }
-}
 
 function groupRequests(data) {
   const grupos = { cambios: [], reembolsos: [], defectos: [], mixtas: [], completadas: [] };
