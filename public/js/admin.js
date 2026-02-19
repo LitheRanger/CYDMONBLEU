@@ -290,35 +290,35 @@ async function loadRequests() {
             
             completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed');
             
-            const completadasIds = new Set(completadas.map(r => r.id));
+            const completadasIds = new Set(completadas.map(r => r.order_id));
             
             mixtas = requests.filter(r => {
-                if (completadasIds.has(r.id)) return false;
+                if (completadasIds.has(r.order_id)) return false;
                 return isMixedRequest(r);
             });
             
-            const mixtasIds = new Set(mixtas.map(r => r.id));
+            const mixtasIds = new Set(mixtas.map(r => r.order_id));
             
             defectos = requests.filter(r => {
-                if (completadasIds.has(r.id)) return false;
-                if (mixtasIds.has(r.id)) return false;
+                if (completadasIds.has(r.order_id)) return false;
+                if (mixtasIds.has(r.order_id)) return false;
                 return hasDefect(r);
             });
             
-            const defectosIds = new Set(defectos.map(r => r.id));
+            const defectosIds = new Set(defectos.map(r => r.order_id));
             
             cambios = requests.filter(r => {
-                if (completadasIds.has(r.id)) return false;
-                if (mixtasIds.has(r.id)) return false;
-                if (defectosIds.has(r.id)) return false;
+                if (completadasIds.has(r.order_id)) return false;
+                if (mixtasIds.has(r.order_id)) return false;
+                if (defectosIds.has(r.order_id)) return false;
                 // Incluir si tiene items de cambio o si return_type es cambio
                 return hasChangeItem(r) || normalizeType(r.return_type) === 'cambio';
             });
             
             reembolsos = requests.filter(r => {
-                if (completadasIds.has(r.id)) return false;
-                if (mixtasIds.has(r.id)) return false;
-                if (defectosIds.has(r.id)) return false;
+                if (completadasIds.has(r.order_id)) return false;
+                if (mixtasIds.has(r.order_id)) return false;
+                if (defectosIds.has(r.order_id)) return false;
                 // Incluir si tiene items de reembolso o si return_type es reembolso
                 return hasRefundItem(r) || normalizeType(r.return_type) === 'reembolso';
             });
@@ -818,7 +818,6 @@ function exportCSV() {
         source = filteredCompletadas.length ? filteredCompletadas : completadas;
     }
     const rows = source.map(r => [
-        r.id,
         r.order_id,
         r.contact_email,
         r.return_type,
