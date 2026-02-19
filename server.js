@@ -869,10 +869,20 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
     }
 
     try {
-        // A. Buscar la orden por nombre/número (lo que el cliente tiene)
-        const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
-        console.log(`🔍 /api/validate-order: Buscando orden por nombre: ${orderNameForSearch}`);
-        const order = await shopifyClient.getOrder(orderNameForSearch);
+        // A. Buscar la orden - PRIMERO por número exacto (más preciso), LUEGO por nombre como fallback
+        let order = null;
+        const cleanInput = String(orderNumber || '').replace(/^#/, '').trim();
+        
+        // Intentar búsqueda exacta por número (busca en 5000 órdenes)
+        console.log(`🔍 /api/validate-order: Buscando orden #${cleanInput}`);
+        order = await shopifyClient.getOrderByNumber(cleanInput);
+        
+        // Si no encontró por número exacto, fallback a búsqueda por nombre
+        if (!order) {
+            console.log(`⚠️ No encontrada búsqueda exacta, intentando búsqueda por nombre...`);
+            const orderNameForSearch = `#${cleanInput}`;
+            order = await shopifyClient.getOrder(orderNameForSearch);
+        }
 
         if (!order) {
             return res.status(404).json({ valid: false, message: 'Orden no encontrada.' });
