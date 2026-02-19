@@ -869,11 +869,28 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
     }
 
     try {
-        // A. Buscar la orden por número de orden (ej: 160670 o #160670)
-        // Hacer que sea simple: solo búsqueda por nombre/número
-        const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
-        console.log(`🔍 /api/validate-order: Buscando orden por número: ${orderNameForSearch}`);
-        const order = await shopifyClient.getOrder(orderNameForSearch);
+        // A. Buscar la orden - PRIMERO por ID numérico (si es válido), LUEGO por nombre como fallback
+        let order = null;
+        const cleanNumber = String(orderNumber || '').replace(/^#/, '').trim();
+        
+        // Si es un número puro, intentar búsqueda por ID primero (más fiable)
+        if (/^\d+$/.test(cleanNumber)) {
+            console.log(`🔍 /api/validate-order: Intentando búsqueda por ID numérico: ${cleanNumber}`);
+            order = await shopifyClient.getOrderById(cleanNumber);
+            if (order) {
+                console.log(`   ✅ Encontrada por ID: ${order.name} (ID: ${order.id})`);
+            }
+        }
+        
+        // Si no encontró por ID, intentar por nombre como fallback
+        if (!order) {
+            const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+            console.log(`🔍 /api/validate-order: Intentando búsqueda por nombre: ${orderNameForSearch}`);
+            order = await shopifyClient.getOrder(orderNameForSearch);
+            if (order) {
+                console.log(`   ✅ Encontrada por nombre: ${order.name} (ID: ${order.id})`);
+            }
+        }
 
         if (!order) {
             return res.status(404).json({ valid: false, message: 'Orden no encontrada.' });
