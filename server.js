@@ -2358,9 +2358,12 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
             [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
         );
 
+        // Enviar email al cliente con la nueva guía
+        sendPaymentConfirmationEmail(request.contact_email, request.customer_name, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
+
         res.json({
             success: true,
-            message: 'Guía regenerada',
+            message: 'Guía regenerada y enviada al cliente',
             trackingNumber: label.trackingNumber
         });
     } catch (err) {

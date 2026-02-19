@@ -726,18 +726,19 @@ async function downloadLabel(requestId) {
 }
 
 async function retryLabel(requestId) {
-    if (!confirm('¿Regenerar guia MyeShip?')) return;
+    if (!confirm('¿Regenerar guía y enviarla al cliente?')) return;
     try {
         const res = await fetch(`${API_BASE}/api/admin/requests/${requestId}/retry-label`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-            alert(`Guia regenerada: ${data.trackingNumber}`);
+            alert(`✅ Guía regenerada: ${data.trackingNumber}\n\n📧 Se envió al cliente por email`);
             loadRequests();
         } else {
             alert(`Error: ${data.message}`);
         }
     } catch (e) {
         console.error('Error:', e);
+        alert('Error al regenerar la guía');
     }
 }
 
