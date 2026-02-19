@@ -260,20 +260,36 @@ function renderRow(r, tabName, tbody) {
     const isCambio = tabName === 'cambios';
     const isCompletadas = tabName === 'completadas' || tabName === 'defectos';
     const isReembolso = tabName === 'reembolsos';
+    const isMixtas = tabName === 'mixtas';
 
     const rowType = r.return_type || (hasChangeItem(r) && hasRefundItem(r) ? 'Mixto' : (hasChangeItem(r) ? 'Cambio' : (hasRefundItem(r) ? 'Reembolso' : '—')));
 
-    tr.innerHTML = `
-                <td><strong>${r.order_id || '—'}</strong></td>
-                <td>${r.customer_name || '—'}</td>
-                <td class="muted">${r.contact_email || '—'}</td>
-                ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
-                <td>${paymentBadge(r)}</td>
-                <td>${adminBadge(r.admin_status)}</td>
-                <td>${trackingText}</td>
-                <td>${labelBadge}</td>
-                <td class="muted">${formatDate(r.created_at)}</td>
-            `;
+    if (isMixtas) {
+        // Para mixtas: sin columna Tipo ni Acciones
+        tr.innerHTML = `
+                    <td><strong>${r.order_id || '—'}</strong></td>
+                    <td>${r.customer_name || '—'}</td>
+                    <td class="muted">${r.contact_email || '—'}</td>
+                    <td>${paymentBadge(r)}</td>
+                    <td>${adminBadge(r.admin_status)}</td>
+                    <td>${trackingText}</td>
+                    <td>${labelBadge}</td>
+                    <td class="muted">${formatDate(r.created_at)}</td>
+                `;
+    } else {
+        // Para otras pestañas
+        tr.innerHTML = `
+                    <td><strong>${r.order_id || '—'}</strong></td>
+                    <td>${r.customer_name || '—'}</td>
+                    <td class="muted">${r.contact_email || '—'}</td>
+                    ${(tabName === 'completadas' || tabName === 'defectos') ? `<td>${rowType}</td>` : ''}
+                    <td>${paymentBadge(r)}</td>
+                    <td>${adminBadge(r.admin_status)}</td>
+                    <td>${trackingText}</td>
+                    <td>${labelBadge}</td>
+                    <td class="muted">${formatDate(r.created_at)}</td>
+                `;
+    }
     tbody.appendChild(tr);
 }
 
