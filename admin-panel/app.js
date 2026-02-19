@@ -284,6 +284,33 @@ window.addEventListener('DOMContentLoaded', async () => {
     clearAuth();
   });
   
+  // Add event listeners to search and filter
+  document.getElementById('search').addEventListener('input', () => { currentPage = 1; updateView(); });
+  document.getElementById('filter-tab').addEventListener('change', () => { currentPage = 1; updateView(); });
+  
+  document.getElementById('export-csv').addEventListener('click', () => {
+    const data = filterData();
+    let csv = '';
+    if (data.length) {
+      const keys = Object.keys(data[0]);
+      csv += keys.join(',') + '\n';
+      data.forEach(row => {
+        csv += keys.map(k => '"' + String(row[k] || '').replace(/"/g, '""') + '"').join(',') + '\n';
+      });
+    }
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'solicitudes_export_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+  });
+  
+  // Add modal close handler
+  document.getElementById('close-modal').addEventListener('click', function() {
+    document.getElementById('modal').classList.remove('show');
+  });
+  
   // Check for saved auth
   const auth = getSavedAuth();
   if (auth) {
@@ -447,28 +474,6 @@ function renderPagination(total) {
   pag.appendChild(next);
 }
 
-document.getElementById('search').addEventListener('input', () => { currentPage = 1; updateView(); });
-document.getElementById('filter-tab').addEventListener('change', () => { currentPage = 1; updateView(); });
-
-document.getElementById('export-csv').addEventListener('click', () => {
-  const data = filterData();
-  let csv = '';
-  if (data.length) {
-    const keys = Object.keys(data[0]);
-    csv += keys.join(',') + '\n';
-    data.forEach(row => {
-      csv += keys.map(k => '"' + String(row[k] || '').replace(/"/g, '""') + '"').join(',') + '\n';
-    });
-  }
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'solicitudes.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
 function updateView() {
   const tab = document.querySelector('.tab-btn.active').dataset.tab;
   let data = [];
@@ -510,6 +515,3 @@ async function doAction(endpoint, body) {
     alert('Error: ' + e.message);
   }
 }
-document.getElementById('close-modal').addEventListener('click', function() {
-  document.getElementById('modal').classList.remove('show');
-});
