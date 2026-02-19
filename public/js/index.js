@@ -832,6 +832,24 @@ async function procesarPago() {
 
         if (data.success && data.requestId) {
             if (data.skipPayment) {
+                // Calcular cupón si hay devoluciones
+                const refundItemsValue = Object.keys(seleccion)
+                    .filter(idx => seleccion[idx].requestType === 'Reembolso')
+                    .reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
+                
+                const reasons = Object.values(seleccion).map(s => String(s.reason || '').toLowerCase());
+                const isDefectRequest = reasons.length > 0 && reasons.includes('defecto');
+                const refundReasons = Object.values(seleccion)
+                    .filter(s => s.requestType === 'Reembolso')
+                    .map(s => String(s.reason || '').toLowerCase());
+                const isNoEsperaba = refundReasons.length > 0 && refundReasons.includes('no era lo que esperaba');
+                
+                const couponValue = (refundItemsValue > 0)
+                    ? (isDefectRequest || isNoEsperaba)
+                        ? refundItemsValue
+                        : Math.max(refundItemsValue - GUIDE_COST, 0)
+                    : 0;
+                
                 localStorage.setItem('mon_request_id', data.requestId);
                 localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
                 localStorage.setItem('mon_order_data', JSON.stringify({
@@ -851,7 +869,8 @@ async function procesarPago() {
                         replacementSize: seleccion[idx].replacementSize
                     })),
                     tipo: tipoFinal,
-                    fecha: new Date().toLocaleDateString('es-MX')
+                    fecha: new Date().toLocaleDateString('es-MX'),
+                    coupon: couponValue > 0 ? couponValue : null
                 }));
 
                 showSuccessToast("✓ Solicitud guardada. Generando guia...");
@@ -881,6 +900,24 @@ async function procesarPago() {
             removeToast(loadingToast);
 
             if (checkoutData.success && checkoutData.url) {
+                // Calcular cupón si hay devoluciones
+                const refundItemsValue = Object.keys(seleccion)
+                    .filter(idx => seleccion[idx].requestType === 'Reembolso')
+                    .reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
+                
+                const reasons = Object.values(seleccion).map(s => String(s.reason || '').toLowerCase());
+                const isDefectRequest = reasons.length > 0 && reasons.includes('defecto');
+                const refundReasons = Object.values(seleccion)
+                    .filter(s => s.requestType === 'Reembolso')
+                    .map(s => String(s.reason || '').toLowerCase());
+                const isNoEsperaba = refundReasons.length > 0 && refundReasons.includes('no era lo que esperaba');
+                
+                const couponValue = (refundItemsValue > 0)
+                    ? (isDefectRequest || isNoEsperaba)
+                        ? refundItemsValue
+                        : Math.max(refundItemsValue - GUIDE_COST, 0)
+                    : 0;
+                
                 // Guardar requestId localmente antes de redirigir
                 localStorage.setItem('mon_request_id', data.requestId);
                 localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
@@ -901,7 +938,8 @@ async function procesarPago() {
                         replacementSize: seleccion[idx].replacementSize
                     })),
                     tipo: tipoFinal,
-                    fecha: new Date().toLocaleDateString('es-MX')
+                    fecha: new Date().toLocaleDateString('es-MX'),
+                    coupon: couponValue > 0 ? couponValue : null
                 }));
 
                 showSuccessToast("✓ Redirigiendo a pago...");
