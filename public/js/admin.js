@@ -7,14 +7,17 @@ let requests = [];
 let cambios = [];
 let reembolsos = [];
 let defectos = [];
+let mixtas = [];
 let completadas = [];
 let filteredCambios = [];
 let filteredReembolsos = [];
 let filteredDefectos = [];
+let filteredMixtas = [];
 let filteredCompletadas = [];
 let currentTabCambios = 1;
 let currentTabReembolsos = 1;
 let currentTabDefectos = 1;
+let currentTabMixtas = 1;
 let currentTabCompletadas = 1;
 let activeTab = 'cambios';
 const pageSize = 50;
@@ -54,6 +57,13 @@ function hasChangeItem(r) {
 function hasRefundItem(r) {
     const items = Array.isArray(r.items) ? r.items : [];
     return items.some(i => String(i.requestType || '').toLowerCase() === 'reembolso');
+}
+
+function isMixedRequest(r) {
+    const items = Array.isArray(r.items) ? r.items : [];
+    if (items.length === 0) return false;
+    const types = new Set(items.map(i => String(i.requestType || '').toLowerCase()));
+    return types.size > 1; // Mixed if has multiple different item types
 }
 
 function isNoPayment(r) {
@@ -261,26 +271,40 @@ async function loadRequests() {
             // Filtrar por tipo de solicitud - permitir duplicados en pestañas
             // Cada solicitud puede aparecer en múltiples pestañas si tiene diferentes tipos de items
             
+            completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed');
+            
+            const completadasIds = new Set(completadas.map(r => r.id));
+            
+            mixtas = requests.filter(r => {
+                if (completadasIds.has(r.id)) return false;
+                return isMixedRequest(r);
+            });
+            
+            const mixtasIds = new Set(mixtas.map(r => r.id));
+            
             defectos = requests.filter(r => {
-                if (String(r.admin_status || '').toLowerCase() === 'completed') return false;
+                if (completadasIds.has(r.id)) return false;
+                if (mixtasIds.has(r.id)) return false;
                 return hasDefect(r);
             });
             
+            const defectosIds = new Set(defectos.map(r => r.id));
+            
             cambios = requests.filter(r => {
-                if (String(r.admin_status || '').toLowerCase() === 'completed') return false;
-                if (hasDefect(r)) return false; // Los defectos van a su propia pestaña
+                if (completadasIds.has(r.id)) return false;
+                if (mixtasIds.has(r.id)) return false;
+                if (defectosIds.has(r.id)) return false;
                 // Incluir si tiene items de cambio o si return_type es cambio
                 return hasChangeItem(r) || normalizeType(r.return_type) === 'cambio';
             });
             
             reembolsos = requests.filter(r => {
-                if (String(r.admin_status || '').toLowerCase() === 'completed') return false;
-                if (hasDefect(r)) return false; // Los defectos van a su propia pestaña
+                if (completadasIds.has(r.id)) return false;
+                if (mixtasIds.has(r.id)) return false;
+                if (defectosIds.has(r.id)) return false;
                 // Incluir si tiene items de reembolso o si return_type es reembolso
                 return hasRefundItem(r) || normalizeType(r.return_type) === 'reembolso';
             });
-            
-            completadas = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed');
             
             updateStats();
             applyFilter();
@@ -322,6 +346,17 @@ function applyFilter() {
         return true;
     });
 
+    // Filtrar MIXTAS
+    filteredMixtas = mixtas.filter(r => {
+        const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+        if (!matchesPaymentFilter(r, status)) return false;
+        if (label === 'yes' && !r.tracking_number) return false;
+        if (label === 'no' && r.tracking_number) return false;
+        if (refund && r.refund_status !== refund) return false;
+        return true;
+    });
+
     // Filtrar COMPLETADAS
     filteredCompletadas = completadas.filter(r => {
         const hay = `${r.order_id || ''} ${r.customer_name || ''} ${r.contact_email || ''} ${r.tracking_number || ''}`.toLowerCase();
@@ -347,10 +382,12 @@ function applyFilter() {
     currentTabCambios = 1;
     currentTabReembolsos = 1;
     currentTabDefectos = 1;
+    currentTabMixtas = 1;
     currentTabCompletadas = 1;
     renderTab('cambios', filteredCambios);
     renderTab('reembolsos', filteredReembolsos);
     renderTab('defectos', filteredDefectos);
+    renderTab('mixtas', filteredMixtas);
     renderTab('completadas', filteredCompletadas);
 }
 
@@ -790,19 +827,23 @@ function clearView() {
     cambios = [];
     reembolsos = [];
     defectos = [];
+    mixtas = [];
     completadas = [];
     filteredCambios = [];
     filteredReembolsos = [];
     filteredDefectos = [];
+    filteredMixtas = [];
     filteredCompletadas = [];
     currentTabCambios = 1;
     currentTabReembolsos = 1;
     currentTabDefectos = 1;
+    currentTabMixtas = 1;
     currentTabCompletadas = 1;
     updateStats();
     renderTab('cambios', []);
     renderTab('reembolsos', []);
     renderTab('defectos', []);
+    renderTab('mixtas', []);
     renderTab('completadas', []);
 }
 
@@ -947,6 +988,22 @@ document.getElementById('next-defectos').addEventListener('click', () => {
     if (currentTabDefectos < totalPages) {
         currentTabDefectos++;
         renderTab('defectos', data);
+    }
+});
+
+// Event listeners para mixtas
+document.getElementById('prev-mixtas').addEventListener('click', () => {
+    if (currentTabMixtas > 1) {
+        currentTabMixtas--;
+        renderTab('mixtas', filteredMixtas.length ? filteredMixtas : mixtas);
+    }
+});
+document.getElementById('next-mixtas').addEventListener('click', () => {
+    const data = filteredMixtas.length ? filteredMixtas : mixtas;
+    const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+    if (currentTabMixtas < totalPages) {
+        currentTabMixtas++;
+        renderTab('mixtas', data);
     }
 });
 

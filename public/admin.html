@@ -866,6 +866,7 @@
                     <button class="tab-btn active" data-tab="cambios">📦 Cambios</button>
                     <button class="tab-btn" data-tab="reembolsos">💵 Reembolsos</button>
                     <button class="tab-btn" data-tab="defectos">🛠️ Defectos</button>
+                    <button class="tab-btn" data-tab="mixtas">🔀 Mixtas</button>
                     <button class="tab-btn" data-tab="completadas">✅ Completadas</button>
                 </div>
 
@@ -984,6 +985,37 @@
                 <button class="pager-btn" id="prev-defectos">◀ Anterior</button>
                 <div class="muted" id="page-info-defectos">Página 1</div>
                 <button class="pager-btn" id="next-defectos">Siguiente ▶</button>
+            </div>
+        </div>
+
+        <!-- TAB: MIXTAS -->
+        <div class="tab-content" id="tab-mixtas">
+            <div id="loading-mixtas" class="loading">Cargando mixtas…</div>
+            <div id="summary-mixtas" class="summary"></div>
+            <div class="table-wrap">
+                <table class="table" id="table-mixtas">
+                    <thead>
+                        <tr>
+                            <th>Orden</th>
+                            <th>Cliente</th>
+                            <th>Contacto</th>
+                            <th>Tipo</th>
+                            <th>Pago</th>
+                            <th>Solicitud</th>
+                            <th>Tracking</th>
+                            <th>Guía</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-mixtas"></tbody>
+                </table>
+            </div>
+            <div id="empty-mixtas" class="empty" style="display:none;">Sin solicitudes mixtas</div>
+            <div class="pagination" id="pagination-mixtas" style="display:none;">
+                <button class="pager-btn" id="prev-mixtas">◀ Anterior</button>
+                <div class="muted" id="page-info-mixtas">Página 1</div>
+                <button class="pager-btn" id="next-mixtas">Siguiente ▶</button>
             </div>
         </div>
 
