@@ -152,9 +152,8 @@ function renderTable(tab, data) {
   }
   data.forEach(r => {
     const tr = document.createElement('tr');
-    const orderDisplay = r.order_number ? `#${r.order_number}` : (r.orden || '—');
     tr.innerHTML = `
-      <td><strong>${orderDisplay}</strong></td>
+      <td>${r.order_number || r.orden || ''}</td>
       <td>${r.customer_name || r.cliente || ''}</td>
       <td>${r.contact_email || r.contacto || ''}</td>
       <td>${r.return_type || ''}</td>
