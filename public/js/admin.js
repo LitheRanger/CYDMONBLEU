@@ -44,23 +44,40 @@ function normalizeType(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+function getItemsArray(r) {
+    let items = r.items_selected || r.items || [];
+    if (Array.isArray(items) && items.length > 0) return items;
+    
+    if (typeof r.items_json === 'string') {
+        try {
+            const parsed = JSON.parse(r.items_json);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    } else if (r.items_json && typeof r.items_json === 'object') {
+        return Array.isArray(r.items_json) ? r.items_json : [];
+    }
+    return [];
+}
+
 function hasDefect(r) {
-    const items = Array.isArray(r.items) ? r.items : [];
+    const items = getItemsArray(r);
     return items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
 }
 
 function hasChangeItem(r) {
-    const items = Array.isArray(r.items) ? r.items : [];
+    const items = getItemsArray(r);
     return items.some(i => String(i.requestType || '').toLowerCase() === 'cambio');
 }
 
 function hasRefundItem(r) {
-    const items = Array.isArray(r.items) ? r.items : [];
+    const items = getItemsArray(r);
     return items.some(i => String(i.requestType || '').toLowerCase() === 'reembolso');
 }
 
 function isMixedRequest(r) {
-    const items = Array.isArray(r.items) ? r.items : [];
+    const items = getItemsArray(r);
     if (items.length === 0) return false;
     const types = new Set(items.map(i => String(i.requestType || '').toLowerCase()));
     return types.size > 1; // Mixed if has multiple different item types
