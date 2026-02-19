@@ -19,7 +19,7 @@ const pg = require('pg');
 const shopifyClient = require('../Shopifyclient.js');
 
 let dbPool;
-const isPostgreSQL = (process.env.DB_TYPE || 'mysql').toLowerCase() === 'postgresql';
+const isPostgreSQL = (process.env.DATABASE_URL || '').includes('postgresql://');
 
 async function initializeConnections() {
     console.log('🔧 Inicializando conexiones...');
@@ -37,23 +37,25 @@ async function initializeConnections() {
     const dbName = process.env.DB_NAME || 'monbleu_returns';
     
     if (isPostgreSQL) {
+        // Use connectionString (same as server.js)
         dbPool = new pg.Pool({
-            host: dbHost,
-            port: process.env.DB_PORT || 5432,
-            database: dbName,
-            user: dbUser,
-            password: dbPassword || undefined
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
         });
     } else {
         dbPool = await mysql.createPool({
             host: dbHost,
             user: dbUser,
-            password: dbPassword || undefined,
+            password: dbPassword,
             database: dbName,
+            port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0,
             multipleStatements: false
         });
     }
-    console.log(`✅ Base de datos ${isPostgreSQL ? 'PostgreSQL' : 'MySQL'} inicializada`);
+    console.log(`✅ Base de datos ${isPostgreSQL ? 'PostgreSQL (Neon)' : 'MySQL'} inicializada`);
 }
 
 async function executeQuery(sql, params = []) {
@@ -130,8 +132,8 @@ async function findOrderByCustomer(customerName, contactEmail) {
 }
 
 async function processLegacyRequest(request) {
-    const { order_id, customer_name, contact_email, id } = request;
-    console.log(`\n📋 Procesando solicitud: ID=${id}, order_id="${order_id}", cliente="${customer_name}"`);
+    const { order_id, contact_email, id } = request;
+    console.log(`\n📋 Procesando solicitud: ID=${id}, order_id="${order_id}"`);
     
     // Primero validar si el order_id actual es válido (es un ID numérico de Shopify)
     console.log(`  ✔️ Validando order_id actual...`);
@@ -144,8 +146,8 @@ async function processLegacyRequest(request) {
     
     console.log(`  ❌ El order_id ${order_id} NO ES UN ID VÁLIDO de Shopify`);
     
-    // Estrategia 1: Interpretar el order_id como número de orden (#XXXX) y buscar en Shopify
-    console.log(`  🔄 Estrategia 1: Intentando como número de orden...`);
+    // Estrategia: Interpretar el order_id como número de orden (#XXXX) y buscar en Shopify
+    console.log(`  🔄 Intentando extraer ID del número de orden...`);
     let correctOrder = await findOrderByOrderNumber(order_id);
     
     if (correctOrder) {
@@ -160,38 +162,15 @@ async function processLegacyRequest(request) {
         try {
             await executeQuery(updateSQL, [String(correctOrder.id), id]);
             console.log(`  ✅ Actualizado correctamente`);
-            return { status: 'fixed', oldId: order_id, newId: correctOrder.id, strategy: 'order_number' };
+            return { status: 'fixed', oldId: order_id, newId: correctOrder.id };
         } catch (e) {
             console.error(`  ❌ Error actualizando: ${e?.message}`);
             return { status: 'error', orderId: order_id, error: e?.message };
         }
     }
     
-    // Estrategia 2: Intentar recuperar por nombre del cliente
-    console.log(`  🔄 Estrategia 2: Intentando por nombre del cliente...`);
-    correctOrder = await findOrderByCustomer(customer_name, contact_email);
-    
-    if (correctOrder) {
-        console.log(`  🎯 ¡ENCONTRADA! order_number=#${correctOrder.order_number}, ID=${correctOrder.id}`);
-        console.log(`  🔄 Actualizando order_id a: ${correctOrder.id} (anterior: ${order_id})`);
-        
-        // Actualizar en database
-        const updateSQL = isPostgreSQL
-            ? `UPDATE returns_requests SET order_id = $1 WHERE id = $2`
-            : `UPDATE returns_requests SET order_id = ? WHERE id = ?`;
-        
-        try {
-            await executeQuery(updateSQL, [String(correctOrder.id), id]);
-            console.log(`  ✅ Actualizado correctamente`);
-            return { status: 'fixed', oldId: order_id, newId: correctOrder.id, strategy: 'customer_name' };
-        } catch (e) {
-            console.error(`  ❌ Error actualizando: ${e?.message}`);
-            return { status: 'error', orderId: order_id, error: e?.message };
-        }
-    }
-    
-    console.log(`  ❌ No se pudo encontrar la orden con ninguna estrategia`);
-    return { status: 'unfixable', orderId: order_id, customer_name };
+    console.log(`  ❌ No se pudo encontrar la orden con el número de orden`);
+    return { status: 'unfixable', orderId: order_id, reason: 'No se encontró en Shopify' };
 }
 
 async function runRecovery() {
@@ -203,7 +182,7 @@ async function runRecovery() {
         console.log('='.repeat(70));
         
         // Obtener todos los requests
-        const selectSQL = `SELECT id, order_id, customer_name, contact_email FROM returns_requests ORDER BY id`;
+        const selectSQL = `SELECT id, order_id, contact_email FROM returns_requests ORDER BY id`;
         const [requests] = await executeQuery(selectSQL);
         
         console.log(`\n📊 Total de pedidos a revisar: ${requests.length}\n`);
@@ -244,7 +223,7 @@ async function runRecovery() {
         if (results.unfixable.length > 0) {
             console.log('\n⚠️  Pedidos que requieren revisión manual:');
             results.unfixable.forEach(r => {
-                console.log(`  - order_id: ${r.orderId}, cliente: "${r.customer_name}"`);
+                console.log(`  - order_id: ${r.orderId} (${r.reason || 'no se encontró'})`);
             });
         }
         
