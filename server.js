@@ -1208,7 +1208,7 @@ async function resolveOrderForLabel(orderId) {
     
     console.log(`🔍 resolveOrderForLabel: Buscando orden con ID: "${rawOrderId}"`);
     
-    // Estrategia ÚNICA: Si es numérico, buscar por ID directo SOLAMENTE
+    // Estrategia 1: Si es numérico, buscar por ID directo PRIMERO
     if (/^\d+$/.test(rawOrderId)) {
         console.log(`  → Intentando ID numérico directo en Shopify: ${rawOrderId}`);
         const orderById = await shopifyClient.getOrderById(rawOrderId);
@@ -1217,12 +1217,21 @@ async function resolveOrderForLabel(orderId) {
             console.log(`     Dirección: ${orderById.shipping_address?.zip || 'N/A'}`);
             return orderById;
         }
-        console.log(`  ❌ No existe orden con ID Shopify: ${rawOrderId}`);
-        console.error(`  💥 ERROR CRÍTICO: El order_id guardado (${rawOrderId}) NO es un ID válido de Shopify`);
+        
+        // Fallback: Si no existe como ID, intentar como número de orden
+        console.log(`  ⚠️ No es un ID válido, intentando como número de orden: #${rawOrderId}`);
+        const orderByNumber = await shopifyClient.getOrder(`#${rawOrderId}`);
+        if (orderByNumber) {
+            console.log(`  ✅ Orden encontrada por número: #${orderByNumber.order_number} (ID: ${orderByNumber.id})`);
+            console.log(`     Dirección: ${orderByNumber.shipping_address?.zip || 'N/A'}`);
+            return orderByNumber;
+        }
+        
+        console.log(`  ❌ No existe ni como ID ni como número de orden: ${rawOrderId}`);
         return null;
     }
     
-    // Si viene con #, removerlo y reintentar
+    // Si viene con #, removerlo y reintentar recursivamente
     if (rawOrderId.startsWith('#')) {
         const numericId = rawOrderId.substring(1);
         console.log(`  → Removiendo # y reintentando: ${numericId}`);
