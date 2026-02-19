@@ -665,6 +665,7 @@ async function viewDetail(requestId) {
             let actions = [];
             const isCambio = String(r.return_type || '').toLowerCase() === 'cambio';
             const isReembolso = String(r.return_type || '').toLowerCase() === 'reembolso';
+            const hasRefund = hasRefundItem(r);
             const isDefecto = Array.isArray(r.items) && r.items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
             const isCompletada = String(r.admin_status || '').toLowerCase() === 'completed';
             
@@ -677,7 +678,7 @@ async function viewDetail(requestId) {
             }
             
             if (isCambio) actions.push(`<button class="btn" onclick="shipChange('${r.order_id}')">Enviar</button>`);
-            if (isReembolso) actions.push(`<button class="btn" onclick="sendCoupon('${r.order_id}')">Enviar cupón</button>`);
+            if (hasRefund) actions.push(`<button class="btn" onclick="sendCoupon('${r.order_id}')">Enviar cupón</button>`);
             if (isCambio) {
                 const currentStatus = r.refund_status || 'pending_receipt';
                 const nextStatus = currentStatus === 'pending_receipt' ? 'Por Enviar' : 'Por Recibir';
