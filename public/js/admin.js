@@ -46,34 +46,47 @@ function normalizeType(value) {
 
 function getItemsArray(r) {
     let items = r.items_selected || r.items || [];
-    if (Array.isArray(items) && items.length > 0) return items;
+    if (Array.isArray(items) && items.length > 0) {
+        console.log(`[getItemsArray ${r.id}] Found in r.items: ${items.length} items`);
+        return items;
+    }
     
     if (typeof r.items_json === 'string') {
         try {
             const parsed = JSON.parse(r.items_json);
+            console.log(`[getItemsArray ${r.id}] Parsed from string: ${Array.isArray(parsed) ? parsed.length : 0} items`);
             return Array.isArray(parsed) ? parsed : [];
         } catch (e) {
+            console.log(`[getItemsArray ${r.id}] Error parsing string: ${e.message}`);
             return [];
         }
     } else if (r.items_json && typeof r.items_json === 'object') {
+        console.log(`[getItemsArray ${r.id}] Found JSONB object: ${Array.isArray(r.items_json) ? r.items_json.length : 0} items`);
         return Array.isArray(r.items_json) ? r.items_json : [];
     }
+    console.log(`[getItemsArray ${r.id}] No items found anywhere`);
     return [];
 }
 
 function hasDefect(r) {
     const items = getItemsArray(r);
-    return items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
+    const has = items.some(i => String(i.reason || '').toLowerCase() === 'defecto');
+    console.log(`[hasDefect ${r.id}] items=${items.length}, has=${has}`);
+    return has;
 }
 
 function hasChangeItem(r) {
     const items = getItemsArray(r);
-    return items.some(i => String(i.requestType || '').toLowerCase() === 'cambio');
+    const has = items.some(i => String(i.requestType || '').toLowerCase() === 'cambio');
+    console.log(`[hasChangeItem ${r.id}] items=${items.length}, has=${has}, types=${items.map(i => i.requestType).join(',')}`);
+    return has;
 }
 
 function hasRefundItem(r) {
     const items = getItemsArray(r);
-    return items.some(i => String(i.requestType || '').toLowerCase() === 'reembolso');
+    const has = items.some(i => String(i.requestType || '').toLowerCase() === 'reembolso');
+    console.log(`[hasRefundItem ${r.id}] items=${items.length}, has=${has}, types=${items.map(i => i.requestType).join(',')}`);
+    return has;
 }
 
 function isMixedRequest(r) {
