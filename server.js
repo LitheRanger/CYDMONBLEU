@@ -1258,8 +1258,37 @@ async function resolveOrderForLabel(orderId) {
             
             return orderByNumber;
         }
+
+        // 🆕 Estrategia: Si NO encontró el número exacto, intentar buscar una orden reciente que coincida parcialmente
+        console.log(`  🔍 Intentando búsqueda aproximada (órdenes recientes similares)...`);
+        try {
+            // Buscar órdenes recientes que coincidan parcialmente
+            const approximateSearch = await shopifyClient.getOrder(''); // Obtener últimas órdenes
+            if (approximateSearch && approximateSearch.errors) {
+                // Si falla búsqueda general, usar database para encontrar por similar
+                const [dbMatches] = await executeQuery(
+                    `SELECT DISTINCT order_id FROM returns_requests 
+                     WHERE order_id LIKE ? OR order_id LIKE ? 
+                     LIMIT 1`,
+                    [`%${rawOrderId.substring(0, 3)}%`, `${rawOrderId.substring(0, 4)}%`]
+                );
+                if (dbMatches && dbMatches.length > 0) {
+                    const suggestedId = dbMatches[0].order_id;
+                    console.log(`  💡 Sugerencia encontrada en BD: ${suggestedId}`);
+                    // Reintentar con id sugerido
+                    const suggestedOrder = await shopifyClient.getOrderById(suggestedId);
+                    if (suggestedOrder) {
+                        console.log(`  ✅ Usando orden sugerida: #${suggestedOrder.order_number}`);
+                        return suggestedOrder;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn(`  ⚠️ Búsqueda aproximada falló:`, e?.message);
+        }
         
         console.log(`  ❌ No existe ni como ID ni como número de orden: ${rawOrderId}`);
+        console.log(`  📝 NOTA: Verifica que el cliente ingresó correctamente el número de orden`);
         return null;
     }
     
