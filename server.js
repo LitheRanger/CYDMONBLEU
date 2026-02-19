@@ -1224,6 +1224,18 @@ async function resolveOrderForLabel(orderId) {
         if (orderByNumber) {
             console.log(`  ✅ Orden encontrada por número: #${orderByNumber.order_number} (ID: ${orderByNumber.id})`);
             console.log(`     Dirección: ${orderByNumber.shipping_address?.zip || 'N/A'}`);
+            
+            // ⭐ ACTUALIZAR BD CON EL ID CORRECTO (para futuras búsquedas)
+            try {
+                await executeQuery(
+                    `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`,
+                    [String(orderByNumber.id), rawOrderId]
+                );
+                console.log(`  🔄 BD actualizada: ${rawOrderId} → ${orderByNumber.id}`);
+            } catch (e) {
+                console.warn(`  ⚠️ No se pudo actualizar BD:`, e?.message);
+            }
+            
             return orderByNumber;
         }
         
