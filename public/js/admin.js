@@ -461,31 +461,86 @@ async function viewDetail(requestId) {
         console.log('Final itemsSource:', itemsSource);
 
         const isCambio = String(r.return_type || '').toLowerCase() === 'cambio';
-        const itemsHtml = itemsSource.map(i => {
-            const name = i.name || 'Producto';
-            const variant = i.current_variant_title || 'Variante';
-            const qty = i.quantity || 1;
-            const price = i.price != null ? formatCurrency(i.price) : '—';
-            const reason = i.reason || 'Sin razon';
-            const replacementTitle = i.replacementTitle || i.replacement_title || i.replacementVariantTitle || '';
-            const replacementId = i.replacementVariantId || i.replacement_variant_id || '';
-            const replacementDisplay = replacementTitle
-                ? replacementTitle
-                : (replacementId ? `ID ${replacementId}` : 'No seleccionado');
-            const replacementLine = isCambio
-                ? `<div class="item-replacement">Reemplazo: ${replacementDisplay}</div>`
-                : '';
-            return `
+        const isMixto = String(r.return_type || '').toLowerCase() === 'mixto';
+        
+        // Agrupar items por tipo para solicitudes Mixtas
+        const itemsByType = {};
+        itemsSource.forEach(i => {
+            const requestType = (i.requestType || 'cambio').toLowerCase();
+            if (!itemsByType[requestType]) itemsByType[requestType] = [];
+            itemsByType[requestType].push(i);
+        });
+        
+        let itemsHtml = '';
+        
+        if (isMixto && Object.keys(itemsByType).length > 1) {
+            // Para solicitudes Mixtas, mostrar agrupadas por tipo
+            Object.entries(itemsByType).forEach(([type, items]) => {
+                const typeLabel = type === 'cambio' ? '🔄 CAMBIO' : type === 'reembolso' ? '💵 REEMBOLSO' : '❌ DEFECTO';
+                const typeColor = type === 'cambio' ? '#2196F3' : type === 'reembolso' ? '#9C27B0' : '#F44336';
+                itemsHtml += `<div class="items-group"><div class="items-group-header" style="border-left: 4px solid ${typeColor}; padding-left: 12px; margin-bottom: 12px; font-weight: bold; color: ${typeColor};">${typeLabel}</div>`;
+                
+                items.forEach(i => {
+                    const name = i.name || 'Producto';
+                    const variant = i.current_variant_title || 'Variante';
+                    const qty = i.quantity || 1;
+                    const price = i.price != null ? formatCurrency(i.price) : '—';
+                    const reason = i.reason || 'Sin razon';
+                    
+                    let typeSpecificInfo = '';
+                    if (type === 'cambio') {
+                        const replacementTitle = i.replacementTitle || i.replacement_title || i.replacementVariantTitle || '';
+                        const replacementId = i.replacementVariantId || i.replacement_variant_id || '';
+                        const replacementDisplay = replacementTitle
+                            ? replacementTitle
+                            : (replacementId ? `ID ${replacementId}` : 'No seleccionado');
+                        typeSpecificInfo = `<div class="item-replacement"><strong>Reemplazo:</strong> ${replacementDisplay}</div>`;
+                    } else if (type === 'reembolso') {
+                        typeSpecificInfo = `<div class="item-refund"><strong>Monto a reembolsar:</strong> ${price}</div>`;
+                    }
+                    
+                    itemsHtml += `
                         <div class="item-card">
                             <div class="item-title">${name}</div>
                             <div class="item-meta">Variante: ${variant}</div>
                             <div class="item-meta">Cantidad: ${qty}</div>
                             <div class="item-meta">Motivo: ${reason}</div>
-                            <div class="item-meta">Precio: ${price}</div>
-                            ${replacementLine}
+                            ${typeSpecificInfo}
                         </div>
                     `;
-        }).join('') || '<div class="muted">Sin items</div>';
+                });
+                itemsHtml += '</div>';
+            });
+        } else {
+            // Para solicitudes no-Mixtas, mostrar items normalmente
+            itemsHtml = itemsSource.map(i => {
+                const name = i.name || 'Producto';
+                const variant = i.current_variant_title || 'Variante';
+                const qty = i.quantity || 1;
+                const price = i.price != null ? formatCurrency(i.price) : '—';
+                const reason = i.reason || 'Sin razon';
+                const replacementTitle = i.replacementTitle || i.replacement_title || i.replacementVariantTitle || '';
+                const replacementId = i.replacementVariantId || i.replacement_variant_id || '';
+                const replacementDisplay = replacementTitle
+                    ? replacementTitle
+                    : (replacementId ? `ID ${replacementId}` : 'No seleccionado');
+                const replacementLine = isCambio
+                    ? `<div class="item-replacement"><strong>Reemplazo:</strong> ${replacementDisplay}</div>`
+                    : '';
+                return `
+                            <div class="item-card">
+                                <div class="item-title">${name}</div>
+                                <div class="item-meta">Variante: ${variant}</div>
+                                <div class="item-meta">Cantidad: ${qty}</div>
+                                <div class="item-meta">Motivo: ${reason}</div>
+                                <div class="item-meta">Precio: ${price}</div>
+                                ${replacementLine}
+                            </div>
+                        `;
+            }).join('');
+        }
+        
+        itemsHtml = itemsHtml || '<div class="muted">Sin items</div>';
 
         const filesHtml = (r.files || []).map(f => {
             const isImage = (f.mimetype || '').startsWith('image/');
