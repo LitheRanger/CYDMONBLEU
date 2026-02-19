@@ -323,6 +323,15 @@ async function loadRequests() {
                 return hasRefundItem(r) || normalizeType(r.return_type) === 'reembolso';
             });
             
+            console.log('Classification summary:', {
+                total: requests.length,
+                completadas: completadas.length,
+                mixtas: mixtas.length,
+                defectos: defectos.length,
+                cambios: cambios.length,
+                reembolsos: reembolsos.length
+            });
+            
             updateStats();
             applyFilter();
         } else {
