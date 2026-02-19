@@ -385,6 +385,7 @@ async function loadAndRender() {
   window.cambiosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('cambio') && !completadasIds.has(r.id) && !mixtasIds.has(r.id));
   window.reembolsosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('reembolso') && !completadasIds.has(r.id) && !mixtasIds.has(r.id));
   window.defectosData = allData.filter(r => (r.return_type || '').toLowerCase().includes('defecto') && !completadasIds.has(r.id) && !mixtasIds.has(r.id));
+  console.log('Loaded data:', { completadas: window.completadasData.length, mixtas: window.mixtasData.length, cambios: window.cambiosData.length, reembolsos: window.reembolsosData.length, defectos: window.defectosData.length });
   updateView();
 }
 
@@ -475,7 +476,13 @@ function renderPagination(total) {
 }
 
 function updateView() {
-  const tab = document.querySelector('.tab-btn.active').dataset.tab;
+  const activeBtn = document.querySelector('.tab-btn.active');
+  if (!activeBtn) {
+    console.warn('No active tab button found');
+    return; // Safety check
+  }
+  const tab = activeBtn.dataset.tab;
+  console.log('Updating view for tab:', tab);
   let data = [];
   if (tab === 'cambios') data = window.cambiosData || [];
   else if (tab === 'reembolsos') data = window.reembolsosData || [];
