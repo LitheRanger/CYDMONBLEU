@@ -132,8 +132,8 @@ async function findOrderByCustomer(customerName, contactEmail) {
 }
 
 async function processLegacyRequest(request) {
-    const { order_id, contact_email, id } = request;
-    console.log(`\n📋 Procesando solicitud: ID=${id}, order_id="${order_id}"`);
+    const { order_id, contact_email } = request;
+    console.log(`\n📋 Procesando solicitud: order_id="${order_id}"`);
     
     // Primero validar si el order_id actual es válido (es un ID numérico de Shopify)
     console.log(`  ✔️ Validando order_id actual...`);
@@ -152,15 +152,15 @@ async function processLegacyRequest(request) {
     
     if (correctOrder) {
         console.log(`  🎯 ¡ENCONTRADA! order_number=#${correctOrder.order_number}, ID=${correctOrder.id}`);
-        console.log(`  🔄 Actualizando order_id a: ${correctOrder.id} (anterior: ${order_id})`);
+        console.log(`  🔄 Actualizando order_id: ${order_id} → ${correctOrder.id}`);
         
-        // Actualizar en database
+        // Actualizar en database (usar order_id como WHERE clause)
         const updateSQL = isPostgreSQL
-            ? `UPDATE returns_requests SET order_id = $1 WHERE id = $2`
-            : `UPDATE returns_requests SET order_id = ? WHERE id = ?`;
+            ? `UPDATE returns_requests SET order_id = $1 WHERE order_id = $2`
+            : `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`;
         
         try {
-            await executeQuery(updateSQL, [String(correctOrder.id), id]);
+            await executeQuery(updateSQL, [String(correctOrder.id), order_id]);
             console.log(`  ✅ Actualizado correctamente`);
             return { status: 'fixed', oldId: order_id, newId: correctOrder.id };
         } catch (e) {
@@ -182,7 +182,8 @@ async function runRecovery() {
         console.log('='.repeat(70));
         
         // Obtener todos los requests
-        const selectSQL = `SELECT id, order_id, contact_email FROM returns_requests ORDER BY id`;
+        // Nota: PostgreSQL usa order_id como identificador único, no tiene columna 'id'
+        const selectSQL = `SELECT order_id, contact_email FROM returns_requests ORDER BY created_at DESC`;
         const [requests] = await executeQuery(selectSQL);
         
         console.log(`\n📊 Total de pedidos a revisar: ${requests.length}\n`);
