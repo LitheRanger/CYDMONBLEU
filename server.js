@@ -882,10 +882,11 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
             }
         }
         
-        // Si no encontró por ID, intentar por nombre/número
+        // Si no encontré por ID, intentar por nombre/número (agregando # si es necesario)
         if (!order) {
-            console.log(`🔍 /api/validate-order: Intentando búsqueda por nombre: ${orderNumber}`);
-            order = await shopifyClient.getOrder(orderNumber);
+            const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+            console.log(`🔍 /api/validate-order: Intentando búsqueda por nombre: ${orderNameForSearch}`);
+            order = await shopifyClient.getOrder(orderNameForSearch);
             if (order) {
                 console.log(`   ✅ Encontrada por nombre: ${order.name} (ID: ${order.id})`);
             }
