@@ -218,7 +218,42 @@ class ShopifyTokenManager {
     }
   }
 
-  // 1.2 Buscar Variante por ID (Para mostrar talla/color en cambios)
+  // 1.3 Buscar Orden por INPUT del usuario (Inteligente)
+  // El usuario puede ingresar: "#160670", "160670", etc
+  // Esta función prueba múltiples estrategias para encontrar la orden correcta
+  async getOrderByInput(userInput) {
+    try {
+      const cleanInput = String(userInput || '').replace(/^#/, '').trim();
+      
+      console.log(`🔍 Shopify: Buscando orden por input del usuario: "${userInput}"`);
+      
+      // ESTRATEGIA 1: Buscar por número exacto (order_number) - MÁS CONFIABLE
+      console.log(`   Intentando búsqueda por número exacto...`);
+      const orderByNumber = await this.getOrderByNumber(cleanInput);
+      
+      if (orderByNumber) {
+        console.log(`   ✅ Encontrada por número: #${orderByNumber.order_number} (ID: ${orderByNumber.id})`);
+        return orderByNumber;
+      }
+      
+      // ESTRATEGIA 2: Buscar por nombre (#160670) - FALLBACK
+      console.log(`   Número no encontrado. Intentando búsqueda por nombre...`);
+      const orderByName = await this.getOrder(`#${cleanInput}`);
+      
+      if (orderByName) {
+        console.log(`   ✅ Encontrada por nombre: #${orderByName.order_number} (ID: ${orderByName.id})`);
+        return orderByName;
+      }
+      
+      console.log(`   ❌ No encontrada con ninguna estrategia`);
+      return null;
+    } catch (e) {
+      console.error(`❌ Error buscando orden ${userInput}:`, e.message);
+      return null;
+    }
+  }
+
+  // 1.4 Buscar Variante por ID (Para mostrar talla/color en cambios)
   async getVariantById(variantId) {
     try {
       const data = await this.makeRequest(`/admin/api/2024-01/variants/${variantId}.json`);

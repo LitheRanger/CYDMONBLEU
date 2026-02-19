@@ -869,20 +869,17 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
     }
 
     try {
-        // A. Buscar la orden por NOMBRE (lo que el usuario ve: #160670)
-        // NO por número exacto (order_number)
-        const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
-        
-        console.log(`🔍 /api/validate-order: Input: "${orderNumber}" → Buscando por nombre: "${orderNameForSearch}"`);
-        const order = await shopifyClient.getOrder(orderNameForSearch);
-        
-        if (order) {
-            console.log(`✅ Orden encontrada: #${order.order_number} (ID: ${order.id})`);
-        }
+        // A. Buscar la orden usando búsqueda inteligente
+        // El método intenta: número exacto → nombre
+        // Esto asegura encontrar la orden correcta y el ID verdadero
+        console.log(`🔍 /api/validate-order: Input del cliente: "${orderNumber}"`);
+        const order = await shopifyClient.getOrderByInput(orderNumber);
 
         if (!order) {
             return res.status(404).json({ valid: false, message: 'Orden no encontrada.' });
         }
+        
+        console.log(`✅ Orden encontrada correctamente: #${order.order_number} (ID: ${order.id})`);
 
         // B. Validación de Email/Teléfono (Normalización básica)
         const inputEmail = email.toLowerCase().trim();
