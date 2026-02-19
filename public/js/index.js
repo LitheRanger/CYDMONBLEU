@@ -833,21 +833,9 @@ async function procesarPago() {
         if (data.success && data.requestId) {
             if (data.skipPayment) {
                 // Calcular cupón SOLO basado en los items de REEMBOLSO
+                // Cupón = 100% del valor de las prendas devueltas (SIN descontar nada)
                 const refundItems = Object.keys(seleccion).filter(idx => seleccion[idx].requestType === 'Reembolso');
-                const refundItemsValue = refundItems.reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
-                
-                // Verificar si TODOS los reembolsos son defecto O "no era lo que esperaba"
-                const refundReasons = refundItems.map(idx => String(seleccion[idx].reason || '').toLowerCase());
-                const allDefectOrNoEsperaba = refundReasons.length > 0 && 
-                    refundReasons.every(r => r.includes('defecto') || r.includes('no era lo que esperaba'));
-                
-                // Si hay reembolsos y TODOS son defecto o "no era lo que esperaba" → cupón sin descontar guía
-                // Si hay reembolsos pero ALGUNOS son otras razones → cupón descontando guía
-                const couponValue = (refundItemsValue > 0)
-                    ? allDefectOrNoEsperaba 
-                        ? refundItemsValue
-                        : Math.max(refundItemsValue - GUIDE_COST, 0)
-                    : 0;
+                const couponValue = refundItems.reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
                 
                 localStorage.setItem('mon_request_id', data.requestId);
                 localStorage.setItem('mon_contact_email', document.getElementById('email').value || '');
@@ -900,21 +888,9 @@ async function procesarPago() {
 
             if (checkoutData.success && checkoutData.url) {
                 // Calcular cupón SOLO basado en los items de REEMBOLSO
+                // Cupón = 100% del valor de las prendas devueltas (SIN descontar nada)
                 const refundItems = Object.keys(seleccion).filter(idx => seleccion[idx].requestType === 'Reembolso');
-                const refundItemsValue = refundItems.reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
-                
-                // Verificar si TODOS los reembolsos son defecto O "no era lo que esperaba"
-                const refundReasons = refundItems.map(idx => String(seleccion[idx].reason || '').toLowerCase());
-                const allDefectOrNoEsperaba = refundReasons.length > 0 && 
-                    refundReasons.every(r => r.includes('defecto') || r.includes('no era lo que esperaba'));
-                
-                // Si hay reembolsos y TODOS son defecto o "no era lo que esperaba" → cupón sin descontar guía
-                // Si hay reembolsos pero ALGUNOS son otras razones → cupón descontando guía
-                const couponValue = (refundItemsValue > 0)
-                    ? allDefectOrNoEsperaba 
-                        ? refundItemsValue
-                        : Math.max(refundItemsValue - GUIDE_COST, 0)
-                    : 0;
+                const couponValue = refundItems.reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
                 
                 // Guardar requestId localmente antes de redirigir
                 localStorage.setItem('mon_request_id', data.requestId);
