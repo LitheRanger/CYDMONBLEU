@@ -1097,6 +1097,13 @@ document.getElementById('tbody-completadas').addEventListener('click', (e) => {
     if (id) viewDetail(id);
 });
 
+document.getElementById('tbody-mixtas').addEventListener('click', (e) => {
+    const row = e.target.closest('tr[data-request-id]');
+    if (!row) return;
+    const id = row.getAttribute('data-request-id');
+    if (id) viewDetail(id);
+});
+
 // Inicializar tabs y cargar datos
 initTabs();
 loadRequests();
