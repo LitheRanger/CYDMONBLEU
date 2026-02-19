@@ -678,7 +678,7 @@ async function viewDetail(requestId) {
             }
             
             if (isCambio) actions.push(`<button class="btn" onclick="shipChange('${r.order_id}')">Enviar</button>`);
-            if (hasRefund) actions.push(`<button class="btn" onclick="sendCoupon('${r.order_id}')">Enviar cupón</button>`);
+            if (hasRefund || isDefecto) actions.push(`<button class="btn" onclick="sendCoupon('${r.order_id}')">Enviar cupón</button>`);
             if (isCambio) {
                 const currentStatus = r.refund_status || 'pending_receipt';
                 const nextStatus = currentStatus === 'pending_receipt' ? 'Por Enviar' : 'Por Recibir';
