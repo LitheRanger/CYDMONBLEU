@@ -869,37 +869,10 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
     }
 
     try {
-        // A. Buscar la orden - PRIMERO por ID numérico, LUEGO por número exacto, FINALMENTE por nombre
-        let order = null;
-        const cleanInput = String(orderNumber || '').replace(/^#/, '').trim();
-        
-        // Si es un número muy largo (16+ dígitos), probablemente sea un ID de Shopify
-        if (/^\d{16,}$/.test(cleanInput)) {
-            console.log(`🔍 /api/validate-order: Detectado ID de Shopify: ${cleanInput}`);
-            order = await shopifyClient.getOrderById(cleanInput);
-            if (order) {
-                console.log(`   ✅ Encontrada por ID: #${order.order_number} (ID: ${order.id})`);
-            }
-        }
-        
-        // Si no encontró por ID, buscar por número de orden exacto (búsqueda en últimas 250 órdenes)
-        if (!order) {
-            console.log(`🔍 /api/validate-order: Buscando por número de orden exacto: ${cleanInput}`);
-            order = await shopifyClient.getOrderByNumber(cleanInput);
-            if (order) {
-                console.log(`   ✅ Encontrada por número exacto: #${order.order_number} (ID: ${order.id})`);
-            }
-        }
-        
-        // Si no encontró en las últimas 250, intentar búsqueda por nombre como fallback
-        if (!order) {
-            const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
-            console.log(`⚠️ /api/validate-order: Búsqueda por número falló, intentando por nombre: ${orderNameForSearch}`);
-            order = await shopifyClient.getOrder(orderNameForSearch);
-            if (order) {
-                console.log(`   ✅ Encontrada por nombre (fallback): #${order.order_number} (ID: ${order.id})`);
-            }
-        }
+        // A. Buscar la orden por nombre/número (lo que el cliente tiene)
+        const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+        console.log(`🔍 /api/validate-order: Buscando orden por nombre: ${orderNameForSearch}`);
+        const order = await shopifyClient.getOrder(orderNameForSearch);
 
         if (!order) {
             return res.status(404).json({ valid: false, message: 'Orden no encontrada.' });
