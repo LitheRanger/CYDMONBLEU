@@ -155,6 +155,42 @@ class ShopifyTokenManager {
     }
   }
 
+  // 1.2 Buscar Orden por Número (order_number)
+  // Busca UNA orden específica por su número (más exacto que por nombre)
+  async getOrderByNumber(orderNumber) {
+    try {
+      const cleanNumber = String(orderNumber || '').replace(/^#/, '').trim();
+      console.log(`🔍 Shopify: Buscando orden por número: #${cleanNumber}`);
+      
+      if (!/^\d+$/.test(cleanNumber)) {
+        console.log(`   ❌ Número inválido`);
+        return null;
+      }
+
+      // Buscar todas las órdenes y filtrar por número exacto
+      // (Nota: Shopify API no tiene parámetro directo para order_number en query)
+      // Intentamos buscar con limit alto y filtramos en memoria
+      const data = await this.makeRequest(`/admin/api/2024-01/orders.json?status=any&limit=250`);
+      
+      if (data.orders && Array.isArray(data.orders)) {
+        const found = data.orders.find(order => 
+          String(order.order_number || '').trim() === cleanNumber
+        );
+        
+        if (found) {
+          console.log(`   ✅ Encontrada: #${found.order_number} (ID: ${found.id})`);
+          return found;
+        }
+      }
+      
+      console.log(`   ❌ No encontrada`);
+      return null;
+    } catch (e) {
+      console.error(`❌ Error buscando orden #${orderNumber}:`, e.message);
+      return null;
+    }
+  }
+
   // 1.2 Buscar Variante por ID (Para mostrar talla/color en cambios)
   async getVariantById(variantId) {
     try {

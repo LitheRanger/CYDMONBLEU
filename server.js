@@ -869,26 +869,26 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
     }
 
     try {
-        // A. Buscar la orden - PRIMERO por ID numérico (si es válido), LUEGO por nombre como fallback
+        // A. Buscar la orden - PRIMERO por ID numérico (si es un ID de 16+ dígitos)
+        // LUEGO por número de orden (búsqueda exacta)
         let order = null;
-        const cleanNumber = String(orderNumber || '').replace(/^#/, '').trim();
+        const cleanInput = String(orderNumber || '').replace(/^#/, '').trim();
         
-        // Si es un número puro, intentar búsqueda por ID primero (más fiable)
-        if (/^\d+$/.test(cleanNumber)) {
-            console.log(`🔍 /api/validate-order: Intentando búsqueda por ID numérico: ${cleanNumber}`);
-            order = await shopifyClient.getOrderById(cleanNumber);
+        // Si es un número muy largo (16+ dígitos), probablemente sea un ID de Shopify
+        if (/^\d{16,}$/.test(cleanInput)) {
+            console.log(`🔍 /api/validate-order: Detectado ID de Shopify: ${cleanInput}`);
+            order = await shopifyClient.getOrderById(cleanInput);
             if (order) {
-                console.log(`   ✅ Encontrada por ID: ${order.name} (ID: ${order.id})`);
+                console.log(`   ✅ Encontrada por ID: #${order.order_number} (ID: ${order.id})`);
             }
         }
         
-        // Si no encontró por ID, intentar por nombre como fallback
+        // Si no encontró, buscar por número de orden (búsqueda exacta)
         if (!order) {
-            const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
-            console.log(`🔍 /api/validate-order: Intentando búsqueda por nombre: ${orderNameForSearch}`);
-            order = await shopifyClient.getOrder(orderNameForSearch);
+            console.log(`🔍 /api/validate-order: Buscando por número de orden: ${cleanInput}`);
+            order = await shopifyClient.getOrderByNumber(cleanInput);
             if (order) {
-                console.log(`   ✅ Encontrada por nombre: ${order.name} (ID: ${order.id})`);
+                console.log(`   ✅ Encontrada por número: #${order.order_number} (ID: ${order.id})`);
             }
         }
 
