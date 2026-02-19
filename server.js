@@ -869,8 +869,7 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
     }
 
     try {
-        // A. Buscar la orden - PRIMERO por ID numérico (si es un ID de 16+ dígitos)
-        // LUEGO por número de orden (búsqueda exacta)
+        // A. Buscar la orden - PRIMERO por ID numérico, LUEGO por número exacto, FINALMENTE por nombre
         let order = null;
         const cleanInput = String(orderNumber || '').replace(/^#/, '').trim();
         
@@ -883,12 +882,22 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
             }
         }
         
-        // Si no encontró, buscar por número de orden (búsqueda exacta)
+        // Si no encontró por ID, buscar por número de orden exacto (búsqueda en últimas 250 órdenes)
         if (!order) {
-            console.log(`🔍 /api/validate-order: Buscando por número de orden: ${cleanInput}`);
+            console.log(`🔍 /api/validate-order: Buscando por número de orden exacto: ${cleanInput}`);
             order = await shopifyClient.getOrderByNumber(cleanInput);
             if (order) {
-                console.log(`   ✅ Encontrada por número: #${order.order_number} (ID: ${order.id})`);
+                console.log(`   ✅ Encontrada por número exacto: #${order.order_number} (ID: ${order.id})`);
+            }
+        }
+        
+        // Si no encontró en las últimas 250, intentar búsqueda por nombre como fallback
+        if (!order) {
+            const orderNameForSearch = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+            console.log(`⚠️ /api/validate-order: Búsqueda por número falló, intentando por nombre: ${orderNameForSearch}`);
+            order = await shopifyClient.getOrder(orderNameForSearch);
+            if (order) {
+                console.log(`   ✅ Encontrada por nombre (fallback): #${order.order_number} (ID: ${order.id})`);
             }
         }
 
