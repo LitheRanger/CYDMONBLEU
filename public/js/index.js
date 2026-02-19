@@ -832,20 +832,19 @@ async function procesarPago() {
 
         if (data.success && data.requestId) {
             if (data.skipPayment) {
-                // Calcular cupón si hay devoluciones
-                const refundItemsValue = Object.keys(seleccion)
-                    .filter(idx => seleccion[idx].requestType === 'Reembolso')
-                    .reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
+                // Calcular cupón SOLO basado en los items de REEMBOLSO
+                const refundItems = Object.keys(seleccion).filter(idx => seleccion[idx].requestType === 'Reembolso');
+                const refundItemsValue = refundItems.reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
                 
-                const reasons = Object.values(seleccion).map(s => String(s.reason || '').toLowerCase());
-                const isDefectRequest = reasons.length > 0 && reasons.includes('defecto');
-                const refundReasons = Object.values(seleccion)
-                    .filter(s => s.requestType === 'Reembolso')
-                    .map(s => String(s.reason || '').toLowerCase());
-                const isNoEsperaba = refundReasons.length > 0 && refundReasons.includes('no era lo que esperaba');
+                // Verificar si TODOS los reembolsos son defecto O "no era lo que esperaba"
+                const refundReasons = refundItems.map(idx => String(seleccion[idx].reason || '').toLowerCase());
+                const allDefectOrNoEsperaba = refundReasons.length > 0 && 
+                    refundReasons.every(r => r.includes('defecto') || r.includes('no era lo que esperaba'));
                 
+                // Si hay reembolsos y TODOS son defecto o "no era lo que esperaba" → cupón sin descontar guía
+                // Si hay reembolsos pero ALGUNOS son otras razones → cupón descontando guía
                 const couponValue = (refundItemsValue > 0)
-                    ? (isDefectRequest || isNoEsperaba)
+                    ? allDefectOrNoEsperaba 
                         ? refundItemsValue
                         : Math.max(refundItemsValue - GUIDE_COST, 0)
                     : 0;
@@ -900,20 +899,19 @@ async function procesarPago() {
             removeToast(loadingToast);
 
             if (checkoutData.success && checkoutData.url) {
-                // Calcular cupón si hay devoluciones
-                const refundItemsValue = Object.keys(seleccion)
-                    .filter(idx => seleccion[idx].requestType === 'Reembolso')
-                    .reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
+                // Calcular cupón SOLO basado en los items de REEMBOLSO
+                const refundItems = Object.keys(seleccion).filter(idx => seleccion[idx].requestType === 'Reembolso');
+                const refundItemsValue = refundItems.reduce((sum, idx) => sum + parseFloat(orderData.items[idx].price || 0) * (orderData.items[idx].quantity || 1), 0);
                 
-                const reasons = Object.values(seleccion).map(s => String(s.reason || '').toLowerCase());
-                const isDefectRequest = reasons.length > 0 && reasons.includes('defecto');
-                const refundReasons = Object.values(seleccion)
-                    .filter(s => s.requestType === 'Reembolso')
-                    .map(s => String(s.reason || '').toLowerCase());
-                const isNoEsperaba = refundReasons.length > 0 && refundReasons.includes('no era lo que esperaba');
+                // Verificar si TODOS los reembolsos son defecto O "no era lo que esperaba"
+                const refundReasons = refundItems.map(idx => String(seleccion[idx].reason || '').toLowerCase());
+                const allDefectOrNoEsperaba = refundReasons.length > 0 && 
+                    refundReasons.every(r => r.includes('defecto') || r.includes('no era lo que esperaba'));
                 
+                // Si hay reembolsos y TODOS son defecto o "no era lo que esperaba" → cupón sin descontar guía
+                // Si hay reembolsos pero ALGUNOS son otras razones → cupón descontando guía
                 const couponValue = (refundItemsValue > 0)
-                    ? (isDefectRequest || isNoEsperaba)
+                    ? allDefectOrNoEsperaba 
                         ? refundItemsValue
                         : Math.max(refundItemsValue - GUIDE_COST, 0)
                     : 0;
