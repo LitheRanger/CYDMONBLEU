@@ -117,14 +117,35 @@ class ShopifyTokenManager {
   // 1. Buscar Orden (Para validación)
   async getOrder(orderName) {
     // Buscamos la orden por nombre (#1001)
-    console.log(`🔍 Shopify: Buscando orden por nombre: ${orderName}`);
+    // IMPORTANTE: Shopify devuelve RESULTADOS PARCIALES, filtramos por EXACTO
+    const cleanName = String(orderName || '').trim();
+    console.log(`🔍 Shopify: Buscando orden por nombre: ${cleanName}`);
+    
     try {
-      const data = await this.makeRequest(`/admin/api/2024-01/orders.json?name=${orderName}&status=any&limit=1`);
+      const data = await this.makeRequest(`/admin/api/2024-01/orders.json?name=${cleanName}&status=any&limit=50`);
+      
       if (data.orders && data.orders.length > 0) {
-        const order = data.orders[0];
-        console.log(`   ✅ Encontrada: #${order.order_number} (ID: ${order.id})`);
-        return order;
+        // IMPORTANTE: Filtrar por COINCIDENCIA EXACTA (no parcial)
+        // Shopify devuelve resultados que contienen el texto, filtramos aquí
+        const exactMatch = data.orders.find(order => {
+          const orderDisplayName = order.name ? String(order.name).trim() : '';
+          return orderDisplayName === cleanName || 
+                 orderDisplayName === `#${cleanName.replace(/^#/, '')}` ||
+                 orderDisplayName === cleanName.replace(/^#/, '');
+        });
+        
+        if (exactMatch) {
+          console.log(`   ✅ Encontrada EXACTAMENTE: ${exactMatch.name} (ID: ${exactMatch.id})`);
+          return exactMatch;
+        }
+        
+        // Si no hay coincidencia exacta, retornar null (no asumir el primero)
+        console.log(`   ⚠️ Búsqueda devolvió ${data.orders.length} resultados pero ninguna EXACTA`);
+        data.orders.forEach((o, i) => {
+          console.log(`      [${i}] ${o.name} (order_number: ${o.order_number})`);
+        });
       }
+      
       console.log(`   ❌ No encontrada`);
       return null;
     } catch (e) {
@@ -218,26 +239,26 @@ class ShopifyTokenManager {
     }
   }
 
-  // 1.3 Buscar Orden por INPUT del usuario (Por nombre principalmente)
+  // 1.3 Buscar Orden por INPUT del usuario (Por nombre principalmente, CON VALIDACIÓN EXACTA)
   // El usuario ingresa el NOMBRE de la orden: "#160670", "160670"
-  // Buscamos por nombre y extraemos el número de orden y el ID verdadero
+  // Buscamos por nombre, filtramos por EXACTA coincidencia, y extraemos número e ID
   async getOrderByInput(userInput) {
     try {
       const cleanInput = String(userInput || '').replace(/^#/, '').trim();
-      const orderNameForSearch = cleanInput.startsWith('#') ? cleanInput : `#${cleanInput}`;
       
       console.log(`🔍 Shopify: Buscando orden por NOMBRE (ingresado por usuario): "${userInput}"`);
       
       // PRINCIPAL: Buscar por nombre (lo que el usuario ve y espera)
-      const order = await this.getOrder(orderNameForSearch);
+      // getOrder() ahora filtra por EXACTA coincidencia
+      const order = await this.getOrder(userInput);
       
       if (order) {
-        console.log(`   ✅ Encontrada por nombre: ${orderNameForSearch}`);
+        console.log(`   ✅ Encontrada EXACTAMENTE por nombre: ${order.name}`);
         console.log(`   📊 Datos extraídos - order_number: ${order.order_number}, ID: ${order.id}`);
         return order;
       }
       
-      console.log(`   ❌ No encontrada por nombre`);
+      console.log(`   ❌ No encontrada por nombre exacto`);
       return null;
     } catch (e) {
       console.error(`❌ Error buscando orden ${userInput}:`, e.message);
