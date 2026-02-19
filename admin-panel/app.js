@@ -183,12 +183,8 @@ function renderTable(tab, data) {
     });
   });
 }
-// Simple login (frontend only, no backend)
-const loginForm = document.getElementById('login-form');
-const loginContainer = document.getElementById('login-container');
-const adminShell = document.getElementById('admin-shell');
-const loginError = document.getElementById('login-error');
-const logoutBtn = document.getElementById('logout-btn');
+// DOM elements - initialized in DOMContentLoaded
+let loginForm, loginContainer, adminShell, loginError, logoutBtn;
 
 // --- AUTENTICACIÓN REAL HTTP BASIC ---
 function getAuthHeader(user, pass) {
@@ -224,28 +220,7 @@ async function tryLogin(user, pass) {
   }
 }
 
-loginForm.addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const user = document.getElementById('username').value;
-  const pass = document.getElementById('password').value;
-  const ok = await tryLogin(user, pass);
-  if (ok) {
-    saveAuth(user, pass);
-    loginContainer.style.display = 'none';
-    adminShell.style.display = 'block';
-    loginError.textContent = '';
-    loadAndRender();
-  } else {
-    loginError.textContent = 'Usuario o contraseña incorrectos';
-  }
-});
-
-logoutBtn.addEventListener('click', function() {
-  adminShell.style.display = 'none';
-  loginContainer.style.display = 'flex';
-  loginForm.reset();
-  clearAuth();
-});
+// Event listeners initialized in DOMContentLoaded
 
 // --- URL DE API ---
 const API_URL = 'https://cambios.monbleu.mx/api/admin/requests';
@@ -277,6 +252,39 @@ async function fetchRequests() {
 
 // --- AUTOLOGIN SI HAY CREDENCIALES ---
 window.addEventListener('DOMContentLoaded', async () => {
+  // Initialize DOM elements
+  loginForm = document.getElementById('login-form');
+  loginContainer = document.getElementById('login-container');
+  adminShell = document.getElementById('admin-shell');
+  loginError = document.getElementById('login-error');
+  logoutBtn = document.getElementById('logout-btn');
+  
+  // Initialize event listeners
+  loginForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const user = document.getElementById('username').value;
+    const pass = document.getElementById('password').value;
+    const ok = await tryLogin(user, pass);
+    if (ok) {
+      saveAuth(user, pass);
+      loginContainer.style.display = 'none';
+      adminShell.style.display = 'block';
+      loginError.textContent = '';
+      loadAndRender();
+      initializeTabs();
+    } else {
+      loginError.textContent = 'Usuario o contraseña incorrectos';
+    }
+  });
+
+  logoutBtn.addEventListener('click', function() {
+    adminShell.style.display = 'none';
+    loginContainer.style.display = 'flex';
+    loginForm.reset();
+    clearAuth();
+  });
+  
+  // Check for saved auth
   const auth = getSavedAuth();
   if (auth) {
     const ok = await tryLogin(auth.user, auth.pass);
@@ -285,6 +293,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       adminShell.style.display = 'block';
       loginError.textContent = '';
       loadAndRender();
+      initializeTabs();
       return;
     } else {
       clearAuth();
@@ -295,18 +304,20 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Tabs logic
-const tabBtns = document.querySelectorAll('.tab-btn');
-const tabContents = document.querySelectorAll('.tab-content');
-tabBtns.forEach(btn => {
-  btn.addEventListener('click', function() {
-    tabBtns.forEach(b => b.classList.remove('active'));
-    tabContents.forEach(c => c.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-    currentPage = 1;
-    updateView();
+function initializeTabs() {
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      tabBtns.forEach(b => b.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      currentPage = 1;
+      updateView();
+    });
   });
-});
+}
 
 function groupRequests(data) {
   const grupos = { cambios: [], reembolsos: [], defectos: [], mixtas: [], completadas: [] };
