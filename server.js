@@ -978,40 +978,10 @@ app.post('/api/validate-order', limiterValidate, async (req, res) => {
 // --- 3. ENDPOINT: PROCESAR SELECCIÓN ---
 // upload.any() permite recibir múltiples archivos con cualquier nombre de campo
 app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => {
-            // Datos del formulario
-            const submitParsed = z.object({
-                orderId: z.string().trim().min(1).max(64),
-                orderNumber: z.string().trim().min(1).max(64).optional(),
-                contactEmail: z.string().trim().email().max(255),
-                returnType: z.string().trim().min(1).max(32),
-                customerName: z.string().trim().min(1).max(255).optional()
-            }).safeParse(req.body);
-
-            if (!submitParsed.success) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Datos inválidos',
-                    errors: submitParsed.error.flatten()
-                });
-            }
-
-            const { orderId, orderNumber, contactEmail, returnType, customerName } = submitParsed.data;
-            // Validar que el OrderId existe en Shopify antes de guardar
-            const orderIdForStorage = String(orderId || '').trim();
-            const orderIdForLookup = String(orderId || '').trim();
-
-            // TEMPORAL: Se permite registrar varias solicitudes por el mismo número de orden
-            // const [existing] = await executeQuery(
-            //     'SELECT order_id FROM returns_requests WHERE order_id = ? LIMIT 1',
-            //     [orderIdForStorage]
-            // );
-            // if (existing && existing.length > 0) {
-            //     return res.status(400).json({ success: false, message: 'Ya existe una solicitud para este número de orden.' });
-            // }
     try {
         console.log("📦 Recibiendo solicitud...");
 
-        // Datos del formulario
+        // Validar datos del formulario
         const submitParsed = z.object({
             orderId: z.string().trim().min(1).max(64),
             orderNumber: z.string().trim().min(1).max(64).optional(),
@@ -1029,9 +999,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         }
 
         const { orderId, orderNumber, contactEmail, returnType, customerName } = submitParsed.data;
-        // Validar que el OrderId existe en Shopify antes de guardar
-        const orderIdForStorage = String(orderId || '').trim();
         const orderIdForLookup = String(orderId || '').trim();
+        
+        // Validar que el OrderId existe en Shopify antes de guardar
         let shopifyOrder = null;
         try {
             // Buscar por ID numérico y por nombre
@@ -1046,6 +1016,9 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         if (!shopifyOrder) {
             return res.status(400).json({ success: false, message: 'El número de orden no existe en Shopify. Verifica el dato.' });
         }
+        
+        // Usar el ID de Shopify (numérico) como identificador principal, no el que vino del cliente
+        const orderIdForStorage = String(shopifyOrder.id || '').trim();
         
         // Los items vienen como string JSON, hay que parsearlos
         let items = [];
