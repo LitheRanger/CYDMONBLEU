@@ -1032,12 +1032,22 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
         } catch (e) {
             console.warn('⚠️ Error buscando orden en Shopify:', e?.message || e);
         }
+        
         if (!shopifyOrder) {
-            return res.status(400).json({ success: false, message: 'El número de orden no existe en Shopify. Verifica el dato.' });
+            console.error(`❌ /api/submit-return: Orden NO ENCONTRADA: "${orderIdForLookup}"`);
+            return res.status(400).json({ 
+                success: false, 
+                message: `El número de orden "${orderIdForLookup}" no existe en Shopify. Verifica el dato. Prueba sin el # si incluiste uno, o verifica que sea el order number.` 
+            });
         }
         
         // Usar el ID de Shopify (numérico) como identificador principal, no el que vino del cliente
         const orderIdForStorage = String(shopifyOrder.id || '').trim();
+        
+        // LOG: Mostrar si el cliente ingresó mal el ID
+        if (String(shopifyOrder.id) !== orderIdForLookup && String(shopifyOrder.order_number) !== orderIdForLookup) {
+            console.log(`ℹ️ Cliente ingresó "${orderIdForLookup}" pero la orden real es ID: ${shopifyOrder.id}, #${shopifyOrder.order_number}`);
+        }
         console.log(`💾 /api/submit-return: Guardando order_id="${orderIdForStorage}"`);
         
         // Los items vienen como string JSON, hay que parsearlos
@@ -1334,13 +1344,34 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
 
     if (myeshipClient.isConfigured()) {
         try {
-            const order = await resolveOrderForLabel(finalOrderId);
+            // Usar la misma búsqueda inteligente que /api/validate-order
+            console.log(`🔍 handleApprovedPayment: Buscando orden usando getOrderByInput("${finalOrderId}")...`);
+            const order = await shopifyClient.getOrderByInput(finalOrderId);
+            
             if (!order) {
-                console.warn('⚠️ No se pudo obtener la orden para generar guía');
+                console.error(`❌ SOLICITUD #${requestId}: No se encontró orden en Shopify`);
+                console.error(`   El pago fue aprobado pero la guía NO se puede generar.`);
+                console.error(`   order_id="${finalOrderId}" no existe.`);
                 // Aún así enviar email de pago confirmado
                 sendPaymentConfirmationEmail(contactEmail, customerName, requestId, null);
                 return;
             }
+            
+            console.log(`✅ Orden encontrada: #${order.order_number} (ID: ${order.id})`);
+            
+            // Si el order_id guardado es diferente del ID real de Shopify, actualizar BD
+            if (finalOrderId !== String(order.id)) {
+                try {
+                    console.log(`🔄 Corrigiendo order_id en BD: "${finalOrderId}" → "${order.id}"`);
+                    await executeQuery(
+                        `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`,
+                        [String(order.id), finalOrderId]
+                    );
+                } catch (e) {
+                    console.warn(`⚠️ No se pudo actualizar BD:`, e?.message);
+                }
+            }
+            
             const label = await myeshipClient.createReturnLabel({ order, requestId });
             if (label && label.trackingNumber) {
                 trackingNumber = label.trackingNumber;
