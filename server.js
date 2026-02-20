@@ -1171,8 +1171,8 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                 );
 
                 if (myeshipClient.isConfigured()) {
-                    // Usar el mismo flujo inteligente que el botón "Reintentar guía"
-                    const order = await resolveOrderForLabel(requestOrderId);
+                    // Usar búsqueda inteligente igual a handleApprovedPayment
+                    const order = await shopifyClient.getOrderByInput(requestOrderId);
                     if (order && order.shipping_address) {
                         const label = await myeshipClient.createReturnLabel({ order, orderId: requestOrderId });
                         if (label && label.trackingNumber) {
@@ -1182,6 +1182,8 @@ app.post('/api/submit-return', limiterSubmit, upload.any(), async (req, res) => 
                                 [label.trackingNumber, label.labelBase64, label.labelMime, now, requestOrderId]
                             );
                         }
+                    } else {
+                        console.warn(`⚠️ Defecto: No se pudo obtener orden para generar guía (order_id="${requestOrderId}")`);
                     }
                 }
             } catch (e) {
@@ -2400,10 +2402,23 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
         }
 
         const request = rows[0];
-        const order = await resolveOrderForLabel(request.order_id);
+        // Usar búsqueda inteligente igual a handleApprovedPayment
+        const order = await shopifyClient.getOrderByInput(request.order_id);
 
         if (!order || !order.shipping_address) {
-            return res.status(400).json({ success: false, message: 'No se pudo obtener dirección' });
+            return res.status(400).json({ success: false, message: 'No se pudo obtener dirección de la orden' });
+        }
+        
+        // Si el order_id es diferente, actualizar BD
+        if (request.order_id !== String(order.id)) {
+            try {
+                await executeQuery(
+                    `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`,
+                    [String(order.id), request.order_id]
+                );
+            } catch (e) {
+                console.warn(`⚠️ No se pudo actualizar order_id en BD:`, e?.message);
+            }
         }
 
         const label = await myeshipClient.createReturnLabel({ order, requestId });
