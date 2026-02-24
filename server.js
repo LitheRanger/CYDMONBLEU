@@ -1322,7 +1322,7 @@ async function handleApprovedPayment({ requestId, orderId, paymentId, paymentPro
     );
     
     const storedOrderId = rows && rows[0] ? rows[0].order_id : null;
-    const finalOrderId = orderId || storedOrderId;
+    const finalOrderId = storedOrderId || orderId;
     const contactEmail = rows && rows[0] ? rows[0].contact_email : null;
     const customerName = rows && rows[0] ? rows[0].customer_name : null;
 
