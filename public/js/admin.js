@@ -127,14 +127,17 @@ function updateStats() {
     const total = requests.length;
     const pendingReceipt = requests.filter(r => String(r.refund_status || '').toLowerCase() === 'pending_receipt').length;
     const pendingShipment = requests.filter(r => String(r.refund_status || '').toLowerCase() === 'pending_shipment').length;
+    const completed = requests.filter(r => String(r.admin_status || '').toLowerCase() === 'completed').length;
 
     const totalEl = document.getElementById('total');
     const pendingReceiptEl = document.getElementById('pending-receipt-count');
     const pendingShipmentEl = document.getElementById('pending-shipment-count');
+    const completedEl = document.getElementById('completed-count');
 
     if (totalEl) totalEl.textContent = total;
     if (pendingReceiptEl) pendingReceiptEl.textContent = pendingReceipt;
     if (pendingShipmentEl) pendingShipmentEl.textContent = pendingShipment;
+    if (completedEl) completedEl.textContent = completed;
 }
 
 function updateSummaryTab(tabName, data) {
