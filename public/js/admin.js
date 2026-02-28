@@ -587,7 +587,11 @@ async function viewDetail(requestId) {
                         <h3 class="detail-section-title">Cliente</h3>
                         <div class="detail-grid">
                             <div class="detail-field">
-                                <div class="detail-label">Orden</div>
+                                <div class="detail-label">Orden (Cliente)</div>
+                                <div class="detail-value">${r.order_number ? '#' + r.order_number : '—'}</div>
+                            </div>
+                            <div class="detail-field">
+                                <div class="detail-label">Orden (ID)</div>
                                 <div class="detail-value">${r.order_id || '—'}</div>
                             </div>
                             <div class="detail-field">
