@@ -2008,8 +2008,7 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
                     carrier, tracking_number, label_created_at, created_at, admin_status, refund_status,
                     coupon_code, coupon_amount, coupon_sent_at, change_sent_at
              FROM returns_requests
-             ORDER BY created_at DESC
-             LIMIT 500`,
+             ORDER BY created_at DESC`,
             []
         );
 
