@@ -156,12 +156,13 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         const orderId = metadata.orderId;
 
         if (requestId) {
-            await handleApprovedPayment({
+            // No awaitar — responder 200 a Stripe de inmediato y procesar en background
+            handleApprovedPaymentWithRetry({
                 requestId,
                 orderId,
                 paymentId: session.id,
                 paymentProvider: 'stripe'
-            });
+            }).catch(err => console.error('❌ handleApprovedPaymentWithRetry (stripe):', err.message));
         }
     }
 
@@ -279,6 +280,17 @@ async function initDb() {
                 await dbPool.query(
                     `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS change_sent_at TIMESTAMP NULL`
                 );
+                // ── NUEVAS COLUMNAS PARA RETRY ──────────────────────────────────────
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS label_retries INT DEFAULT 0`
+                );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS label_last_attempt TIMESTAMP NULL`
+                );
+                await dbPool.query(
+                    `ALTER TABLE returns_requests ADD COLUMN IF NOT EXISTS label_error TEXT NULL`
+                );
+                // ───────────────────────────────────────────────────────────────────
                 await dbPool.query(
                     `ALTER TABLE returns_requests DROP COLUMN IF EXISTS stripe_session_id`
                 );
@@ -311,112 +323,50 @@ async function initDb() {
                     label_base64 TEXT NULL,
                     label_mime VARCHAR(64) NULL,
                     label_created_at TIMESTAMP NULL,
+                    label_retries INT DEFAULT 0,
+                    label_last_attempt TIMESTAMP NULL,
+                    label_error TEXT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             `;
             await dbPool.execute(createTableSQL);
-            // Agregar columna admin_status si no existe
-            const [cols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'admin_status']
-            );
-            if (cols && cols[0] && cols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN admin_status VARCHAR(32) DEFAULT 'open'`
+
+            // Helper para agregar columna si no existe (MySQL)
+            const addColumnIfMissing = async (column, definition) => {
+                const [cols] = await dbPool.execute(
+                    `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+                    [process.env.DB_NAME, 'returns_requests', column]
                 );
-            }
-            // Agregar columna refund_status si no existe
-            const [refundCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'refund_status']
-            );
-            if (refundCols && refundCols[0] && refundCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN refund_status VARCHAR(32) DEFAULT 'pending_receipt'`
-                );
-            }
-            // Agregar columnas payment_provider y payment_reference si no existen
-            const [payProviderCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'payment_provider']
-            );
-            if (payProviderCols && payProviderCols[0] && payProviderCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN payment_provider VARCHAR(32) DEFAULT 'mercadopago'`
-                );
-            }
-            const [payRefCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'payment_reference']
-            );
-            if (payRefCols && payRefCols[0] && payRefCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN payment_reference VARCHAR(255) NULL`
-                );
-            }
-            const [customerCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'customer_name']
-            );
-            if (customerCols && customerCols[0] && customerCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN customer_name VARCHAR(255) NULL`
-                );
-            }
-            const [orderNumberCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'order_number']
-            );
-            if (orderNumberCols && orderNumberCols[0] && orderNumberCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN order_number VARCHAR(64) NULL`
-                );
-            }
+                if (cols && cols[0] && cols[0].cnt === 0) {
+                    await dbPool.execute(`ALTER TABLE returns_requests ADD COLUMN ${definition}`);
+                }
+            };
+
+            await addColumnIfMissing('admin_status',       `admin_status VARCHAR(32) DEFAULT 'open'`);
+            await addColumnIfMissing('refund_status',      `refund_status VARCHAR(32) DEFAULT 'pending_receipt'`);
+            await addColumnIfMissing('payment_provider',   `payment_provider VARCHAR(32) DEFAULT 'mercadopago'`);
+            await addColumnIfMissing('payment_reference',  `payment_reference VARCHAR(255) NULL`);
+            await addColumnIfMissing('customer_name',      `customer_name VARCHAR(255) NULL`);
+            await addColumnIfMissing('order_number',       `order_number VARCHAR(64) NULL`);
+            await addColumnIfMissing('coupon_code',        `coupon_code VARCHAR(64) NULL`);
+            await addColumnIfMissing('coupon_amount',      `coupon_amount DECIMAL(10,2) NULL`);
+            await addColumnIfMissing('coupon_sent_at',     `coupon_sent_at TIMESTAMP NULL`);
+            await addColumnIfMissing('change_sent_at',     `change_sent_at TIMESTAMP NULL`);
+            // ── NUEVAS COLUMNAS PARA RETRY ──────────────────────────────────────
+            await addColumnIfMissing('label_retries',      `label_retries INT DEFAULT 0`);
+            await addColumnIfMissing('label_last_attempt', `label_last_attempt TIMESTAMP NULL`);
+            await addColumnIfMissing('label_error',        `label_error TEXT NULL`);
+            // ───────────────────────────────────────────────────────────────────
+
+            // Eliminar columna obsoleta si existe
             const [stripeCols] = await dbPool.execute(
                 `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
                 [process.env.DB_NAME, 'returns_requests', 'stripe_session_id']
             );
             if (stripeCols && stripeCols[0] && stripeCols[0].cnt > 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests DROP COLUMN stripe_session_id`
-                );
+                await dbPool.execute(`ALTER TABLE returns_requests DROP COLUMN stripe_session_id`);
             }
-            const [couponCodeCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'coupon_code']
-            );
-            if (couponCodeCols && couponCodeCols[0] && couponCodeCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN coupon_code VARCHAR(64) NULL`
-                );
-            }
-            const [couponAmountCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'coupon_amount']
-            );
-            if (couponAmountCols && couponAmountCols[0] && couponAmountCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN coupon_amount DECIMAL(10,2) NULL`
-                );
-            }
-            const [couponSentCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'coupon_sent_at']
-            );
-            if (couponSentCols && couponSentCols[0] && couponSentCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN coupon_sent_at TIMESTAMP NULL`
-                );
-            }
-            const [changeSentCols] = await dbPool.execute(
-                `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-                [process.env.DB_NAME, 'returns_requests', 'change_sent_at']
-            );
-            if (changeSentCols && changeSentCols[0] && changeSentCols[0].cnt === 0) {
-                await dbPool.execute(
-                    `ALTER TABLE returns_requests ADD COLUMN change_sent_at TIMESTAMP NULL`
-                );
-            }
+
             console.log('✅ DB lista: tabla returns_requests verificada (MySQL)');
         }
     } catch (err) {
@@ -484,6 +434,7 @@ app.use('/uploads', express.static('uploads'));
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
 // ========== EMAIL UTILITIES ==========
 function buildEmailHtml({ title, preheader, bodyHtml, footerText }) {
     const safePreheader = preheader || '';
@@ -1317,93 +1268,192 @@ async function resolveOrderForLabel(orderId) {
     return null;
 }
 
-async function handleApprovedPayment({ requestId, orderId, paymentId, paymentProvider = 'mercadopago' }) {
+// ═══════════════════════════════════════════════════════════════════════════════
+// SISTEMA DE RETRY CON BACKOFF EXPONENCIAL PARA GENERACIÓN DE GUÍAS
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// PROBLEMA RAÍZ: El webhook de MP/Stripe llega ~1-3 seg después del pago.
+// En ese momento Shopify puede no haber sincronizado aún la dirección de envío.
+// El botón de "Reintentar" del admin funciona porque se usa minutos después,
+// cuando Shopify ya tiene todo sincronizado.
+//
+// SOLUCIÓN: Reintentar la generación de guía hasta LABEL_MAX_RETRIES veces,
+// esperando LABEL_RETRY_DELAYS[intento] milisegundos entre cada uno.
+// Si todos los reintentos fallan, el admin puede usar el botón manual.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const LABEL_MAX_RETRIES   = Number(process.env.LABEL_MAX_RETRIES   || 5);
+// Delays en ms: 5s → 15s → 30s → 60s → 120s  (backoff exponencial)
+const LABEL_RETRY_DELAYS  = [5000, 15000, 30000, 60000, 120000];
+
+/**
+ * Espera `ms` milisegundos antes de resolver.
+ */
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Intenta generar la guía MyeShip una sola vez.
+ * Devuelve el objeto `label` con trackingNumber si tuvo éxito, o null si falló.
+ */
+async function attemptLabelGeneration(requestId, finalOrderId) {
+    const order = await shopifyClient.getOrderByInput(finalOrderId);
+
+    if (!order) {
+        throw new Error(`Orden no encontrada en Shopify: "${finalOrderId}"`);
+    }
+
+    if (!order.shipping_address) {
+        throw new Error(`Orden #${order.order_number} sin dirección de envío todavía`);
+    }
+
+    // Si el order_id guardado difiere del ID real, corregir en BD
+    if (finalOrderId !== String(order.id)) {
+        try {
+            console.log(`🔄 Corrigiendo order_id en BD: "${finalOrderId}" → "${order.id}"`);
+            await executeQuery(
+                `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`,
+                [String(order.id), finalOrderId]
+            );
+        } catch (e) {
+            console.warn(`⚠️ No se pudo corregir order_id en BD:`, e?.message);
+        }
+    }
+
+    const label = await myeshipClient.createReturnLabel({ order, requestId });
+
+    if (!label || !label.trackingNumber) {
+        throw new Error('MyeShip respondió sin trackingNumber');
+    }
+
+    return { order, label };
+}
+
+/**
+ * Núcleo del flujo post-pago.
+ * Marca el pago como "paid" en la BD y luego intenta generar la guía
+ * con reintentos + backoff exponencial.
+ *
+ * Al finalizar (con o sin éxito en la guía) envía siempre el email al cliente.
+ */
+async function handleApprovedPaymentWithRetry({ requestId, orderId, paymentId, paymentProvider = 'mercadopago' }) {
     if (!dbPool || !requestId) return;
 
+    // 1. Obtener datos del registro
     const [rows] = await executeQuery(
-        `SELECT order_id, tracking_number, contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
+        `SELECT order_id, tracking_number, label_base64, label_mime, contact_email, customer_name
+         FROM returns_requests WHERE order_id = ? LIMIT 1`,
         [requestId]
     );
-    
-    const storedOrderId = rows && rows[0] ? rows[0].order_id : null;
-    const finalOrderId = storedOrderId || orderId;
-    const contactEmail = rows && rows[0] ? rows[0].contact_email : null;
-    const customerName = rows && rows[0] ? rows[0].customer_name : null;
 
+    const record        = rows && rows[0] ? rows[0] : null;
+    const storedOrderId = record ? record.order_id : null;
+    const finalOrderId  = storedOrderId || orderId;
+    const contactEmail  = record ? record.contact_email  : null;
+    const customerName  = record ? record.customer_name  : null;
+
+    // 2. Marcar pago como aprobado en BD
     await executeQuery(
-        `UPDATE returns_requests SET payment_status = 'paid', payment_provider = ?, payment_reference = ? WHERE order_id = ?`,
+        `UPDATE returns_requests
+         SET payment_status = 'paid', payment_provider = ?, payment_reference = ?
+         WHERE order_id = ?`,
         [String(paymentProvider || 'mercadopago'), String(paymentId || ''), requestId]
     );
 
-    let trackingNumber = null;
-
-    if (rows && rows[0] && rows[0].tracking_number) {
-        trackingNumber = rows[0].tracking_number;
-        const labelBase64 = rows[0].label_base64;
-        const labelMime = rows[0].label_mime;
-        // Enviar email de coincidencia de pago con PDF (async, no esperar)
-        sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber, labelBase64, labelMime);
+    // 3. Si ya tiene guía generada, solo enviar email y salir
+    if (record && record.tracking_number) {
+        console.log(`ℹ️ Guía ya existente para ${requestId} (${record.tracking_number}), enviando email.`);
+        sendPaymentConfirmationEmail(
+            contactEmail, customerName, requestId,
+            record.tracking_number, record.label_base64, record.label_mime
+        );
         return;
     }
 
-    if (myeshipClient.isConfigured()) {
-        try {
-            // Usar la misma búsqueda inteligente que /api/validate-order
-            console.log(`🔍 handleApprovedPayment: Buscando orden usando getOrderByInput("${finalOrderId}")...`);
-            const order = await shopifyClient.getOrderByInput(finalOrderId);
-            
-            if (!order) {
-                console.error(`❌ SOLICITUD #${requestId}: No se encontró orden en Shopify`);
-                console.error(`   El pago fue aprobado pero la guía NO se puede generar.`);
-                console.error(`   order_id="${finalOrderId}" no existe.`);
-                // Aún así enviar email de pago confirmado
-                sendPaymentConfirmationEmail(contactEmail, customerName, requestId, null);
-                return;
-            }
-            
-            console.log(`✅ Orden encontrada: #${order.order_number} (ID: ${order.id})`);
-            
-            // Si el order_id guardado es diferente del ID real de Shopify, actualizar BD
-            if (finalOrderId !== String(order.id)) {
-                try {
-                    console.log(`🔄 Corrigiendo order_id en BD: "${finalOrderId}" → "${order.id}"`);
-                    await executeQuery(
-                        `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`,
-                        [String(order.id), finalOrderId]
-                    );
-                } catch (e) {
-                    console.warn(`⚠️ No se pudo actualizar BD:`, e?.message);
-                }
-            }
-            
-            const label = await myeshipClient.createReturnLabel({ order, requestId });
-            if (label && label.trackingNumber) {
-                trackingNumber = label.trackingNumber;
-                const now = new Date().toISOString();
-                await executeQuery(
-                    `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE order_id = ?`,
-                    [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
-                );
-                console.log(`📦 Guía MyeShip generada: ${label.trackingNumber} (${label.provider} - ${label.serviceName})`);
-                
-                // Enviar email de pago confirmado con PDF adjunto (async, no esperar)
-                sendPaymentConfirmationEmail(contactEmail, customerName, requestId, label.trackingNumber, label.labelBase64, label.labelMime);
-            } else {
-                console.warn('⚠️ MyeShip respondió sin tracking');
-                // Enviar email sin PDF
-                sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
-            }
-        } catch (labelErr) {
-            console.error('❌ Error generando guía MyeShip:', labelErr.message || labelErr);
-            // Enviar email sin PDF en caso de error
-            sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
-        }
-    } else {
+    // 4. Si MyeShip no está configurado, enviar email sin guía y salir
+    if (!myeshipClient.isConfigured()) {
         const missing = myeshipClient.getMissingConfigFields();
         console.warn(`⚠️ MyeShip no configurado. Faltan: ${missing.join(', ') || 'N/A'}`);
-        // Enviar email sin PDF si MyeShip no está configurado
-        sendPaymentConfirmationEmail(contactEmail, customerName, requestId, trackingNumber);
+        sendPaymentConfirmationEmail(contactEmail, customerName, requestId, null);
+        return;
     }
+
+    // 5. Bucle de reintentos con backoff exponencial
+    let lastError = null;
+
+    for (let attempt = 0; attempt < LABEL_MAX_RETRIES; attempt++) {
+        const delayMs = LABEL_RETRY_DELAYS[attempt] ?? LABEL_RETRY_DELAYS[LABEL_RETRY_DELAYS.length - 1];
+
+        if (attempt > 0) {
+            console.log(`⏳ [Retry ${attempt}/${LABEL_MAX_RETRIES}] Esperando ${delayMs / 1000}s antes de reintentar guía para ${requestId}...`);
+            await sleep(delayMs);
+        } else {
+            // Primer intento: pequeña pausa de 3s para dar tiempo a Shopify de sincronizar
+            console.log(`⏳ [Intento 1/${LABEL_MAX_RETRIES}] Esperando 3s para que Shopify sincronice la orden...`);
+            await sleep(3000);
+        }
+
+        try {
+            console.log(`🔄 [Intento ${attempt + 1}/${LABEL_MAX_RETRIES}] Generando guía para request=${requestId}, order=${finalOrderId}`);
+
+            // Actualizar contador de reintentos en BD
+            await executeQuery(
+                `UPDATE returns_requests
+                 SET label_retries = ?, label_last_attempt = ?, label_error = NULL
+                 WHERE order_id = ?`,
+                [attempt + 1, new Date().toISOString(), requestId]
+            );
+
+            const { order, label } = await attemptLabelGeneration(requestId, finalOrderId);
+
+            // ✅ ÉXITO: guardar guía en BD
+            const now = new Date().toISOString();
+            await executeQuery(
+                `UPDATE returns_requests
+                 SET carrier = 'MYESHIP', tracking_number = ?,
+                     label_base64 = ?, label_mime = ?, label_created_at = ?
+                 WHERE order_id = ?`,
+                [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
+            );
+
+            console.log(`✅ Guía MyeShip generada en intento ${attempt + 1}: ${label.trackingNumber} (${label.provider || ''} - ${label.serviceName || ''})`);
+
+            // Enviar email con guía adjunta
+            sendPaymentConfirmationEmail(
+                contactEmail, customerName, requestId,
+                label.trackingNumber, label.labelBase64, label.labelMime
+            );
+            return; // ← Salir del bucle: todo bien
+
+        } catch (err) {
+            lastError = err;
+            console.warn(`⚠️ [Intento ${attempt + 1}/${LABEL_MAX_RETRIES}] Falló generación de guía para ${requestId}: ${err.message}`);
+
+            // Guardar el error en BD para visibilidad en el admin
+            try {
+                await executeQuery(
+                    `UPDATE returns_requests SET label_error = ? WHERE order_id = ?`,
+                    [String(err.message || err).substring(0, 500), requestId]
+                );
+            } catch (_) { /* ignorar errores de log */ }
+        }
+    }
+
+    // 6. Todos los reintentos fallaron
+    console.error(`❌ Todos los reintentos de guía fallaron para ${requestId}. Último error: ${lastError?.message}`);
+    console.error(`   → El admin puede usar "Reintentar guía" desde el panel.`);
+
+    // Enviar email de pago aprobado SIN guía (el cliente al menos sabe que pagó)
+    sendPaymentConfirmationEmail(contactEmail, customerName, requestId, null);
+}
+
+/**
+ * Versión legacy mantenida por compatibilidad (usada en defectos y otros flujos).
+ * Para el flujo post-pago normal usar handleApprovedPaymentWithRetry.
+ */
+async function handleApprovedPayment({ requestId, orderId, paymentId, paymentProvider = 'mercadopago' }) {
+    return handleApprovedPaymentWithRetry({ requestId, orderId, paymentId, paymentProvider });
 }
 
 async function handleFailedPayment({ requestId, paymentId, paymentProvider = 'mercadopago' }) {
@@ -1459,6 +1509,7 @@ function verifyMpSignature(req) {
         };
     }
 
+    const crypto = require('crypto');
     const signedPayload = `id:${dataId};request-id:${requestId};ts:${signature.ts};`;
     const expected = crypto
         .createHmac('sha256', mpWebhookSecret)
@@ -1500,6 +1551,7 @@ function getPaymentValue(payment, key, fallback) {
 }
 
 function fetchMerchantOrder(merchantOrderId) {
+    const https = require('https');
     return new Promise((resolve, reject) => {
         if (!merchantOrderId) return resolve(null);
         const options = {
@@ -1689,7 +1741,7 @@ app.post('/api/create-mp-preference', limiterCheckout, async (req, res) => {
     }
 });
 
-// --- 4B. PAYPAL ORDER ---
+// --- 4B. PAYPAL ORDER (reutiliza lógica de Stripe internamente) ---
 app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
     try {
         console.log('📦 Creando orden PayPal...');
@@ -1708,15 +1760,11 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
         const { requestId, amount, currency, description, orderId, contactEmail } = parsed.data;
         console.log(`✅ Datos validados - Request ID: ${requestId}, Amount: ${amount}, Order ID: ${orderId}`);
 
-        if (!paypalClient) {
-            console.error('❌ PayPal client no configurado. Variables faltantes:', {
-                hasClientId: !!paypalClientId,
-                hasClientSecret: !!paypalClientSecret,
-                env: paypalEnv
-            });
+        if (!stripe) {
+            console.error('❌ Stripe/PayPal client no configurado.');
             return res.status(500).json({
                 success: false,
-                message: 'PayPal no configurado. Agrega PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET en .env'
+                message: 'Pasarela de pago no configurada.'
             });
         }
 
@@ -1784,7 +1832,7 @@ app.post('/api/create-paypal-order', limiterCheckout, async (req, res) => {
     }
 });
 
-// --- 4E. STRIPE WEBHOOK (Confirmar pagos) ---
+// --- 4E. CREAR SESIÓN STRIPE ---
 app.post('/api/create-checkout-session', limiterCheckout, async (req, res) => {
     try {
         const parsed = checkoutSchema.safeParse(req.body);
@@ -1945,7 +1993,9 @@ app.post('/api/mp-webhook', async (req, res) => {
                 console.warn(`⚠️ Pago MP inválido (${validation.reason}) para request ${requestId}`);
                 return res.json({ received: true });
             }
-            await handleApprovedPayment({ requestId, orderId, paymentId, paymentProvider: 'mercadopago' });
+            // ✅ Lanzar con retry en background — responder 200 a MP de inmediato
+            handleApprovedPaymentWithRetry({ requestId, orderId, paymentId, paymentProvider: 'mercadopago' })
+                .catch(err => console.error('❌ handleApprovedPaymentWithRetry (mp):', err.message));
         } else if (['rejected', 'cancelled'].includes(status)) {
             const expected = await getExpectedAmount(requestId);
             if (expected === null) {
@@ -2004,9 +2054,10 @@ app.get('/api/admin/requests', requireAdmin, async (req, res) => {
         }
 
         const [rows] = await executeQuery(
-                    `SELECT order_id, order_number, contact_email, customer_name, return_type, items_json, amount, payment_status, payment_reference,
+            `SELECT order_id, order_number, contact_email, customer_name, return_type, items_json, amount, payment_status, payment_reference,
                     carrier, tracking_number, label_created_at, created_at, admin_status, refund_status,
-                    coupon_code, coupon_amount, coupon_sent_at, change_sent_at
+                    coupon_code, coupon_amount, coupon_sent_at, change_sent_at,
+                    label_retries, label_last_attempt, label_error
              FROM returns_requests
              ORDER BY created_at DESC`,
             []
@@ -2096,7 +2147,6 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
                         currentVariantTitle = originalVariant?.title || '';
                     }
 
-                    // Priorizar nombre del payload, luego de line, luego fallback
                     const productName = item.name || line?.title || line?.name || 'Producto';
 
                     return {
@@ -2124,7 +2174,6 @@ app.get('/api/admin/requests/:requestId', requireAdmin, async (req, res) => {
                         currentVariantTitle = originalVariant?.title || '';
                     }
 
-                    // Usar nombre del payload si existe
                     const productName = item.name || 'Producto';
 
                     return {
@@ -2163,7 +2212,6 @@ app.post('/api/admin/requests/:requestId/complete', requireAdmin, async (req, re
 
         const requestId = req.params.requestId;
 
-        // Obtener info del cliente para enviar email
         const [rows] = await executeQuery(
             `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
@@ -2176,7 +2224,6 @@ app.post('/api/admin/requests/:requestId/complete', requireAdmin, async (req, re
             [requestId]
         );
 
-        // Enviar email de finalización (async, no esperar)
         sendCompletionEmail(contactEmail, customerName, requestId);
 
         res.json({ success: true, message: 'Solicitud marcada como completada' });
@@ -2195,7 +2242,6 @@ app.post('/api/admin/requests/:requestId/refund-status', requireAdmin, async (re
         const requestId = req.params.requestId;
         const { status } = req.body;
 
-        // Obtener solicitud actual para validar tipo
         const [rows] = await executeQuery(
             `SELECT return_type FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
@@ -2207,7 +2253,6 @@ app.post('/api/admin/requests/:requestId/refund-status', requireAdmin, async (re
 
         const returnType = rows[0].return_type || 'reembolso';
         
-        // Para reembolsos: solo permitir 'pending_receipt'
         if (returnType === 'reembolso' && status !== 'pending_receipt') {
             return res.status(400).json({
                 success: false,
@@ -2215,7 +2260,6 @@ app.post('/api/admin/requests/:requestId/refund-status', requireAdmin, async (re
             });
         }
 
-        // Para cambios: permitir ambos estados
         if (returnType === 'cambio' && !['pending_receipt', 'pending_shipment'].includes(status)) {
             return res.status(400).json({
                 success: false,
@@ -2253,7 +2297,6 @@ app.post('/api/admin/requests/:requestId/decision', requireAdmin, async (req, re
             return res.status(400).json({ success: false, message: 'Estado inválido' });
         }
 
-        // Obtener info del cliente para enviar email
         const [rows] = await executeQuery(
             `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
@@ -2266,7 +2309,6 @@ app.post('/api/admin/requests/:requestId/decision', requireAdmin, async (req, re
             [status, requestId]
         );
 
-        // Enviar email de decisión (async, no esperar)
         sendDecisionEmail(contactEmail, customerName, requestId, status, rejectionReason);
 
         res.json({ success: true, message: 'Estado actualizado', admin_status: status });
@@ -2288,7 +2330,6 @@ app.post('/api/admin/requests/:requestId/ship-change', requireAdmin, async (req,
             return res.status(400).json({ success: false, message: 'Tracking requerido' });
         }
 
-        // Obtener info del cliente para enviar email
         const [rows] = await executeQuery(
             `SELECT contact_email, customer_name FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
@@ -2301,7 +2342,6 @@ app.post('/api/admin/requests/:requestId/ship-change', requireAdmin, async (req,
             [trackingNumber, new Date().toISOString(), requestId]
         );
 
-        // Enviar email de envío (async, no esperar)
         sendShipmentEmail(contactEmail, customerName, requestId, trackingNumber);
 
         res.json({ success: true, message: 'Cambio enviado', trackingNumber });
@@ -2392,7 +2432,6 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
         }
 
         const requestId = req.params.requestId;
-        // Buscar por order_id en vez de id
         const [rows] = await executeQuery(
             `SELECT * FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
@@ -2417,7 +2456,11 @@ app.post('/api/admin/requests/:requestId/retry-label', requireAdmin, async (req,
 
         const now = new Date().toISOString();
         await executeQuery(
-            `UPDATE returns_requests SET carrier = 'MYESHIP', tracking_number = ?, label_base64 = ?, label_mime = ?, label_created_at = ? WHERE order_id = ?`,
+            `UPDATE returns_requests
+             SET carrier = 'MYESHIP', tracking_number = ?,
+                 label_base64 = ?, label_mime = ?, label_created_at = ?,
+                 label_error = NULL
+             WHERE order_id = ?`,
             [label.trackingNumber, label.labelBase64, label.labelMime, now, requestId]
         );
 
@@ -2519,7 +2562,6 @@ app.post('/api/admin/migrate-enrich-items', requireAdmin, async (req, res) => {
 
                 if (!Array.isArray(items) || items.length === 0) continue;
 
-                // Obtener orden de Shopify
                 let order = await shopifyClient.getOrderById(request.order_id);
                 if (!order) {
                     const rawOrderId = String(request.order_id || '').trim();
@@ -2527,17 +2569,14 @@ app.post('/api/admin/migrate-enrich-items', requireAdmin, async (req, res) => {
                     order = await shopifyClient.getOrder(orderName) || await shopifyClient.getOrder(rawOrderId);
                 }
 
-                // Enriquecer items
                 const enrichedItems = await Promise.all(
                     items.map(async (item) => {
-                        // Si ya tiene nombre completo, no hacer nada
                         if (item.name && item.name !== 'Producto') {
                             return item;
                         }
 
                         let enriched = { ...item };
 
-                        // Buscar en order line_items
                         if (order && Array.isArray(order.line_items)) {
                             const line = order.line_items.find(li => 
                                 String(li.variant_id) === String(item.variantId || item.id)
@@ -2550,7 +2589,6 @@ app.post('/api/admin/migrate-enrich-items', requireAdmin, async (req, res) => {
                             }
                         }
 
-                        // Enriquecer replacement si existe
                         if (item.replacementVariantId && !item.replacementTitle) {
                             const replacementVariant = await getVariant(item.replacementVariantId);
                             if (replacementVariant) {
@@ -2558,7 +2596,6 @@ app.post('/api/admin/migrate-enrich-items', requireAdmin, async (req, res) => {
                             }
                         }
 
-                        // Enriquecer current variant title si falta
                         if (!enriched.current_variant_title && (item.variantId || item.id)) {
                             const originalVariant = await getVariant(item.variantId || item.id);
                             if (originalVariant) {
@@ -2570,7 +2607,6 @@ app.post('/api/admin/migrate-enrich-items', requireAdmin, async (req, res) => {
                     })
                 );
 
-                // Actualizar en BD
                 await executeQuery(
                     `UPDATE returns_requests SET items_json = ? WHERE order_id = ?`,
                     [JSON.stringify(enrichedItems), request.order_id]
@@ -2606,7 +2642,9 @@ app.get('/api/label/:requestId', async (req, res) => {
 
         const { requestId } = req.params;
         const [rows] = await executeQuery(
-            `SELECT carrier, tracking_number, label_base64, label_mime FROM returns_requests WHERE order_id = ? LIMIT 1`,
+            `SELECT carrier, tracking_number, label_base64, label_mime,
+                    label_retries, label_last_attempt, label_error
+             FROM returns_requests WHERE order_id = ? LIMIT 1`,
             [requestId]
         );
 
@@ -2616,7 +2654,12 @@ app.get('/api/label/:requestId', async (req, res) => {
 
         const row = rows[0];
         if (!row.tracking_number) {
-            return res.status(404).json({ success: false, message: 'Guía aún no disponible' });
+            return res.status(404).json({
+                success: false,
+                message: 'Guía aún no disponible',
+                labelRetries: row.label_retries || 0,
+                labelError: row.label_error || null
+            });
         }
 
         if (!row.label_base64) {
@@ -2685,10 +2728,9 @@ app.use((err, req, res, next) => {
     return next(err);
 });
 
-// --- 4. INICIAR SERVIDOR ---
+// --- INICIAR SERVIDOR ---
 async function startServer() {
     try {
-        // Esperar a que se inicialice la BD
         if (!dbDisabled) {
             await initDb();
             console.log('✅ Inicialización de BD completada');
@@ -2698,6 +2740,8 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log(`--------------------------------------------------`);
             console.log(`🚀 Servidor MON|BLEU listo en http://localhost:${PORT}`);
+            console.log(`   Retry de guías: hasta ${LABEL_MAX_RETRIES} intentos`);
+            console.log(`   Delays: ${LABEL_RETRY_DELAYS.map(d => d/1000 + 's').join(' → ')}`);
             console.log(`--------------------------------------------------`);
         });
     } catch (err) {
