@@ -1296,9 +1296,15 @@ function sleep(ms) {
 /**
  * Intenta generar la guía MyeShip una sola vez.
  * Devuelve el objeto `label` con trackingNumber si tuvo éxito, o null si falló.
+ *
+ * IMPORTANTE: Usa resolveOrderForLabel() en lugar de getOrderByInput() para que
+ * los IDs numéricos de Shopify (ej: 7586310029599) se busquen por getOrderById()
+ * primero y no fallen al buscarlos como "nombre" de orden.
  */
 async function attemptLabelGeneration(requestId, finalOrderId) {
-    const order = await shopifyClient.getOrderByInput(finalOrderId);
+    // resolveOrderForLabel prioriza getOrderById() para IDs numéricos,
+    // con fallback a getOrder() por nombre y corrección automática en BD.
+    const order = await resolveOrderForLabel(finalOrderId);
 
     if (!order) {
         throw new Error(`Orden no encontrada en Shopify: "${finalOrderId}"`);
@@ -1308,10 +1314,11 @@ async function attemptLabelGeneration(requestId, finalOrderId) {
         throw new Error(`Orden #${order.order_number} sin dirección de envío todavía`);
     }
 
-    // Si el order_id guardado difiere del ID real, corregir en BD
+    // resolveOrderForLabel ya corrige el order_id en BD si difiere, pero
+    // hacemos una doble verificación por seguridad.
     if (finalOrderId !== String(order.id)) {
         try {
-            console.log(`🔄 Corrigiendo order_id en BD: "${finalOrderId}" → "${order.id}"`);
+            console.log(`🔄 [attemptLabelGeneration] Corrigiendo order_id en BD: "${finalOrderId}" → "${order.id}"`);
             await executeQuery(
                 `UPDATE returns_requests SET order_id = ? WHERE order_id = ?`,
                 [String(order.id), finalOrderId]
