@@ -5,7 +5,10 @@ class ShopifyClient {
   constructor() {
     this.token = process.env.SHOPIFY_ACCESS_TOKEN || '';
     this.shop = (process.env.SHOP_DOMAIN || process.env.SHOPIFY_SHOP || '').replace('.myshopify.com', '');
-
+    
+console.log('🔑 TOKEN:', this.token ? `presente (${this.token.substring(0, 10)}...)` : 'AUSENTE ❌');
+  console.log('🏪 SHOP:', this.shop || 'AUSENTE ❌');
+    
     if (!this.token || !this.shop) {
       console.warn('⚠️ Shopify no configurado. Define SHOPIFY_ACCESS_TOKEN y SHOP_DOMAIN en las variables de entorno.');
     }
