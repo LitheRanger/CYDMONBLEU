@@ -24,39 +24,37 @@ class ShopifyTokenManager {
     return await this.refreshToken();
   }
 
-  async refreshToken() {
-    try {
-      console.log("🔄 Refrescando token de Shopify...");
-      const response = await fetch(
-        `https://${this.shop}.myshopify.com/admin/oauth/access_token`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
-            grant_type: 'client_credentials'
-          })
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Error Auth Shopify: ${response.statusText}`);
+ async refreshToken() {
+  try {
+    console.log("🔄 Refrescando token de Shopify...");
+    const response = await fetch(
+      `https://${this.shop}.myshopify.com/admin/oauth/access_token`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // ← CAMBIO
+        body: new URLSearchParams({                                         // ← CAMBIO
+          grant_type: 'client_credentials',
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+        })
       }
+    );
 
-      const data = await response.json();
-      this.token = data.access_token;
-      
-      // Guardamos cuándo expira (restamos 5 min de buffer)
-      this.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
-      
-      console.log("✅ Token Shopify actualizado");
-      return this.token;
-    } catch (error) {
-      console.error("❌ Error obteniendo token:", error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`Error Auth Shopify: ${response.status} ${response.statusText}`);
     }
+
+    const data = await response.json();
+    this.token = data.access_token;
+    this.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
+
+    console.log("✅ Token Shopify actualizado");
+    return this.token;
+  } catch (error) {
+    console.error("❌ Error obteniendo token:", error);
+    throw error;
   }
+}
 
   async makeRequest(endpoint, options = {}) {
     const timeoutMs = Number(process.env.SHOPIFY_TIMEOUT_MS || 10000);
