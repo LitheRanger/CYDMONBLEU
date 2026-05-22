@@ -45,6 +45,7 @@ class ShopifyTokenManager {
     }
 
     const data = await response.json();
+    console.log("🔑 Scopes otorgados:", data.scope);
     this.token = data.access_token;
     this.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
 
