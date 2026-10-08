@@ -9,6 +9,9 @@ const MYESHIP_BASE_URL = MYESHIP_ENV === 'production'
 const MYESHIP_API_KEY = process.env.MYESHIP_API_KEY;
 const MYESHIP_TIMEOUT_MS = Number(process.env.MYESHIP_TIMEOUT_MS || 30000);
 
+// Máximo de tarifas (paqueterías/servicios) a intentar antes de rendirse
+const MYESHIP_MAX_RATE_ATTEMPTS = Number(process.env.MYESHIP_MAX_RATE_ATTEMPTS || 5);
+
 const http = axios.create({ timeout: MYESHIP_TIMEOUT_MS });
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -24,7 +27,7 @@ async function requestWithRetry(fn, retries = 3) {
       const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout');
       const retryable = status === 429 || status >= 500 || isTimeout;
       if (!retryable || i === retries) break;
-      const delay = 1000 * (i + 1) + Math.random() * 500; // Exponential backoff with jitter
+      const delay = 1000 * (i + 1) + Math.random() * 500; // Backoff con jitter
       console.log(`⏳ Retry ${i + 1}/${retries} after ${Math.round(delay)}ms...`);
       await sleep(delay);
     }
@@ -81,7 +84,8 @@ function getMissingConfigFields() {
 }
 
 /**
- * Helper para hacer llamadas a la API de MyeShip
+ * Helper para hacer llamadas a la API de MyeShip.
+ * Solo registra el cuerpo de la respuesta, nunca headers (para no filtrar la API key).
  */
 async function apiCall(method, endpoint, data = null) {
   try {
@@ -107,6 +111,15 @@ async function apiCall(method, endpoint, data = null) {
 }
 
 /**
+ * Normaliza teléfono mexicano a 10 dígitos (FedEx/DHL rechazan +52, espacios, guiones)
+ */
+function normalizePhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length > 10) return digits.slice(-10);
+  return digits;
+}
+
+/**
  * Normaliza direcciones al formato esperado por MyeShip
  */
 function parseAddress(address) {
@@ -114,15 +127,13 @@ function parseAddress(address) {
     throw new Error('Address is required');
   }
 
-  // Shopify format: address1, address2, city, province_code/province, zip, country_code/country
   const street1 = address.address1 || '';
   const street2 = address.address2 || '';
   const city = address.city || '';
   const state = address.province_code || address.province || 'N/A';
-  const zip = address.zip || '';
+  const zip = String(address.zip || '').replace(/\D/g, '');
   const country = address.country_code || address.country || 'MX';
 
-  // Ensure country is 2-letter code
   const countryCode = country.length > 2 ? country.substring(0, 2).toUpperCase() : country.toUpperCase();
 
   return {
@@ -130,7 +141,7 @@ function parseAddress(address) {
     street2: street2.substring(0, 35),
     city: city.substring(0, 35),
     state: state.substring(0, 35),
-    zip: zip.substring(0, 35),
+    zip: zip.substring(0, 10),
     country: countryCode
   };
 }
@@ -139,7 +150,6 @@ function parseAddress(address) {
  * Construye el payload para crear una cotización (paso 1)
  */
 function buildQuotationPayload({ order, requestId }) {
-  // Preferimos la direccion de envio original de la orden para el remitente
   const shipping = order?.shipping_address || order?.billing_address || null;
 
   if (!shipping) {
@@ -147,7 +157,7 @@ function buildQuotationPayload({ order, requestId }) {
   }
 
   const shipperName = `${shipping.first_name || ''} ${shipping.last_name || ''}`.trim() || 'Customer';
-  const shipperPhone = shipping.phone || process.env.DEFAULT_CUSTOMER_PHONE || '0000000000';
+  const shipperPhone = normalizePhone(shipping.phone || order?.phone || process.env.DEFAULT_CUSTOMER_PHONE) || '0000000000';
   const shipperEmail = order?.email || order?.customer?.email || 'noreply@example.com';
 
   const shipperAddress = parseAddress(shipping);
@@ -162,16 +172,9 @@ function buildQuotationPayload({ order, requestId }) {
 
   console.log('📍 MyeShip remitente (cliente que devuelve):', {
     name: shipperName,
-    phone: shipperPhone,
-    email: shipperEmail,
-    address: shipperAddress
-  });
-  console.log('📦 MyeShip destino (almacén de retorno):', {
-    name: RETURN_CONTACT_NAME,
-    company: RETURN_COMPANY_NAME,
-    phone: RETURN_PHONE,
-    email: process.env.RETURN_EMAIL || 'noreply@monbleu.com',
-    address: returnAddress
+    zip: shipperAddress.zip,
+    city: shipperAddress.city,
+    state: shipperAddress.state
   });
 
   return {
@@ -196,7 +199,7 @@ function buildQuotationPayload({ order, requestId }) {
       state: returnAddress.state,
       zip: returnAddress.zip,
       country: returnAddress.country,
-      phone: RETURN_PHONE,
+      phone: normalizePhone(RETURN_PHONE),
       email: process.env.RETURN_EMAIL || 'noreply@monbleu.com'
     },
     parcels: [
@@ -224,7 +227,7 @@ function buildQuotationPayload({ order, requestId }) {
  */
 async function getQuotation(payload) {
   const response = await apiCall('POST', '/quotation', payload);
-  
+
   if (!response || !response.rates) {
     throw new Error('Invalid quotation response from MyeShip');
   }
@@ -232,45 +235,75 @@ async function getQuotation(payload) {
   return response;
 }
 
+const providerOf = (rate) => String(rate?.provider || '').toLowerCase();
+const serviceOf = (rate) => String(rate?.servicelevel?.name || '').toLowerCase();
+const amountOf = (rate) => {
+  const n = parseFloat(rate?.amount);
+  return Number.isFinite(n) ? n : Number.MAX_VALUE;
+};
+
 /**
- * Selecciona la tarifa más barata o la primera disponible
+ * Ordena las tarifas en orden de preferencia (la primera es la que se intenta primero).
+ * Mantiene la misma prioridad que antes:
+ *   1. FedEx Express Saver
+ *   2. Proveedor preferido (MYESHIP_PREFERRED_PROVIDER)
+ *   3. Más barata (si MYESHIP_AUTO_SELECT_CHEAPEST) o BESTVALUE
+ *   4. El resto, de la más barata a la más cara (fallback)
  */
-function selectRate(quotation) {
-  if (!quotation.rates || quotation.rates.length === 0) {
+function rankRates(quotation) {
+  const rates = Array.isArray(quotation?.rates) ? quotation.rates.filter(r => r && r.rate_id) : [];
+  if (rates.length === 0) {
     throw new Error('No shipping rates available');
   }
 
-  // Siempre elegir FedEx Express Saver si está disponible
-  const expressSaver = quotation.rates.find(r =>
-    (r.provider || '').toLowerCase().includes('fedex') &&
-    r.servicelevel && r.servicelevel.name && r.servicelevel.name.toLowerCase() === 'express saver'
-  );
-  if (expressSaver) {
-    console.log('✅ MyeShip: Usando FedEx Express Saver');
-    return expressSaver;
-  }
+  const byPrice = [...rates].sort((a, b) => amountOf(a) - amountOf(b));
+  const ranked = [];
+  const push = (rate) => {
+    if (rate && !ranked.includes(rate)) ranked.push(rate);
+  };
 
-  // Si no está disponible, seguir lógica anterior
+  push(rates.find(r => providerOf(r).includes('fedex') && serviceOf(r) === 'express saver'));
+
   if (MYESHIP_PREFERRED_PROVIDER) {
-    const preferred = quotation.rates.find(r => 
-      (r.provider || '').toLowerCase().includes(MYESHIP_PREFERRED_PROVIDER)
-    );
-    if (preferred) {
-      console.log(`✅ MyeShip: Using preferred provider: ${preferred.provider}`);
-      return preferred;
-    }
-    console.log(`⚠️ MyeShip: Preferred provider '${MYESHIP_PREFERRED_PROVIDER}' not available, using fallback`);
+    push(byPrice.find(r => providerOf(r).includes(MYESHIP_PREFERRED_PROVIDER)));
   }
 
   if (MYESHIP_AUTO_SELECT_CHEAPEST) {
-    const cheapest = quotation.rates.reduce((prev, current) => {
-      return parseFloat(current.amount) < parseFloat(prev.amount) ? current : prev;
-    });
-    return cheapest;
+    push(byPrice[0]);
+  } else {
+    push(rates.find(r => Array.isArray(r.tags) && r.tags.includes('BESTVALUE')));
   }
 
-  const bestValue = quotation.rates.find(r => r.tags && r.tags.includes('BESTVALUE'));
-  return bestValue || quotation.rates[0];
+  byPrice.forEach(push);
+  return ranked;
+}
+
+/**
+ * Extrae los mensajes de error de la paquetería de un error de axios
+ */
+function carrierErrorText(error) {
+  const data = error?.response?.data;
+  const msgs = Array.isArray(data?.messages) ? data.messages.map(m => m?.text).filter(Boolean) : [];
+  return [data?.message, ...msgs].filter(Boolean).join(' | ') || error?.message || String(error);
+}
+
+/**
+ * ¿El error es de la paquetería (cobertura, servicio, datos que ella rechaza)
+ * y vale la pena intentar con otra tarifa?
+ * No hace fallback ante errores de autenticación, de red o de MyeShip en general.
+ */
+function isCarrierRejection(error) {
+  const status = error?.response?.status || 0;
+  if (status !== 400 && status !== 422) return false;
+  const text = carrierErrorText(error);
+  return /responded with error|ZIPCODE|NOTAVAILABLE|cobertura|coverage|not available|no disponible/i.test(text);
+}
+
+/**
+ * Si el rechazo es por cobertura del CP, todos los servicios de esa paquetería van a fallar igual.
+ */
+function isCoverageRejection(error) {
+  return /ZIPCODE|NOTAVAILABLE|cobertura|coverage/i.test(carrierErrorText(error));
 }
 
 /**
@@ -283,7 +316,8 @@ async function createShipment(rateId, labelFormat = 'PDF') {
   });
 
   if (response.status !== 'SUCCESS') {
-    throw new Error(`Shipment creation failed: ${response.status}`);
+    const msgs = Array.isArray(response?.messages) ? response.messages.map(m => m?.text).filter(Boolean) : [];
+    throw new Error(`Shipment creation failed: ${response.status}${msgs.length ? ' - ' + msgs.join(' | ') : ''}`);
   }
 
   return response;
@@ -297,9 +331,8 @@ async function downloadLabelBase64(labelUrl) {
     const response = await http.get(labelUrl, {
       responseType: 'arraybuffer'
     });
-    
-    const base64 = Buffer.from(response.data).toString('base64');
-    return base64;
+
+    return Buffer.from(response.data).toString('base64');
   } catch (error) {
     console.error('Error downloading label:', error.message);
     throw error;
@@ -307,67 +340,104 @@ async function downloadLabelBase64(labelUrl) {
 }
 
 /**
- * Función principal: Crea una guía de retorno
- * Retorna: { trackingNumber, labelBase64, labelMime }
+ * Función principal: Crea una guía de retorno.
+ * Intenta las tarifas en orden de preferencia; si una paquetería rechaza
+ * (p. ej. CP sin cobertura), pasa automáticamente a la siguiente.
+ * Retorna: { trackingNumber, labelBase64, labelMime, provider, serviceName, attempts }
  */
-async function createReturnLabel({ order, requestId }) {
+async function createReturnLabel({ order, requestId, orderId }) {
   if (!isConfigured()) {
     throw new Error('MyeShip not configured: missing environment variables');
   }
 
-  try {
-    console.log(`📋 MyeShip: Creating return label for request ${requestId}...`);
+  const reference = requestId || orderId;
+  console.log(`📋 MyeShip: Creating return label for request ${reference}...`);
 
-    // Paso 1: Crear cotización
-    const quotationPayload = buildQuotationPayload({ order, requestId });
-    const quotation = await getQuotation(quotationPayload);
+  // Paso 1: Cotizar (siempre fresco, así los rate_id nunca están vencidos)
+  const quotationPayload = buildQuotationPayload({ order, requestId: reference });
+  const quotation = await getQuotation(quotationPayload);
+  const ranked = rankRates(quotation);
 
-    console.log(`✅ MyeShip: Got ${quotation.rates.length} available rates`);
+  console.log(`✅ MyeShip: ${quotation.rates.length} tarifas. Orden de intento: ${ranked
+    .slice(0, MYESHIP_MAX_RATE_ATTEMPTS)
+    .map(r => `${r.provider} ${r.servicelevel?.name || ''} $${r.amount}`)
+    .join(' → ')}`);
 
-    // Paso 2: Seleccionar tarifa
-    const selectedRate = selectRate(quotation);
-    console.log(`📦 MyeShip: Tarifa seleccionada - ${selectedRate.provider} (${selectedRate.servicelevel.name}) - $${selectedRate.amount} ${selectedRate.currency}`);
-    
-    // Mostrar detalles de origen/destino de la tarifa
-    if (selectedRate.origin_address) {
-      console.log('📫 MyeShip: Origen (remitente) de la tarifa:', selectedRate.origin_address);
-    }
-    if (selectedRate.destination_address) {
-      console.log('📬 MyeShip: Destino de la tarifa:', selectedRate.destination_address);
-    }
+  // Paso 2: Intentar crear la guía con cada tarifa hasta que una funcione
+  const failures = [];
+  const blockedProviders = new Set();
+  let attempts = 0;
 
-    // Paso 3: Crear envío y generar guía
-    const shipment = await createShipment(selectedRate.rate_id, 'PDF');
+  for (const rate of ranked) {
+    if (attempts >= MYESHIP_MAX_RATE_ATTEMPTS) break;
+    if (blockedProviders.has(providerOf(rate))) continue;
+    attempts++;
 
-    if (!shipment.tracking_number) {
-      throw new Error('No tracking number received from MyeShip');
-    }
+    const label = `${rate.provider} (${rate.servicelevel?.name || 'N/A'}) $${rate.amount} ${rate.currency || ''}`.trim();
+    console.log(`📦 MyeShip [${attempts}/${MYESHIP_MAX_RATE_ATTEMPTS}]: Intentando ${label}`);
 
-    console.log(`✅ MyeShip: Tracking number generated: ${shipment.tracking_number}`);
+    try {
+      const shipment = await createShipment(rate.rate_id, 'PDF');
 
-    // Paso 4: Descargar guía en Base64
-    let labelBase64 = null;
-    if (shipment.label_url) {
-      try {
-        labelBase64 = await downloadLabelBase64(shipment.label_url);
-        console.log(`✅ MyeShip: Label downloaded (${labelBase64.length} bytes)`);
-      } catch (downloadErr) {
-        console.warn('⚠️ MyeShip: Could not download label, but tracking was generated');
-        // No fallar si no se puede descargar la guía - el tracking es lo importante
+      if (!shipment.tracking_number) {
+        throw new Error('No tracking number received from MyeShip');
+      }
+
+      console.log(`✅ MyeShip: Guía generada con ${label}: ${shipment.tracking_number}`);
+
+      let labelBase64 = null;
+      if (shipment.label_url) {
+        try {
+          labelBase64 = await downloadLabelBase64(shipment.label_url);
+          console.log(`✅ MyeShip: Label downloaded (${labelBase64.length} bytes)`);
+        } catch (downloadErr) {
+          console.warn('⚠️ MyeShip: Could not download label, but tracking was generated');
+        }
+      }
+
+      if (failures.length) {
+        console.log(`ℹ️ MyeShip: Se usó fallback tras ${failures.length} rechazo(s): ${failures.map(f => f.provider).join(', ')}`);
+      }
+
+      return {
+        trackingNumber: shipment.tracking_number,
+        labelBase64,
+        labelMime: 'application/pdf',
+        provider: rate.provider,
+        serviceName: rate.servicelevel?.name,
+        attempts
+      };
+    } catch (error) {
+      if (!isCarrierRejection(error)) {
+        // Error de auth, red o de MyeShip: no tiene caso probar otra paquetería
+        console.error('❌ MyeShip Error:', carrierErrorText(error));
+        throw error;
+      }
+
+      const reason = carrierErrorText(error);
+      failures.push({ provider: rate.provider, service: rate.servicelevel?.name, reason });
+      console.warn(`⚠️ MyeShip: ${label} rechazada → ${reason}`);
+
+      if (isCoverageRejection(error)) {
+        blockedProviders.add(providerOf(rate));
       }
     }
-
-    return {
-      trackingNumber: shipment.tracking_number,
-      labelBase64: labelBase64,
-      labelMime: 'application/pdf',
-      provider: selectedRate.provider,
-      serviceName: selectedRate.servicelevel.name
-    };
-  } catch (error) {
-    console.error('❌ MyeShip Error:', error.message);
-    throw error;
   }
+
+  // Ninguna tarifa funcionó: error con el detalle de cada paquetería
+  const summary = failures.map(f => `${f.provider} ${f.service || ''}: ${f.reason}`).join(' || ');
+  const err = new Error(`Ninguna paquetería pudo generar la guía. ${summary}`);
+  err.response = {
+    status: 422,
+    data: {
+      message: 'Ninguna paquetería pudo generar la guía',
+      messages: failures.map(f => ({ source: f.provider, text: `${f.provider}: ${f.reason}` })),
+      status: 'ERROR'
+    }
+  };
+  err.failures = failures;
+  console.error('❌ MyeShip:', err.message);
+  throw err;
 }
 
 /**
